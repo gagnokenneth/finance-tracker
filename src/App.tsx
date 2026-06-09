@@ -4,7 +4,11 @@ import { AuthProvider } from './auth/AuthContext.tsx'
 import { useAuth } from './auth/useAuth.ts'
 import { AppShell } from './components/AppShell.tsx'
 import { Dashboard } from './pages/Dashboard.tsx'
-import { Placeholder } from './pages/Placeholder.tsx'
+import { Funds } from './pages/Funds.tsx'
+import { Bills } from './pages/Bills.tsx'
+import { Expendable } from './pages/Expendable.tsx'
+import { Debts } from './pages/Debts.tsx'
+import { Savings } from './pages/Savings.tsx'
 import { SignIn } from './pages/SignIn.tsx'
 
 const queryClient = new QueryClient()
@@ -16,11 +20,11 @@ function AuthedApp() {
     <Routes>
       <Route element={<AppShell />}>
         <Route index element={<Dashboard />} />
-        <Route path="funds" element={<Placeholder name="Funds" />} />
-        <Route path="bills" element={<Placeholder name="Bills" />} />
-        <Route path="expendable" element={<Placeholder name="Expendable" />} />
-        <Route path="debts" element={<Placeholder name="Debts" />} />
-        <Route path="savings" element={<Placeholder name="Savings" />} />
+        <Route path="funds" element={<Funds />} />
+        <Route path="bills" element={<Bills />} />
+        <Route path="expendable" element={<Expendable />} />
+        <Route path="debts" element={<Debts />} />
+        <Route path="savings" element={<Savings />} />
       </Route>
     </Routes>
   )
