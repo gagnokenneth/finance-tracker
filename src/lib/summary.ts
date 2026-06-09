@@ -28,8 +28,18 @@ export function computeSummary(data: FinanceData, month: string): Summary {
   const savingsTotal =
     sum(data.savings.map((s) => s.amount)) -
     sum(data.savings_transfers.map((t) => t.amount))
+  // Funds entries created by a savings transfer-back are recorded for history
+  // but must NOT re-credit the balance — the reduced savingsTotal already does.
+  const savingsReturnedToFunds = sum(
+    data.funds.filter((f) => f.source === 'Savings').map((f) => f.amount),
+  )
   const remainingBalance =
-    totalFunds - billsPaid - monthlyExpendable - debtPayments - savingsTotal
+    totalFunds -
+    savingsReturnedToFunds -
+    billsPaid -
+    monthlyExpendable -
+    debtPayments -
+    savingsTotal
 
   return {
     totalFunds,
