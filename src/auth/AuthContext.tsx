@@ -24,7 +24,15 @@ const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? ''
 const STUB_USER: AuthUser = { email: 'ken.gagno@vibeteams.ai', name: 'Ken' }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(null)
+  // Restore a still-valid token during init (pure) — never setState in the effect.
+  const [user, setUser] = useState<AuthUser | null>(() => {
+    if (!LIVE) return null
+    const existing = getToken()
+    if (!existing) return null
+    const p = decodeJwt(existing)
+    if (p && p.exp * 1000 > Date.now()) return { email: p.email, name: p.name }
+    return null
+  })
   const buttonElRef = useRef<HTMLElement | null>(null)
   const initialized = useRef(false)
 
@@ -52,12 +60,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  // Live mode: restore existing token, load GIS, listen for expiry.
+  // Live mode: load GIS, listen for expiry. (Token restore happens in useState init.)
   useEffect(() => {
     if (!LIVE) return
-
-    const existing = getToken()
-    if (existing) adoptToken(existing)
 
     const onExpired = () => setUser(null)
     window.addEventListener(AUTH_EXPIRED_EVENT, onExpired)
