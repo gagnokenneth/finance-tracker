@@ -1,12 +1,14 @@
 # Finance Tracker — Foundation Implementation Plan (Plan 1 of 3)
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+>
+> **No automated tests:** Per project preference, this plan creates NO test files. Verify each task with `npx tsc -b`, `npm run build`, and the manual smoke check at the end.
 
-**Goal:** Stand up a working finance app running on seeded mock data, with Tailwind styling, tab navigation, a unit-tested summary engine, and a real Dashboard — module screens come in Plan 2, the live backend in Plan 3.
+**Goal:** Stand up a working finance app running on seeded mock data, with Tailwind styling, tab navigation, a summary engine, and a real Dashboard — module screens come in Plan 2, the live backend in Plan 3.
 
 **Architecture:** React + Vite + TS frontend. All server state flows through a single `FinanceApi` interface; this plan implements the `MockApi` adapter (seeded localStorage). A pure `computeSummary` function derives all dashboard numbers. TanStack Query owns fetching/caching; React Router provides a top tab bar. Auth is a stub here (real Google Sign-In is Plan 3).
 
-**Tech Stack:** React 19, TypeScript 6 (`verbatimModuleSyntax` → use `import type`; imports include `.ts`/`.tsx` extensions), Vite 8, Tailwind CSS v4 (`@tailwindcss/vite`, no config file), `react-router-dom`, `@tanstack/react-query`, Vitest + React Testing Library + jsdom.
+**Tech Stack:** React 19, TypeScript 6 (`verbatimModuleSyntax` → use `import type`; imports include `.ts`/`.tsx` extensions), Vite 8, Tailwind CSS v4 (`@tailwindcss/vite`, no config file), `react-router-dom`, `@tanstack/react-query`.
 
 Reference spec: `docs/superpowers/specs/2026-06-09-personal-finance-tracker-design.md`
 
@@ -19,17 +21,14 @@ src/
   types.ts                     # domain types + FinanceData aggregate
   lib/
     money.ts                   # currency formatting
-    money.test.ts
     summary.ts                 # computeSummary (pure)
-    summary.test.ts
-    currentMonth.ts            # current-month helper (injectable clock)
+    currentMonth.ts            # current-month helper
   api/
     FinanceApi.ts              # the interface + DTO types
     index.ts                   # adapter selector (VITE_API_MODE)
     mock/
       seed.ts                  # initial seed dataset
       MockApi.ts               # localStorage-backed implementation
-      MockApi.test.ts
   auth/
     AuthContext.tsx            # auth state (stubbed sign-in)
     useAuth.ts
@@ -39,18 +38,17 @@ src/
     Money.tsx                  # formatted money span
   pages/
     Dashboard.tsx              # real summary dashboard
-    Dashboard.test.tsx
     Placeholder.tsx            # "coming in Plan 2" stub for module routes
+    SignIn.tsx                 # sign-in gate
   hooks/
     useFinanceData.ts          # TanStack Query hook over the API
   App.tsx                      # providers + router
   main.tsx                     # entry (Tailwind import)
   index.css                    # ONLY Tailwind entry: @import "tailwindcss";
-  test/
-    setup.ts                   # RTL/jsdom setup
+  env.d.ts                     # env var typing
 ```
 
-Removed: `src/App.css`, the custom styles in `src/index.css`, demo assets, the demo `App.tsx` body.
+Removed: `src/App.css`, the custom styles in `src/index.css`, the demo `App.tsx` body.
 
 ---
 
@@ -60,13 +58,12 @@ Removed: `src/App.css`, the custom styles in `src/index.css`, demo assets, the d
 - Modify: `package.json` (via npm)
 - Modify: `vite.config.ts`
 - Modify: `src/index.css`
-- Modify: `src/main.tsx`
 
 - [ ] **Step 1: Install runtime + dev dependencies**
 
 ```bash
 npm install react-router-dom @tanstack/react-query
-npm install -D tailwindcss @tailwindcss/vite vitest @vitest/ui jsdom @testing-library/react @testing-library/jest-dom @testing-library/user-event
+npm install -D tailwindcss @tailwindcss/vite
 ```
 
 - [ ] **Step 2: Add the Tailwind Vite plugin**
@@ -103,67 +100,16 @@ Overwrite `src/index.css` with exactly:
 git rm src/App.css
 ```
 
-- [ ] **Step 5: Configure Vitest**
-
-Add a `test` block to `vite.config.ts` (Vitest reads Vite config). Final file:
-
-```ts
-import { defineConfig } from 'vite'
-import react, { reactCompilerPreset } from '@vitejs/plugin-react'
-import babel from '@rolldown/plugin-babel'
-import tailwindcss from '@tailwindcss/vite'
-
-// https://vite.dev/config/
-export default defineConfig({
-  plugins: [
-    react(),
-    babel({ presets: [reactCompilerPreset()] }),
-    tailwindcss(),
-  ],
-  test: {
-    globals: true,
-    environment: 'jsdom',
-    setupFiles: ['./src/test/setup.ts'],
-  },
-})
-```
-
-Vitest's `test` key needs its types. Add the triple-slash ref at the very top of `vite.config.ts`:
-
-```ts
-/// <reference types="vitest/config" />
-```
-
-- [ ] **Step 6: Create the test setup file**
-
-Create `src/test/setup.ts`:
-
-```ts
-import '@testing-library/jest-dom/vitest'
-```
-
-- [ ] **Step 7: Add test scripts to package.json**
-
-In `package.json` `scripts`, add:
-
-```json
-"test": "vitest run",
-"test:watch": "vitest"
-```
-
-- [ ] **Step 8: Verify install + dev server boots**
-
-Run: `npm run test`
-Expected: exits 0 with "No test files found" (no tests yet — that is fine).
+- [ ] **Step 5: Verify install + typecheck**
 
 Run: `npx tsc -b`
 Expected: no type errors.
 
-- [ ] **Step 9: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add -A
-git commit -m "chore: add Tailwind v4, router, query, and Vitest"
+git commit -m "chore: add Tailwind v4, router, and query deps"
 ```
 
 ---
@@ -277,38 +223,8 @@ git commit -m "feat: add domain types"
 
 **Files:**
 - Create: `src/lib/money.ts`
-- Test: `src/lib/money.test.ts`
 
-- [ ] **Step 1: Write the failing test**
-
-Create `src/lib/money.test.ts`:
-
-```ts
-import { describe, it, expect } from 'vitest'
-import { formatMoney } from './money.ts'
-
-describe('formatMoney', () => {
-  it('formats whole numbers with two decimals and a symbol', () => {
-    expect(formatMoney(1000)).toBe('$1,000.00')
-  })
-  it('formats decimals', () => {
-    expect(formatMoney(1234.5)).toBe('$1,234.50')
-  })
-  it('formats negatives with a leading minus', () => {
-    expect(formatMoney(-50)).toBe('-$50.00')
-  })
-  it('formats zero', () => {
-    expect(formatMoney(0)).toBe('$0.00')
-  })
-})
-```
-
-- [ ] **Step 2: Run test to verify it fails**
-
-Run: `npm run test -- money`
-Expected: FAIL — cannot find `./money.ts` / `formatMoney` is not a function.
-
-- [ ] **Step 3: Write minimal implementation**
+- [ ] **Step 1: Write the implementation**
 
 Create `src/lib/money.ts`:
 
@@ -318,20 +234,21 @@ const fmt = new Intl.NumberFormat('en-US', {
   currency: 'USD',
 })
 
+/** Formats a number as USD, e.g. 1234.5 -> "$1,234.50", -50 -> "-$50.00". */
 export function formatMoney(amount: number): string {
   return fmt.format(amount)
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [ ] **Step 2: Verify it compiles**
 
-Run: `npm run test -- money`
-Expected: PASS (4 tests).
+Run: `npx tsc -b`
+Expected: no errors.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 3: Commit**
 
 ```bash
-git add src/lib/money.ts src/lib/money.test.ts
+git add src/lib/money.ts
 git commit -m "feat: add money formatting helper"
 ```
 
@@ -342,7 +259,7 @@ git commit -m "feat: add money formatting helper"
 **Files:**
 - Create: `src/lib/currentMonth.ts`
 
-- [ ] **Step 1: Write the helper (injectable date for testability)**
+- [ ] **Step 1: Write the helper**
 
 Create `src/lib/currentMonth.ts`:
 
@@ -373,105 +290,10 @@ git commit -m "feat: add month-key helper"
 
 **Files:**
 - Create: `src/lib/summary.ts`
-- Test: `src/lib/summary.test.ts`
 
-- [ ] **Step 1: Write the failing tests**
+- [ ] **Step 1: Write the implementation**
 
-Create `src/lib/summary.test.ts`:
-
-```ts
-import { describe, it, expect } from 'vitest'
-import { computeSummary } from './summary.ts'
-import type { FinanceData } from '../types.ts'
-
-function emptyData(): FinanceData {
-  return {
-    funds: [],
-    bills: [],
-    expendable: [],
-    debts: [],
-    debt_payments: [],
-    savings: [],
-    savings_transfers: [],
-    settings: { monthlyBudgets: {}, allowedEmails: [] },
-  }
-}
-
-describe('computeSummary', () => {
-  it('returns all zeros for empty data', () => {
-    const s = computeSummary(emptyData(), '2026-06')
-    expect(s.totalFunds).toBe(0)
-    expect(s.totalBills).toBe(0)
-    expect(s.billsPaid).toBe(0)
-    expect(s.monthlyExpendable).toBe(0)
-    expect(s.spentThisMonth).toBe(0)
-    expect(s.remainingExpendable).toBe(0)
-    expect(s.totalDebt).toBe(0)
-    expect(s.savingsTotal).toBe(0)
-    expect(s.remainingBalance).toBe(0)
-  })
-
-  it('computes every metric from the spec worked example', () => {
-    const data = emptyData()
-    data.funds = [
-      { id: 1, source: 'Salary', amount: 5000, date: '2026-06-01' },
-      { id: 2, source: 'Freelance', amount: 1000, date: '2026-06-10' },
-    ]
-    data.bills = [
-      { id: 1, name: 'Rent', amount: 1500, due_date: '2026-06-05', paid: true },
-      { id: 2, name: 'Power', amount: 200, due_date: '2026-06-15', paid: false },
-    ]
-    data.settings.monthlyBudgets = { '2026-06': 900 }
-    data.expendable = [
-      { id: 1, month: '2026-06', daily_amount: 100, date: '2026-06-02' },
-      { id: 2, month: '2026-06', daily_amount: 50, date: '2026-06-03' },
-      { id: 3, month: '2026-05', daily_amount: 999, date: '2026-05-20' }, // other month, ignored
-    ]
-    data.debts = [
-      { id: 1, name: 'Card', total_amount: 2000, remaining: 1200, type: 'straight', interest_rate: 0 },
-    ]
-    data.debt_payments = [
-      { id: 1, debt_id: 1, amount_paid: 800, date: '2026-06-07' },
-    ]
-    data.savings = [
-      { id: 1, date: '2026-06-01', amount: 500, source: 'funds', total: 500 },
-    ]
-    data.savings_transfers = [
-      { id: 1, date: '2026-06-20', amount: 200 },
-    ]
-
-    const s = computeSummary(data, '2026-06')
-
-    expect(s.totalFunds).toBe(6000)
-    expect(s.totalBills).toBe(1700)
-    expect(s.billsPaid).toBe(1500)
-    expect(s.monthlyExpendable).toBe(900)
-    expect(s.spentThisMonth).toBe(150)
-    expect(s.remainingExpendable).toBe(750)
-    expect(s.totalDebt).toBe(1200)
-    expect(s.savingsTotal).toBe(300) // 500 - 200
-    // 6000 - 1500 - 900 - 800 - 300
-    expect(s.remainingBalance).toBe(2500)
-  })
-
-  it('treats a missing monthly budget as zero', () => {
-    const data = emptyData()
-    data.funds = [{ id: 1, source: 'x', amount: 100, date: '2026-06-01' }]
-    const s = computeSummary(data, '2026-06')
-    expect(s.monthlyExpendable).toBe(0)
-    expect(s.remainingBalance).toBe(100)
-  })
-})
-```
-
-- [ ] **Step 2: Run tests to verify they fail**
-
-Run: `npm run test -- summary`
-Expected: FAIL — cannot find `./summary.ts`.
-
-- [ ] **Step 3: Write the implementation**
-
-Create `src/lib/summary.ts`:
+Create `src/lib/summary.ts`. This is the single source of truth for all dashboard math, per the spec formulas (Remaining Balance subtracts Savings Total).
 
 ```ts
 import type { FinanceData } from '../types.ts'
@@ -521,16 +343,19 @@ export function computeSummary(data: FinanceData, month: string): Summary {
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+> Sanity reference (used in the seed and manual smoke check): with the seed data,
+> 6000 funds − 1500 bills paid − 900 budget − 800 debt payment − 300 savings = **2500**.
 
-Run: `npm run test -- summary`
-Expected: PASS (3 tests).
+- [ ] **Step 2: Verify it compiles**
 
-- [ ] **Step 5: Commit**
+Run: `npx tsc -b`
+Expected: no errors.
+
+- [ ] **Step 3: Commit**
 
 ```bash
-git add src/lib/summary.ts src/lib/summary.test.ts
-git commit -m "feat: add unit-tested summary engine"
+git add src/lib/summary.ts
+git commit -m "feat: add summary engine"
 ```
 
 ---
@@ -668,83 +493,8 @@ git commit -m "feat: add mock seed data"
 
 **Files:**
 - Create: `src/api/mock/MockApi.ts`
-- Test: `src/api/mock/MockApi.test.ts`
 
-- [ ] **Step 1: Write the failing tests**
-
-Create `src/api/mock/MockApi.test.ts`:
-
-```ts
-import { describe, it, expect, beforeEach } from 'vitest'
-import { MockApi } from './MockApi.ts'
-
-const KEY = 'finance-mock-db'
-
-describe('MockApi', () => {
-  beforeEach(() => {
-    localStorage.clear()
-  })
-
-  it('seeds on first getAll and persists to localStorage', async () => {
-    const api = new MockApi()
-    const data = await api.getAll()
-    expect(data.funds.length).toBe(2)
-    expect(localStorage.getItem(KEY)).not.toBeNull()
-  })
-
-  it('addFund assigns an incrementing id and persists', async () => {
-    const api = new MockApi()
-    const fund = await api.addFund({ source: 'Bonus', amount: 300, date: '2026-06-11' })
-    expect(fund.id).toBe(3)
-    const data = await api.getAll()
-    expect(data.funds.some((f) => f.id === 3 && f.amount === 300)).toBe(true)
-  })
-
-  it('setBillPaid toggles the paid flag', async () => {
-    const api = new MockApi()
-    const bill = await api.setBillPaid(2, true)
-    expect(bill.paid).toBe(true)
-    const data = await api.getAll()
-    expect(data.bills.find((b) => b.id === 2)!.paid).toBe(true)
-  })
-
-  it('payDebt records a payment and reduces remaining', async () => {
-    const api = new MockApi()
-    const { payment, debt } = await api.payDebt({ debt_id: 1, amount_paid: 200, date: '2026-06-12' })
-    expect(payment.id).toBeGreaterThan(0)
-    expect(debt.remaining).toBe(1000) // was 1200
-  })
-
-  it('addSavings computes the running total', async () => {
-    const api = new MockApi()
-    // existing savings total = 500 - 200 transfer = 300; new entry +150 -> total 450
-    const entry = await api.addSavings({ date: '2026-06-21', amount: 150, source: 'funds' })
-    expect(entry.total).toBe(450)
-  })
-
-  it('transferSavingsToFunds creates a transfer and a funds entry labeled Savings', async () => {
-    const api = new MockApi()
-    const { transfer, fund } = await api.transferSavingsToFunds({ date: '2026-06-22', amount: 100 })
-    expect(transfer.amount).toBe(100)
-    expect(fund.source).toBe('Savings')
-    expect(fund.amount).toBe(100)
-  })
-
-  it('setMonthlyBudget updates settings', async () => {
-    const api = new MockApi()
-    await api.setMonthlyBudget('2026-07', 1000)
-    const data = await api.getAll()
-    expect(data.settings.monthlyBudgets['2026-07']).toBe(1000)
-  })
-})
-```
-
-- [ ] **Step 2: Run tests to verify they fail**
-
-Run: `npm run test -- MockApi`
-Expected: FAIL — cannot find `./MockApi.ts`.
-
-- [ ] **Step 3: Write the implementation**
+- [ ] **Step 1: Write the implementation**
 
 Create `src/api/mock/MockApi.ts`:
 
@@ -876,15 +626,15 @@ export class MockApi implements FinanceApi {
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [ ] **Step 2: Verify it compiles**
 
-Run: `npm run test -- MockApi`
-Expected: PASS (7 tests).
+Run: `npx tsc -b`
+Expected: no errors.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 3: Commit**
 
 ```bash
-git add src/api/mock/MockApi.ts src/api/mock/MockApi.test.ts
+git add src/api/mock/MockApi.ts
 git commit -m "feat: add localStorage-backed MockApi adapter"
 ```
 
@@ -893,8 +643,8 @@ git commit -m "feat: add localStorage-backed MockApi adapter"
 ## Task 9: Adapter selector
 
 **Files:**
-- Create: `src/api/index.ts`
 - Create: `src/env.d.ts` (env var typing)
+- Create: `src/api/index.ts`
 
 - [ ] **Step 1: Type the env vars**
 
@@ -959,7 +709,7 @@ git commit -m "feat: add API adapter selector"
 
 - [ ] **Step 1: Write the auth context (stubbed sign-in)**
 
-Real Google Sign-In lands in Plan 3. Here, `signIn()` immediately authenticates a stub user so route guards and the signed-in UI can be built and tested now.
+Real Google Sign-In lands in Plan 3. Here, `signIn()` immediately authenticates a stub user so route guards and the signed-in UI can be built now.
 
 Create `src/auth/AuthContext.tsx`:
 
@@ -1151,48 +901,10 @@ git commit -m "feat: add module placeholder page"
 
 **Files:**
 - Create: `src/pages/Dashboard.tsx`
-- Test: `src/pages/Dashboard.test.tsx`
 
-- [ ] **Step 1: Write the failing test**
+- [ ] **Step 1: Write the Dashboard**
 
-Create `src/pages/Dashboard.test.tsx`. It renders the Dashboard with a real QueryClient over the MockApi seed and asserts the computed Remaining Balance appears.
-
-```tsx
-import { describe, it, expect, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { Dashboard } from './Dashboard.tsx'
-
-function renderDashboard() {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  return render(
-    <QueryClientProvider client={client}>
-      <Dashboard />
-    </QueryClientProvider>,
-  )
-}
-
-describe('Dashboard', () => {
-  beforeEach(() => localStorage.clear())
-
-  it('shows a loading state then the seeded remaining balance', async () => {
-    renderDashboard()
-    expect(screen.getByText(/loading/i)).toBeInTheDocument()
-    // Seed: 6000 - 1500 - 900 - 800 - 300 = 2500
-    expect(await screen.findByText('$2,500.00')).toBeInTheDocument()
-    expect(screen.getByText('Remaining Balance')).toBeInTheDocument()
-  })
-})
-```
-
-- [ ] **Step 2: Run test to verify it fails**
-
-Run: `npm run test -- Dashboard`
-Expected: FAIL — cannot find `./Dashboard.tsx`.
-
-- [ ] **Step 3: Write the Dashboard**
-
-Create `src/pages/Dashboard.tsx`. Uses the current month via `monthKey()`.
+Create `src/pages/Dashboard.tsx`. Uses the current month via `monthKey()` and `computeSummary`.
 
 ```tsx
 import { useFinanceData } from '../hooks/useFinanceData.ts'
@@ -1237,15 +949,15 @@ export function Dashboard() {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [ ] **Step 2: Verify it compiles**
 
-Run: `npm run test -- Dashboard`
-Expected: PASS (1 test).
+Run: `npx tsc -b`
+Expected: no errors.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 3: Commit**
 
 ```bash
-git add src/pages/Dashboard.tsx src/pages/Dashboard.test.tsx
+git add src/pages/Dashboard.tsx
 git commit -m "feat: add dashboard page"
 ```
 
@@ -1337,7 +1049,7 @@ git commit -m "feat: add app shell with tab navigation"
 **Files:**
 - Create: `src/pages/SignIn.tsx`
 - Rewrite: `src/App.tsx`
-- Modify: `src/main.tsx`
+- Verify: `src/main.tsx`
 
 - [ ] **Step 1: Write the sign-in screen**
 
@@ -1429,10 +1141,7 @@ createRoot(document.getElementById('root')!).render(
 )
 ```
 
-- [ ] **Step 4: Run the full test suite + typecheck + build**
-
-Run: `npm run test`
-Expected: PASS (all suites: money, summary, MockApi, Dashboard).
+- [ ] **Step 4: Typecheck + build**
 
 Run: `npx tsc -b`
 Expected: no errors.
@@ -1443,7 +1152,7 @@ Expected: build succeeds.
 - [ ] **Step 5: Manual smoke check**
 
 Run: `npm run dev`, open the URL.
-Expected: Sign-in screen → click "Sign in with Google" → Dashboard shows Remaining Balance $2,500.00 and the metric cards; tabs render placeholders. Tailwind styling is visibly applied.
+Expected: Sign-in screen → click "Sign in with Google" → Dashboard shows Remaining Balance **$2,500.00** and the metric cards; tabs render placeholders; Tailwind styling is visibly applied.
 
 - [ ] **Step 6: Commit**
 
@@ -1456,4 +1165,4 @@ git commit -m "feat: wire providers, router, and sign-in gate"
 
 ## Done — Plan 1 outcome
 
-A working, signed-in (stubbed) finance app on seeded mock data: a real, unit-tested Dashboard and tab navigation, with module screens stubbed. Plan 2 replaces the placeholders with full module screens; Plan 3 adds the Apps Script backend, real Google Sign-In, and GitHub Pages deploy.
+A working, signed-in (stubbed) finance app on seeded mock data: a real Dashboard and tab navigation, with module screens stubbed. Plan 2 replaces the placeholders with full module screens; Plan 3 adds the Apps Script backend, real Google Sign-In, and GitHub Pages deploy.
