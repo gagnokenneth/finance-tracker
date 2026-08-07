@@ -1,17 +1,17 @@
 // Finance Tracker — Google Apps Script web app backend.
-// Bind this script to the Google Sheet that holds the data sheets, paste CLIENT_ID,
-// then Deploy > New deployment > Web app (Execute as: Me, Access: Anyone).
+// Bind this script to the Google Sheet that holds the data sheets, then
+// Deploy > New deployment > Web app (Execute as: Me, Access: Anyone).
+// Secrets are generated automatically on first use; nothing to paste here.
 // Full steps: docs/superpowers/guides/apps-script-setup.md
 
-var CLIENT_ID = 'PASTE_YOUR_OAUTH_WEB_CLIENT_ID_HERE';
-
 var SHEETS = {
+  users: ['id', 'username', 'pw_hash', 'currency', 'created'],
   funds: ['id', 'source', 'amount', 'date', 'notes'],
   bills: ['id', 'name', 'amount', 'due_date', 'paid', 'notes'],
   expendable: ['id', 'month', 'daily_amount', 'date', 'notes'],
-  debts: ['id', 'name', 'type'],
-  debt_schedule: ['id', 'debt_id', 'due_date', 'amount', 'paid', 'paid_date', 'paid_amount'],
-  debt_statements: ['id', 'debt_id', 'due_date', 'min_due', 'total_due', 'outstanding', 'paid', 'paid_date', 'paid_amount'],
+  debts: ['id', 'user_id', 'name', 'type'],
+  debt_schedule: ['id', 'user_id', 'debt_id', 'due_date', 'amount', 'paid', 'paid_date', 'paid_amount'],
+  debt_statements: ['id', 'user_id', 'debt_id', 'due_date', 'min_due', 'total_due', 'outstanding', 'paid', 'paid_date', 'paid_amount'],
   savings: ['id', 'date', 'amount', 'source', 'total', 'notes'],
   savings_transfers: ['id', 'date', 'amount', 'notes'],
   settings: ['key', 'value']
@@ -43,35 +43,27 @@ function doGet() {
 
 function doPost(e) {
   try {
+    initSecrets();
     var body = JSON.parse(e.postData.contents);
-
-    // Identity is checked before anything touches the spreadsheet, so an
-    // anonymous caller can never trigger sheet creation.
-    var email = verify(body.token);
-    if (!email) return json({ error: 'unauthorized' });
-
     ensureSheets();
 
-    var allowed = readSettings().allowedEmails;
-    // The whitelist is the security boundary, so it is never auto-populated:
-    // seeding the first caller would hand the data to whoever arrived first.
-    if (allowed.length === 0) {
-      return json({
-        error:
-          'This backend has no allowed users yet. In the settings sheet, add a row with key "allowed_email" and your Google address as the value, then reload.'
-      });
-    }
-    if (allowed.indexOf(email) === -1) return json({ error: 'unauthorized' });
+    var action = body.action;
+    // These two are the only unauthenticated actions.
+    if (action === 'signup') return json(signup(body.payload || {}));
+    if (action === 'login') return json(login(body.payload || {}));
 
-    var result = dispatch(body.action, body.payload);
+    var session = verifyToken(body.token);
+    if (!session || !session.uid) return json({ error: 'unauthorized' });
+
+    // uid always comes from the verified token, never from the payload.
+    var result = dispatch(action, body.payload, session.uid);
 
     // Writes answer with the whole updated dataset, read back in this SAME
-    // execution. That saves the client a second request — each one costs over a
-    // second of Apps Script overhead — and removes the race where a separate
-    // read execution observes state from before the write.
-    if (RETURNS_DATA[body.action]) {
-      SpreadsheetApp.flush(); // commit pending writes before reading them back
-      return json({ data: getAll() });
+    // execution: one request instead of two, and no window where a separate
+    // read observes state from before the write.
+    if (RETURNS_DATA[action]) {
+      SpreadsheetApp.flush();
+      return json({ data: getAll(session.uid) });
     }
     return json({ data: result });
   } catch (err) {
@@ -112,40 +104,152 @@ function json(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
 }
 
+function props() { return PropertiesService.getScriptProperties(); }
+
 /**
- * Verifies a Google ID token and returns its email.
+ * Generates the two secrets on first use so there is no manual setup step.
  *
- * The tokeninfo call is a network round trip from inside Apps Script, and it
- * previously ran on every single request. Successful results are cached against
- * a hash of the token — never the token itself, since cache keys are visible in
- * the script's cache and capped in length anyway.
- *
- * Trade-off: a token revoked mid-session stays accepted until the entry expires.
- * Tokens only live about an hour, so the exposure is bounded and small.
+ * PW_PEPPER must never be rotated: it is mixed into every stored password hash,
+ * so changing it invalidates every account.
  */
-var TOKEN_CACHE_SECONDS = 300;
+function initSecrets() {
+  var p = props();
+  if (!p.getProperty('PW_PEPPER')) p.setProperty('PW_PEPPER', Utilities.getUuid() + Utilities.getUuid());
+  if (!p.getProperty('SESSION_SECRET')) p.setProperty('SESSION_SECRET', Utilities.getUuid() + Utilities.getUuid());
+}
 
-function verify(token) {
+function pepper() { return props().getProperty('PW_PEPPER'); }
+function sessionSecret() { return props().getProperty('SESSION_SECRET'); }
+
+/**
+ * The client already ran 210k PBKDF2 iterations against a salt derived from the
+ * username. This adds the server-held pepper, so a leaked spreadsheet does not
+ * contain anything an attacker can start guessing against.
+ */
+function hashCredential(derived) {
+  return Utilities.base64Encode(
+    Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(derived) + pepper())
+  );
+}
+
+function signToken(payloadObj) {
+  var payload = Utilities.base64EncodeWebSafe(JSON.stringify(payloadObj));
+  return payload + '.' + Utilities.base64EncodeWebSafe(
+    Utilities.computeHmacSha256Signature(payload, sessionSecret())
+  );
+}
+
+/**
+ * Returns { uid, username } or null. No expiry is enforced — sessions do not
+ * expire by design; rotating SESSION_SECRET is the only revocation lever.
+ */
+function verifyToken(token) {
   if (!token) return null;
+  var parts = String(token).split('.');
+  if (parts.length !== 2) return null;
+  var expected = Utilities.base64EncodeWebSafe(
+    Utilities.computeHmacSha256Signature(parts[0], sessionSecret())
+  );
+  if (!constantTimeEquals(parts[1], expected)) return null;
+  try {
+    return JSON.parse(Utilities.newBlob(Utilities.base64DecodeWebSafe(parts[0])).getDataAsString());
+  } catch (err) {
+    return null;
+  }
+}
 
+/** Compares without revealing where the first difference is. */
+function constantTimeEquals(a, b) {
+  a = String(a); b = String(b);
+  if (a.length !== b.length) return false;
+  var diff = 0;
+  for (var i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+/**
+ * Returns false once more than `max` attempts happen inside the window. The
+ * /exec endpoint is public, so login needs this.
+ */
+function rateLimit(key, max, seconds) {
   var cache = CacheService.getScriptCache();
-  var key = 'tok_' + Utilities.base64EncodeWebSafe(
-    Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, token)
-  );
-  var cached = cache.get(key);
-  if (cached) return cached;
+  var k = 'rl_' + key;
+  var n = Number(cache.get(k) || 0) + 1;
+  cache.put(k, String(n), seconds);
+  return n <= max;
+}
 
-  var resp = UrlFetchApp.fetch(
-    'https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(token),
-    { muteHttpExceptions: true }
-  );
-  if (resp.getResponseCode() !== 200) return null;
-  var info = JSON.parse(resp.getContentText());
-  if (CLIENT_ID && info.aud !== CLIENT_ID) return null;
-  if (!info.email) return null;
+function normalizeUsername(u) { return String(u || '').trim().toLowerCase(); }
 
-  cache.put(key, info.email, TOKEN_CACHE_SECONDS);
-  return info.email;
+function findUserByUsername(username) {
+  var rows = readRows('users');
+  for (var i = 0; i < rows.length; i++) {
+    if (normalizeUsername(rows[i].username) === username) {
+      return {
+        id: num(rows[i].id),
+        username: String(rows[i].username),
+        pw_hash: String(rows[i].pw_hash)
+      };
+    }
+  }
+  return null;
+}
+
+function userById(id) {
+  var rows = readRows('users');
+  for (var i = 0; i < rows.length; i++) {
+    if (num(rows[i].id) === num(id)) {
+      return {
+        id: num(rows[i].id),
+        username: String(rows[i].username),
+        currency: rows[i].currency ? String(rows[i].currency) : 'PHP'
+      };
+    }
+  }
+  return null;
+}
+
+function sessionResponse(uid, username) {
+  return { token: signToken({ uid: uid, username: username }), user: { id: uid, username: username } };
+}
+
+function signup(p) {
+  var username = normalizeUsername(p.username);
+  if (username.length < 3) return { error: 'Pick a username of at least 3 characters.' };
+  if (!p.derived) return { error: 'Use at least 10 characters.' };
+
+  var expected = settingValue('signup_code');
+  if (!expected) return { error: 'Signup is closed. No signup_code is set in the settings sheet.' };
+  if (String(p.invite_code || '') !== expected) return { error: "That invite code isn't valid." };
+
+  if (findUserByUsername(username)) return { error: 'That username is taken.' };
+
+  var user = {
+    id: nextId('users'),
+    username: username,
+    pw_hash: hashCredential(p.derived),
+    currency: 'PHP',
+    created: new Date().toISOString().slice(0, 10)
+  };
+  appendRow('users', user);
+  SpreadsheetApp.flush();
+
+  return { data: sessionResponse(user.id, username) };
+}
+
+function login(p) {
+  var username = normalizeUsername(p.username);
+  if (!rateLimit('login_' + username, 5, 60)) {
+    return { error: 'Too many attempts. Wait a minute and try again.' };
+  }
+  var user = findUserByUsername(username);
+  // Identical message whether the user is missing or the password is wrong, so
+  // this cannot be used to discover which usernames exist.
+  if (!user) return { error: 'Wrong username or password.' };
+  if (!constantTimeEquals(user.pw_hash, hashCredential(p.derived))) {
+    return { error: 'Wrong username or password.' };
+  }
+  return { data: sessionResponse(user.id, user.username) };
 }
 
 function ss() { return SpreadsheetApp.getActiveSpreadsheet(); }
@@ -233,7 +337,7 @@ function patchRow(name, id, patch) {
   var headers = SHEETS[name];
   for (var c = 0; c < headers.length; c++) {
     var h = headers[c];
-    if (h === 'id' || h === 'debt_id') continue;
+    if (h === 'id' || h === 'user_id' || h === 'debt_id') continue;
     if (!Object.prototype.hasOwnProperty.call(patch, h)) continue;
     var v = patch[h];
     sh.getRange(rowIndex, c + 1).setValue(v === undefined || v === null ? '' : v);
@@ -316,19 +420,48 @@ function sumField(rows, field) {
   return t;
 }
 
+function settingValue(key) {
+  var rows = readRows('settings');
+  for (var i = 0; i < rows.length; i++) {
+    if (String(rows[i].key) === key) return String(rows[i].value);
+  }
+  return '';
+}
+
+/** Global settings only. Currency is per-user and attached by getAll. */
 function readSettings() {
   var rows = readRows('settings');
   var monthlyBudgets = {};
-  var allowedEmails = [];
-  var currency = 'PHP';
   for (var i = 0; i < rows.length; i++) {
     var k = String(rows[i].key);
-    var v = rows[i].value;
-    if (k.indexOf('budget_') === 0) monthlyBudgets[k.substring(7)] = num(v);
-    else if (k === 'allowed_email' && v) allowedEmails.push(String(v));
-    else if (k === 'currency' && v) currency = String(v);
+    if (k.indexOf('budget_') === 0) monthlyBudgets[k.substring(7)] = num(rows[i].value);
   }
-  return { monthlyBudgets: monthlyBudgets, allowedEmails: allowedEmails, currency: currency };
+  return { monthlyBudgets: monthlyBudgets };
+}
+
+/** Rows of `name` belonging to this user. */
+function readOwnedRows(name, uid) {
+  var rows = readRows(name);
+  var out = [];
+  for (var i = 0; i < rows.length; i++) {
+    if (num(rows[i].user_id) === num(uid)) out.push(rows[i]);
+  }
+  return out;
+}
+
+/**
+ * Throws 'not found' when the row is missing OR owned by someone else —
+ * identical either way, so ids cannot be probed for existence.
+ */
+function assertOwned(name, id, uid) {
+  var rows = readRows(name);
+  for (var i = 0; i < rows.length; i++) {
+    if (num(rows[i].id) === num(id)) {
+      if (num(rows[i].user_id) !== num(uid)) throw new Error('not found');
+      return;
+    }
+  }
+  throw new Error('not found');
 }
 
 /** Inserts or updates a single key in the settings sheet. */
@@ -345,35 +478,37 @@ function upsertSetting(key, value) {
   return null;
 }
 
-function getAll() {
+function getAll(uid) {
   var data = {};
   DATA_SHEETS.forEach(function (name) {
     // Inactive sheets are reported as empty rather than read — see ACTIVE_SHEETS.
     if (ACTIVE_SHEETS.indexOf(name) === -1) { data[name] = []; return; }
-    data[name] = readRows(name).map(function (r) { return coerce(name, r); });
+    data[name] = readOwnedRows(name, uid).map(function (r) { return coerce(name, r); });
   });
+  var user = userById(uid);
   data.settings = readSettings();
+  data.settings.currency = user ? user.currency : 'PHP';
   return data;
 }
 
-function dispatch(action, p) {
+function dispatch(action, p, uid) {
   switch (action) {
-    case 'getAll': return getAll();
+    case 'getAll': return getAll(uid);
     case 'addFund': return addFund(p);
     case 'addBill': return addBill(p);
     case 'setBillPaid': return setBillPaid(p);
     case 'addExpendable': return addExpendable(p);
     case 'setMonthlyBudget': return setMonthlyBudget(p);
-    case 'addDebt': return addDebt(p);
-    case 'updateDebt': return updateDebt(p);
-    case 'deleteDebt': return deleteDebt(p);
-    case 'addScheduleRow': return addChildRow('debt_schedule', p);
-    case 'updateScheduleRow': return updateChildRow('debt_schedule', p);
-    case 'deleteScheduleRow': return deleteChildRow('debt_schedule', p);
-    case 'addStatement': return addChildRow('debt_statements', p);
-    case 'updateStatement': return updateChildRow('debt_statements', p);
-    case 'deleteStatement': return deleteChildRow('debt_statements', p);
-    case 'setCurrency': return upsertSetting('currency', p.currency);
+    case 'addDebt': return addDebt(p, uid);
+    case 'updateDebt': return updateDebt(p, uid);
+    case 'deleteDebt': return deleteDebt(p, uid);
+    case 'addScheduleRow': return addChildRow('debt_schedule', p, uid);
+    case 'updateScheduleRow': return updateChildRow('debt_schedule', p, uid);
+    case 'deleteScheduleRow': return deleteChildRow('debt_schedule', p, uid);
+    case 'addStatement': return addChildRow('debt_statements', p, uid);
+    case 'updateStatement': return updateChildRow('debt_statements', p, uid);
+    case 'deleteStatement': return deleteChildRow('debt_statements', p, uid);
+    case 'setCurrency': return setCurrency(p, uid);
     case 'addSavings': return addSavings(p);
     case 'transferSavingsToFunds': return transferSavingsToFunds(p);
     default: throw new Error('Unknown action: ' + action);
@@ -407,8 +542,8 @@ function setMonthlyBudget(p) {
   return upsertSetting('budget_' + p.month, p.amount);
 }
 
-function addDebt(p) {
-  var debt = { id: nextId('debts'), name: p.name, type: p.type };
+function addDebt(p, uid) {
+  var debt = { id: nextId('debts'), user_id: uid, name: p.name, type: p.type };
   appendRow('debts', debt);
 
   var target = p.type === 'fixed' ? 'debt_schedule' : 'debt_statements';
@@ -418,41 +553,53 @@ function addDebt(p) {
     var copy = {};
     for (var k in row) if (Object.prototype.hasOwnProperty.call(row, k)) copy[k] = row[k];
     copy.id = baseId + i;
+    copy.user_id = uid;
     copy.debt_id = debt.id;
     return copy;
   });
   appendRows(target, prepared);
 
-  return coerce('debts', debt);
-}
-
-function updateDebt(p) {
-  setCell('debts', p.id, 'name', p.patch.name);
   return null; // RETURNS_DATA action — doPost reads the dataset back
 }
 
-function deleteDebt(p) {
+function updateDebt(p, uid) {
+  assertOwned('debts', p.id, uid);
+  setCell('debts', p.id, 'name', p.patch.name);
+  return null;
+}
+
+function deleteDebt(p, uid) {
+  assertOwned('debts', p.id, uid);
   deleteRowsWhere('debt_schedule', 'debt_id', p.id);
   deleteRowsWhere('debt_statements', 'debt_id', p.id);
   deleteRowById('debts', p.id);
   return null;
 }
 
-function addChildRow(name, p) {
+function addChildRow(name, p, uid) {
+  assertOwned('debts', p.debtId, uid); // the parent debt must be yours
   var row = {};
   for (var k in p.input) if (Object.prototype.hasOwnProperty.call(p.input, k)) row[k] = p.input[k];
   row.id = nextId(name);
+  row.user_id = uid;
   row.debt_id = p.debtId;
   appendRow(name, row);
-  return coerce(name, row);
+  return null;
 }
 
-function updateChildRow(name, p) {
+function updateChildRow(name, p, uid) {
+  assertOwned(name, p.id, uid);
   return patchRow(name, p.id, normalizePaidPatch(p.patch));
 }
 
-function deleteChildRow(name, p) {
+function deleteChildRow(name, p, uid) {
+  assertOwned(name, p.id, uid);
   deleteRowById(name, p.id);
+  return null;
+}
+
+function setCurrency(p, uid) {
+  setCell('users', uid, 'currency', p.currency);
   return null;
 }
 
