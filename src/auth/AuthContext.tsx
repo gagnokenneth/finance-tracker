@@ -1,111 +1,65 @@
-import { createContext, useState, useCallback, useEffect, useRef } from 'react'
+import { createContext, useState, useCallback, useEffect } from 'react'
 import type { ReactNode } from 'react'
-import { getToken, setToken, clearToken, AUTH_EXPIRED_EVENT } from './token.ts'
-import { decodeJwt } from './googleJwt.ts'
-import { readMockUser, writeMockUser, clearMockUser } from './mockSession.ts'
+import { getApi } from '../api/index.ts'
+import { deriveCredential } from './password.ts'
+import {
+  AUTH_EXPIRED_EVENT,
+  clearToken,
+  decodeSession,
+  readToken,
+  writeToken,
+} from './session.ts'
 
 export interface AuthUser {
-  email: string
-  name: string
+  id: number
+  username: string
 }
 
 export interface AuthState {
   user: AuthUser | null
-  live: boolean
-  signIn: () => void
+  signIn: (username: string, password: string) => Promise<void>
+  signUp: (username: string, password: string, inviteCode: string) => Promise<void>
   signOut: () => void
-  renderButton: (el: HTMLElement | null) => void
 }
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const AuthContext = createContext<AuthState | null>(null)
 
-const LIVE = import.meta.env.VITE_API_MODE === 'live'
-const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? ''
-const STUB_USER: AuthUser = { email: 'ken.gagno@vibeteams.ai', name: 'Ken' }
-
 export function AuthProvider({ children }: { children: ReactNode }) {
-  // Restore the session during init (pure) — never setState in the effect.
-  const [user, setUser] = useState<AuthUser | null>(() => {
-    // Mock mode has no token; its stub session is persisted separately so a
-    // reload doesn't bounce you back to the sign-in screen.
-    if (!LIVE) return readMockUser()
-    const existing = getToken()
-    if (!existing) return null
-    const p = decodeJwt(existing)
-    if (p && p.exp * 1000 > Date.now()) return { email: p.email, name: p.name }
-    return null
-  })
-  const buttonElRef = useRef<HTMLElement | null>(null)
-  const initialized = useRef(false)
+  // Restore the session during init (pure) — never setState in an effect.
+  const [user, setUser] = useState<AuthUser | null>(() => decodeSession(readToken()))
 
-  const adoptToken = useCallback((token: string) => {
-    const p = decodeJwt(token)
-    if (!p || p.exp * 1000 <= Date.now()) {
-      clearToken()
-      setUser(null)
-      return
-    }
-    setToken(token)
-    setUser({ email: p.email, name: p.name })
+  const signIn = useCallback(async (username: string, password: string) => {
+    const derived = await deriveCredential(username, password)
+    const result = await getApi().login({ username, derived })
+    writeToken(result.token)
+    setUser(result.user)
   }, [])
+
+  const signUp = useCallback(
+    async (username: string, password: string, inviteCode: string) => {
+      const derived = await deriveCredential(username, password)
+      const result = await getApi().signup({ username, derived, invite_code: inviteCode })
+      writeToken(result.token)
+      setUser(result.user)
+    },
+    [],
+  )
 
   const signOut = useCallback(() => {
     clearToken()
-    clearMockUser()
     setUser(null)
-    if (LIVE) window.google?.accounts.id.disableAutoSelect()
   }, [])
 
-  const renderButton = useCallback((el: HTMLElement | null) => {
-    buttonElRef.current = el
-    if (el && window.google && initialized.current) {
-      window.google.accounts.id.renderButton(el, { theme: 'outline', size: 'large' })
-    }
-  }, [])
-
-  // Live mode: load GIS, listen for expiry. (Token restore happens in useState init.)
+  // The API layer clears the token when the backend rejects it; this returns the
+  // UI to the sign-in screen. Only clearing state, which the lint rule allows.
   useEffect(() => {
-    if (!LIVE) return
-
     const onExpired = () => setUser(null)
     window.addEventListener(AUTH_EXPIRED_EVENT, onExpired)
-
-    const script = document.createElement('script')
-    script.src = 'https://accounts.google.com/gsi/client'
-    script.async = true
-    script.defer = true
-    script.onload = () => {
-      if (!window.google || !CLIENT_ID) return
-      window.google.accounts.id.initialize({
-        client_id: CLIENT_ID,
-        callback: (resp) => adoptToken(resp.credential),
-      })
-      initialized.current = true
-      if (buttonElRef.current) {
-        window.google.accounts.id.renderButton(buttonElRef.current, {
-          theme: 'outline',
-          size: 'large',
-        })
-      }
-    }
-    document.head.appendChild(script)
-
     return () => window.removeEventListener(AUTH_EXPIRED_EVENT, onExpired)
-  }, [adoptToken])
-
-  const signIn = useCallback(() => {
-    if (LIVE) {
-      window.google?.accounts.id.prompt()
-      return
-    }
-    writeMockUser(STUB_USER)
-    setUser(STUB_USER)
   }, [])
 
   return (
-    <AuthContext.Provider value={{ user, live: LIVE, signIn, signOut, renderButton }}>
-      {children}
-    </AuthContext.Provider>
+    <AuthContext.Provider value={{ user, signIn, signUp, signOut }}>{children}</AuthContext.Provider>
   )
 }

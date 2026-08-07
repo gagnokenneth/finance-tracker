@@ -7,7 +7,6 @@ Do the phases in order — each one produces a value the next one needs.
 
 | Phase | Produces | Needed by |
 |---|---|---|
-| 1. Google Cloud | OAuth client ID | Phases 2, 3, 4 |
 | 2. Sheet + Apps Script | `/exec` web app URL | Phases 3, 4 |
 | 3. Local live test | Confidence the backend works | — |
 | 4. GitHub setup | Secrets + Pages enabled | Phase 5 |
@@ -15,25 +14,10 @@ Do the phases in order — each one produces a value the next one needs.
 
 ---
 
-## Phase 1 — OAuth client
+## Phase 1 — nothing to do
 
-1. Google Cloud Console → create or select a project.
-2. **APIs & Services → OAuth consent screen**: External. Add your own Google
-   address as a test user.
-3. **Credentials → Create credentials → OAuth client ID → Web application.**
-4. Under **Authorized JavaScript origins** add both:
-
-   ```
-   http://localhost:5173
-   https://gagnokenneth.github.io
-   ```
-
-   Origin only. No `/finance-tracker` path, no trailing slash — Google matches the
-   origin exactly and a path here is the most common cause of
-   `origin_mismatch` at sign-in.
-
-5. Copy the client ID (`…apps.googleusercontent.com`). **Keep it open**, three
-   later steps need it.
+Auth is username/password against your own backend, so there is no OAuth client,
+no consent screen, and no Google client ID. Skip to Phase 2.
 
 ## Phase 2 — Sheet and Apps Script
 
@@ -64,7 +48,6 @@ root (it is gitignored):
 ```
 VITE_API_MODE=live
 VITE_APPS_SCRIPT_URL=<your /exec URL>
-VITE_GOOGLE_CLIENT_ID=<your client ID>
 ```
 
 ```bash
@@ -72,7 +55,7 @@ nvm use          # reads .nvmrc → Node 24
 npm run dev
 ```
 
-Open `http://localhost:5173` and sign in with Google. Expected sequence:
+Open `http://localhost:5173`. Expected sequence:
 
 1. Sign-in succeeds.
 2. The app shows: *"This backend has no allowed users yet. In the settings
@@ -96,7 +79,8 @@ repository secret:
 | Name | Value |
 |---|---|
 | `VITE_APPS_SCRIPT_URL` | your `/exec` URL |
-| `VITE_GOOGLE_CLIENT_ID` | your client ID |
+
+`VITE_GOOGLE_CLIENT_ID` is obsolete — delete it if it is still set.
 
 Both are compiled into the built JavaScript and are therefore public. That is
 expected: a Google client ID is not a secret, and the `/exec` URL is protected
@@ -144,11 +128,11 @@ mode — see below.
 
 | Symptom | Cause |
 |---|---|
-| Sign-in card with **no button and no message** | `VITE_GOOGLE_CLIENT_ID` secret missing or misspelled. The build still sets live mode, so the app takes the Google path and renders nothing. This one is silent — check the secret name first. |
 | Data loads but nothing reaches the Sheet | `VITE_APPS_SCRIPT_URL` missing. `getApi()` falls back to `MockApi` with only a console warning, so the site serves local seed data. |
-| `origin_mismatch` at sign-in | Authorized JavaScript origin has a path or trailing slash. Must be exactly `https://gagnokenneth.github.io`. |
-| "No allowed users yet" | Expected before you add the `allowed_email` row. |
-| `unauthorized` after signing in | The signed-in address is not the one in `allowed_email`. |
+| "Signup is closed" | No `signup_code` row in the `settings` sheet. |
+| `unauthorized` on every request | The stored session was signed with a different `SESSION_SECRET`. Sign in again. |
+| Everyone logged out at once | `SESSION_SECRET` changed. |
+| All passwords suddenly wrong | `PW_PEPPER` changed. It must never be rotated. |
 | Blank page, 404s for JS/CSS | `base` in `vite.config.ts` no longer matches the repo name. It is `/finance-tracker/`. |
 | Backend changes have no effect | Apps Script deployment still points at an old version. Deploy a new version. |
 | Signed out after about an hour | Expected. Google ID tokens expire; sign in again. |
