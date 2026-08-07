@@ -409,10 +409,8 @@ function appendRows(name, objs) {
   sh.getRange(sh.getLastRow() + 1, 1, values.length, headers.length).setValues(values);
 }
 
-/** Writes only the keys present in patch. id and debt_id are never patchable. */
-function patchRow(name, id, patch) {
-  var rowIndex = findSheetRow(name, id);
-  if (rowIndex === -1) throw new Error(name + ' ' + id + ' not found');
+/** Writes only the keys present in patch. Identity columns are never patchable. */
+function patchRowAt(name, rowIndex, patch) {
   var sh = sheet(name);
   var headers = SHEETS[name];
   for (var c = 0; c < headers.length; c++) {
@@ -422,8 +420,8 @@ function patchRow(name, id, patch) {
     var v = patch[h];
     sh.getRange(rowIndex, c + 1).setValue(v === undefined || v === null ? '' : v);
   }
-  // No read-back: callers of this are all RETURNS_DATA actions, so doPost reads
-  // the whole dataset once instead of re-reading this sheet here.
+  // No read-back: callers are all RETURNS_DATA actions, so doPost reads the
+  // whole dataset once instead of re-reading this sheet here.
   return null;
 }
 
@@ -439,11 +437,6 @@ function normalizePaidPatch(patch) {
     patch.paid_amount = '';
   }
   return patch;
-}
-
-function deleteRowById(name, id) {
-  var rowIndex = findSheetRow(name, id);
-  if (rowIndex !== -1) sheet(name).deleteRow(rowIndex);
 }
 
 /** Deletes bottom-up so earlier row indices stay valid as rows are removed. */
@@ -522,32 +515,32 @@ function readOwnedRows(name, uid) {
 }
 
 /**
- * Throws 'not found' when the row is missing OR owned by someone else —
- * identical either way, so ids cannot be probed for existence.
+ * 1-based sheet row for a row the caller owns. Throws 'not found' when the row
+ * is missing OR belongs to someone else — identical either way, so ids cannot be
+ * probed for existence.
+ *
+ * Reads only the id and user_id columns, which are always the first two on owned
+ * sheets, and returns the location so callers do not look the row up a second
+ * time.
  */
-function assertOwned(name, id, uid) {
-  var rows = readRows(name);
-  for (var i = 0; i < rows.length; i++) {
-    if (num(rows[i].id) === num(id)) {
-      if (num(rows[i].user_id) !== num(uid)) throw new Error('not found');
-      return;
+function ownedRowIndex(name, id, uid) {
+  var sh = sheet(name);
+  var last = sh.getLastRow();
+  if (last >= 2) {
+    var vals = sh.getRange(2, 1, last - 1, 2).getValues();
+    for (var i = 0; i < vals.length; i++) {
+      if (num(vals[i][0]) === num(id)) {
+        if (num(vals[i][1]) !== num(uid)) throw new Error('not found');
+        return i + 2;
+      }
     }
   }
   throw new Error('not found');
 }
 
-/** Inserts or updates a single key in the settings sheet. */
-function upsertSetting(key, value) {
-  var sh = sheet('settings');
-  var values = sh.getDataRange().getValues();
-  for (var i = 1; i < values.length; i++) {
-    if (String(values[i][0]) === key) {
-      sh.getRange(i + 1, 2).setValue(value);
-      return null;
-    }
-  }
-  sh.appendRow([key, value]);
-  return null;
+/** Ownership check where the row's position is not needed. */
+function assertOwned(name, id, uid) {
+  ownedRowIndex(name, id, uid);
 }
 
 function getAll(uid) {
@@ -635,16 +628,16 @@ function addDebt(p, uid) {
 }
 
 function updateDebt(p, uid) {
-  assertOwned('debts', p.id, uid);
-  setCell('debts', p.id, 'name', p.patch.name);
+  var rowIndex = ownedRowIndex('debts', p.id, uid);
+  sheet('debts').getRange(rowIndex, SHEETS.debts.indexOf('name') + 1).setValue(p.patch.name);
   return null;
 }
 
 function deleteDebt(p, uid) {
-  assertOwned('debts', p.id, uid);
+  var rowIndex = ownedRowIndex('debts', p.id, uid);
   deleteRowsWhere('debt_schedule', 'debt_id', p.id);
   deleteRowsWhere('debt_statements', 'debt_id', p.id);
-  deleteRowById('debts', p.id);
+  sheet('debts').deleteRow(rowIndex);
   return null;
 }
 
@@ -660,13 +653,12 @@ function addChildRow(name, p, uid) {
 }
 
 function updateChildRow(name, p, uid) {
-  assertOwned(name, p.id, uid);
-  return patchRow(name, p.id, normalizePaidPatch(p.patch));
+  var rowIndex = ownedRowIndex(name, p.id, uid);
+  return patchRowAt(name, rowIndex, normalizePaidPatch(p.patch));
 }
 
 function deleteChildRow(name, p, uid) {
-  assertOwned(name, p.id, uid);
-  deleteRowById(name, p.id);
+  sheet(name).deleteRow(ownedRowIndex(name, p.id, uid));
   return null;
 }
 

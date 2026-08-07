@@ -1,6 +1,7 @@
 import { createContext, useState, useCallback, useEffect } from 'react'
 import type { ReactNode } from 'react'
 import { getApi } from '../api/index.ts'
+import type { AuthResult } from '../api/FinanceApi.ts'
 import { deriveCredential } from './password.ts'
 import {
   AUTH_EXPIRED_EVENT,
@@ -29,21 +30,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Restore the session during init (pure) — never setState in an effect.
   const [user, setUser] = useState<AuthUser | null>(() => decodeSession(readToken()))
 
-  const signIn = useCallback(async (username: string, password: string) => {
-    const derived = await deriveCredential(username, password)
-    const result = await getApi().login({ username, derived })
-    writeToken(result.token)
-    setUser(result.user)
-  }, [])
-
-  const signUp = useCallback(
-    async (username: string, password: string, inviteCode: string) => {
+  /**
+   * Signing in and signing up differ only in which call they make. Sharing the
+   * surrounding steps keeps them from drifting — both must derive, then call,
+   * then store the token, then set the user, in that order.
+   */
+  const authenticate = useCallback(
+    async (username: string, password: string, call: (derived: string) => Promise<AuthResult>) => {
       const derived = await deriveCredential(username, password)
-      const result = await getApi().signup({ username, derived, invite_code: inviteCode })
+      const result = await call(derived)
       writeToken(result.token)
       setUser(result.user)
     },
     [],
+  )
+
+  const signIn = useCallback(
+    (username: string, password: string) =>
+      authenticate(username, password, (derived) => getApi().login({ username, derived })),
+    [authenticate],
+  )
+
+  const signUp = useCallback(
+    (username: string, password: string, inviteCode: string) =>
+      authenticate(username, password, (derived) =>
+        getApi().signup({ username, derived, invite_code: inviteCode }),
+      ),
+    [authenticate],
   )
 
   const signOut = useCallback(() => {
