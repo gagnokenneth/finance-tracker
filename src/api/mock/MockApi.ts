@@ -28,6 +28,7 @@ import type {
 } from '../../types.ts'
 import { createSeed } from './seed.ts'
 import { readToken, decodeSession } from '../../auth/session.ts'
+import { normalizeUsername } from '../../auth/password.ts'
 
 const KEY = 'finance-mock-db'
 
@@ -110,7 +111,7 @@ export class MockApi implements FinanceApi {
 
   async signup(input: SignupInput): Promise<AuthResult> {
     const db = this.loadDb()
-    const username = input.username.trim().toLowerCase()
+    const username = normalizeUsername(input.username)
     // Mock has no settings sheet holding a real code, but the field is still
     // required so the signup form is exercised the way it is on live.
     if (!input.invite_code.trim()) throw new Error("That invite code isn't valid.")
@@ -126,7 +127,7 @@ export class MockApi implements FinanceApi {
 
   async login(input: LoginInput): Promise<AuthResult> {
     const db = this.loadDb()
-    const username = input.username.trim().toLowerCase()
+    const username = normalizeUsername(input.username)
     const user = db.users.find((u) => u.username === username)
     // Same message either way, matching the backend.
     if (!user || user.pw_hash !== input.derived) throw new Error('Wrong username or password.')

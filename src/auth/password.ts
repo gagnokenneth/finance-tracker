@@ -16,6 +16,15 @@ const SITE = 'finance-tracker:'
 
 export const MIN_PASSWORD_LENGTH = 10
 
+/**
+ * Must match normalizeUsername in apps-script/Code.gs. The PBKDF2 salt is
+ * derived from this, so any divergence between client and server silently
+ * breaks login rather than failing loudly.
+ */
+export function normalizeUsername(username: string): string {
+  return username.trim().toLowerCase()
+}
+
 function toHex(bytes: Uint8Array): string {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
 }
@@ -23,7 +32,7 @@ function toHex(bytes: Uint8Array): string {
 export async function deriveCredential(username: string, password: string): Promise<string> {
   const enc = new TextEncoder()
   const salt = new Uint8Array(
-    await crypto.subtle.digest('SHA-256', enc.encode(SITE + username.trim().toLowerCase())),
+    await crypto.subtle.digest('SHA-256', enc.encode(SITE + normalizeUsername(username))),
   )
   const key = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, [
     'deriveBits',

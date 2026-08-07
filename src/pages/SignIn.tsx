@@ -16,6 +16,13 @@ export function SignIn() {
   const [pending, setPending] = useState(false)
 
   const creating = mode === 'signup'
+  const submitLabel = pending
+    ? creating
+      ? 'Creating account…'
+      : 'Signing in…'
+    : creating
+      ? 'Create account'
+      : 'Sign in'
 
   const switchMode = (next: Mode) => {
     setMode(next)
@@ -97,13 +104,7 @@ export function SignIn() {
             disabled={pending}
             className="mt-2 w-full rounded-lg bg-ink py-2.5 text-sm font-medium text-white transition-colors hover:bg-ink/90 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
           >
-            {pending
-              ? creating
-                ? 'Creating account…'
-                : 'Signing in…'
-              : creating
-                ? 'Create account'
-                : 'Sign in'}
+            {submitLabel}
           </button>
         </form>
 
