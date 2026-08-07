@@ -25,7 +25,15 @@ var SHEETS = {
  * so the new shape is applied on the very next request after a deployment,
  * instead of up to an hour later.
  */
-var SCHEMA_VERSION = 3;
+var SCHEMA_VERSION = 4;
+
+/*
+ * Tabs whose stale shape may be DISCARDED and recreated. Deliberately excludes
+ * users and invites: a column change there would otherwise delete every account
+ * and password hash on the next request, re-seed fresh codes, and lock everyone
+ * out with no recovery path.
+ */
+var REBUILDABLE_SHEETS = ['debts', 'debt_schedule', 'debt_statements'];
 
 var DATA_SHEETS = ['funds', 'bills', 'expendable', 'debts', 'debt_schedule', 'debt_statements', 'savings', 'savings_transfers'];
 
@@ -96,6 +104,19 @@ function ensureSheets() {
   var readyKey = 'sheets_ready_v' + SCHEMA_VERSION;
   if (cache.get(readyKey)) return;
 
+  // Two requests arriving with a cold cache would both try to delete and
+  // recreate the same tab; the second throws. Serialise, then re-check.
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    if (cache.get(readyKey)) return;
+    rebuildSheets(cache, readyKey);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function rebuildSheets(cache, readyKey) {
   var spreadsheet = ss();
   for (var name in SHEETS) {
     if (!Object.prototype.hasOwnProperty.call(SHEETS, name)) continue;
@@ -110,10 +131,13 @@ function ensureSheets() {
       continue;
     }
     if (headersMatch(sh, name)) continue;
+    // A stale shape outside the rebuildable set is left exactly as it is; losing
+    // accounts is never an acceptable side effect of a deploy.
+    if (REBUILDABLE_SHEETS.indexOf(name) === -1) continue;
 
-    // Stale shape: dropped and recreated. This DISCARDS the rows in that tab —
-    // deliberate, so a deployment needs no manual sheet surgery. Other tabs
-    // always exist, so deleting this one can never leave the file empty.
+    // Dropped and recreated. This DISCARDS the rows in that tab — deliberate, so
+    // a deployment needs no manual sheet surgery. Other tabs always exist, so
+    // deleting this one can never leave the file empty.
     spreadsheet.deleteSheet(sh);
     writeHeaders(spreadsheet.insertSheet(name), name);
   }
@@ -128,8 +152,12 @@ function ensureSheets() {
  * them from the sheet; only you can see it.
  */
 function seedInvites() {
+  // A one-way marker, not row count: clearing the sheet is how the owner closes
+  // signups, and re-seeding would silently reopen them.
+  if (props().getProperty('INVITES_SEEDED')) return;
+  props().setProperty('INVITES_SEEDED', '1');
   var sh = sheet('invites');
-  if (sh.getLastRow() > 1) return; // already seeded
+  if (sh.getLastRow() > 1) return;
   var rows = [];
   for (var i = 0; i < INVITE_COUNT; i++) rows.push([newInviteCode(), '', '']);
   sh.getRange(2, 1, rows.length, 3).setValues(rows);
@@ -247,19 +275,44 @@ function constantTimeEquals(a, b) {
   return diff === 0;
 }
 
-/**
- * Returns false once more than `max` attempts happen inside the window. The
- * /exec endpoint is public, so login needs this.
+/*
+ * Failed-attempt throttle for the public /exec endpoint.
+ *
+ * Only failures are counted, and the window's end is stored rather than re-set
+ * on each write. Counting successes and extending the TTL would let an attacker
+ * hammering one username keep that account locked out indefinitely — punishing
+ * the owner instead of the attacker.
  */
-function rateLimit(key, max, seconds) {
-  var cache = CacheService.getScriptCache();
-  var k = 'rl_' + key;
-  var n = Number(cache.get(k) || 0) + 1;
-  cache.put(k, String(n), seconds);
-  return n <= max;
+function failureState(key) {
+  var raw = CacheService.getScriptCache().get('rl_' + key);
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch (err) { return null; }
+}
+
+function tooManyFailures(key, max) {
+  var st = failureState(key);
+  return !!st && new Date().getTime() <= st.until && st.n >= max;
+}
+
+function recordFailure(key, seconds) {
+  var now = new Date().getTime();
+  var st = failureState(key);
+  if (!st || now > st.until) st = { n: 0, until: now + seconds * 1000 };
+  st.n += 1;
+  var remaining = Math.max(1, Math.ceil((st.until - now) / 1000));
+  CacheService.getScriptCache().put('rl_' + key, JSON.stringify(st), remaining);
 }
 
 function normalizeUsername(u) { return String(u || '').trim().toLowerCase(); }
+
+/*
+ * ASCII only, and must match isValidUsername in src/auth/password.ts.
+ *
+ * Beyond being a sane identifier rule, this keeps the token payload Latin-1:
+ * signToken base64-encodes UTF-8 bytes while the client decodes with atob, so a
+ * non-ASCII username would render as mojibake.
+ */
+function isValidUsername(u) { return /^[a-z0-9][a-z0-9._-]{2,31}$/.test(u); }
 
 function findUserByUsername(username) {
   var rows = readRows('users');
@@ -295,38 +348,55 @@ function sessionResponse(uid, username) {
 
 function signup(p) {
   var username = normalizeUsername(p.username);
-  if (username.length < 3) return { error: 'Pick a username of at least 3 characters.' };
-  if (!p.derived) return { error: 'Use at least 10 characters.' };
+  if (!isValidUsername(username)) {
+    return { error: 'Use 3-32 characters: letters, numbers, dot, dash or underscore.' };
+  }
+  // Password length is a client-side policy (MIN_PASSWORD_LENGTH); the server
+  // only ever sees the derived value, so all it can check is that shape.
+  if (!/^[0-9a-f]{64}$/.test(String(p.derived || ''))) {
+    return { error: 'Could not read those credentials. Try again.' };
+  }
 
-  var inviteRow = findUnusedInvite(p.invite_code);
-  if (inviteRow === -1) return { error: "That invite code isn't valid or has already been used." };
+  /*
+   * Locked: this endpoint is public, and without serialisation two concurrent
+   * signups both read the same nextId('users') and the same unused invite row.
+   * That yields two accounts sharing one id — and a shared id means they read
+   * and write each other's data, because every query is scoped by uid.
+   */
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    var inviteRow = findUnusedInvite(p.invite_code);
+    if (inviteRow === -1) return { error: "That invite code isn't valid or has already been used." };
+    if (findUserByUsername(username)) return { error: 'That username is taken.' };
 
-  if (findUserByUsername(username)) return { error: 'That username is taken.' };
-
-  var user = {
-    id: nextId('users'),
-    username: username,
-    pw_hash: hashCredential(p.derived),
-    currency: 'PHP',
-    created: new Date().toISOString().slice(0, 10)
-  };
-  appendRow('users', user);
-  markInviteUsed(inviteRow, username); // single use — burn it
-  SpreadsheetApp.flush();
-
-  return { data: sessionResponse(user.id, username) };
+    var user = {
+      id: nextId('users'),
+      username: username,
+      pw_hash: hashCredential(p.derived),
+      currency: 'PHP',
+      created: new Date().toISOString().slice(0, 10)
+    };
+    appendRow('users', user);
+    markInviteUsed(inviteRow, username); // single use — burn it
+    SpreadsheetApp.flush();
+    return { data: sessionResponse(user.id, username) };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function login(p) {
   var username = normalizeUsername(p.username);
-  if (!rateLimit('login_' + username, 5, 60)) {
+  var key = 'login_' + username;
+  if (tooManyFailures(key, 5)) {
     return { error: 'Too many attempts. Wait a minute and try again.' };
   }
   var user = findUserByUsername(username);
   // Identical message whether the user is missing or the password is wrong, so
   // this cannot be used to discover which usernames exist.
-  if (!user) return { error: 'Wrong username or password.' };
-  if (!constantTimeEquals(user.pw_hash, hashCredential(p.derived))) {
+  if (!user || !constantTimeEquals(user.pw_hash, hashCredential(p.derived))) {
+    recordFailure(key, 60);
     return { error: 'Wrong username or password.' };
   }
   return { data: sessionResponse(user.id, user.username) };
@@ -556,14 +626,16 @@ function getAll(uid) {
   return data;
 }
 
+/*
+ * Only per-user debt actions are served. The funds / bills / expendable /
+ * savings sheets have no user_id column, so serving their actions would let any
+ * authenticated user read and write another user's rows. Their pages are
+ * unreachable in the frontend; re-enabling one means giving its sheet a user_id
+ * and scoping its handlers first.
+ */
 function dispatch(action, p, uid) {
   switch (action) {
     case 'getAll': return getAll(uid);
-    case 'addFund': return addFund(p);
-    case 'addBill': return addBill(p);
-    case 'setBillPaid': return setBillPaid(p);
-    case 'addExpendable': return addExpendable(p);
-    case 'setMonthlyBudget': return setMonthlyBudget(p);
     case 'addDebt': return addDebt(p, uid);
     case 'updateDebt': return updateDebt(p, uid);
     case 'deleteDebt': return deleteDebt(p, uid);
@@ -574,37 +646,8 @@ function dispatch(action, p, uid) {
     case 'updateStatement': return updateChildRow('debt_statements', p, uid);
     case 'deleteStatement': return deleteChildRow('debt_statements', p, uid);
     case 'setCurrency': return setCurrency(p, uid);
-    case 'addSavings': return addSavings(p);
-    case 'transferSavingsToFunds': return transferSavingsToFunds(p);
     default: throw new Error('Unknown action: ' + action);
   }
-}
-
-function addFund(p) {
-  var fund = { id: nextId('funds'), source: p.source, amount: p.amount, date: p.date, notes: p.notes || '' };
-  appendRow('funds', fund);
-  return coerce('funds', fund);
-}
-
-function addBill(p) {
-  var bill = { id: nextId('bills'), name: p.name, amount: p.amount, due_date: p.due_date, paid: p.paid === true, notes: p.notes || '' };
-  appendRow('bills', bill);
-  return coerce('bills', bill);
-}
-
-function setBillPaid(p) {
-  setCell('bills', p.id, 'paid', p.paid === true);
-  return getById('bills', p.id);
-}
-
-function addExpendable(p) {
-  var entry = { id: nextId('expendable'), month: p.month, daily_amount: p.daily_amount, date: p.date, notes: p.notes || '' };
-  appendRow('expendable', entry);
-  return coerce('expendable', entry);
-}
-
-function setMonthlyBudget(p) {
-  return upsertSetting('budget_' + p.month, p.amount);
 }
 
 function addDebt(p, uid) {
@@ -665,13 +708,6 @@ function deleteChildRow(name, p, uid) {
 function setCurrency(p, uid) {
   setCell('users', uid, 'currency', p.currency);
   return null;
-}
-
-function addSavings(p) {
-  var prior = sumField(readRows('savings'), 'amount') - sumField(readRows('savings_transfers'), 'amount');
-  var entry = { id: nextId('savings'), date: p.date, amount: p.amount, source: p.source, total: prior + num(p.amount), notes: p.notes || '' };
-  appendRow('savings', entry);
-  return coerce('savings', entry);
 }
 
 function transferSavingsToFunds(p) {

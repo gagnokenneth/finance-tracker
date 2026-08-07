@@ -25,6 +25,17 @@ export function normalizeUsername(username: string): string {
   return username.trim().toLowerCase()
 }
 
+/**
+ * Must match isValidUsername in apps-script/Code.gs. ASCII only: the session
+ * token is base64-encoded, and a non-Latin-1 username would either throw in
+ * btoa or decode to mojibake.
+ */
+export const USERNAME_RULE = '3-32 characters: letters, numbers, dot, dash or underscore.'
+
+export function isValidUsername(username: string): boolean {
+  return /^[a-z0-9][a-z0-9._-]{2,31}$/.test(normalizeUsername(username))
+}
+
 function toHex(bytes: Uint8Array): string {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
 }

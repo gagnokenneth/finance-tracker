@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useAuth } from '../auth/useAuth.ts'
-import { MIN_PASSWORD_LENGTH } from '../auth/password.ts'
+import { MIN_PASSWORD_LENGTH, USERNAME_RULE, isValidUsername } from '../auth/password.ts'
 import { Field, TextInput } from '../components/ui.tsx'
 import { isLiveApi } from '../api/index.ts'
 
@@ -37,8 +37,12 @@ export function SignIn() {
     e.preventDefault()
     setError(null)
 
+    if (creating && !isValidUsername(username)) {
+      setError(`Use ${USERNAME_RULE}`)
+      return
+    }
     if (creating && password.length < MIN_PASSWORD_LENGTH) {
-      setError(`Use at least ${MIN_PASSWORD_LENGTH} characters.`)
+      setError(`Use at least ${MIN_PASSWORD_LENGTH} characters for your password.`)
       return
     }
 

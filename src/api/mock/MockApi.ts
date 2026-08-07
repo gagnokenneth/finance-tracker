@@ -28,7 +28,7 @@ import type {
 } from '../../types.ts'
 import { createSeed } from './seed.ts'
 import { readToken, decodeSession } from '../../auth/session.ts'
-import { normalizeUsername } from '../../auth/password.ts'
+import { normalizeUsername, isValidUsername, USERNAME_RULE } from '../../auth/password.ts'
 
 const KEY = 'finance-mock-db'
 
@@ -117,7 +117,7 @@ export class MockApi implements FinanceApi {
     const username = normalizeUsername(input.username)
     // Mock mode takes no invite code — local development should not need one.
     // The live backend still requires and burns a real code.
-    if (username.length < 3) throw new Error('Pick a username of at least 3 characters.')
+    if (!isValidUsername(username)) throw new Error(`Use ${USERNAME_RULE}`)
     if (db.users.some((u) => u.username === username)) throw new Error('That username is taken.')
 
     const user: MockUser = { id: nextId(db.users), username, pw_hash: input.derived }
