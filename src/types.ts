@@ -1,5 +1,6 @@
 export type DebtType = 'straight' | 'installment'
 export type SavingsSource = 'funds' | 'remaining_expendable'
+export type Currency = 'PHP' | 'USD'
 
 export interface FundEntry {
   id: number
@@ -64,6 +65,7 @@ export interface Settings {
   // monthly expendable budget keyed by yyyy-mm
   monthlyBudgets: Record<string, number>
   allowedEmails: string[]
+  currency: Currency
 }
 
 /** All sheets, as the frontend holds them in memory. */
