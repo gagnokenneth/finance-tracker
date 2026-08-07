@@ -2,6 +2,7 @@ import { createContext, useState, useCallback, useEffect, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { getToken, setToken, clearToken, AUTH_EXPIRED_EVENT } from './token.ts'
 import { decodeJwt } from './googleJwt.ts'
+import { readMockUser, writeMockUser, clearMockUser } from './mockSession.ts'
 
 export interface AuthUser {
   email: string
@@ -24,9 +25,11 @@ const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? ''
 const STUB_USER: AuthUser = { email: 'ken.gagno@vibeteams.ai', name: 'Ken' }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  // Restore a still-valid token during init (pure) — never setState in the effect.
+  // Restore the session during init (pure) — never setState in the effect.
   const [user, setUser] = useState<AuthUser | null>(() => {
-    if (!LIVE) return null
+    // Mock mode has no token; its stub session is persisted separately so a
+    // reload doesn't bounce you back to the sign-in screen.
+    if (!LIVE) return readMockUser()
     const existing = getToken()
     if (!existing) return null
     const p = decodeJwt(existing)
@@ -49,6 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(() => {
     clearToken()
+    clearMockUser()
     setUser(null)
     if (LIVE) window.google?.accounts.id.disableAutoSelect()
   }, [])
@@ -91,8 +95,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [adoptToken])
 
   const signIn = useCallback(() => {
-    if (LIVE) window.google?.accounts.id.prompt()
-    else setUser(STUB_USER)
+    if (LIVE) {
+      window.google?.accounts.id.prompt()
+      return
+    }
+    writeMockUser(STUB_USER)
+    setUser(STUB_USER)
   }, [])
 
   return (
