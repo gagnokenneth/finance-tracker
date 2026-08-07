@@ -1,4 +1,4 @@
-export type DebtType = 'straight' | 'installment'
+export type DebtType = 'fixed' | 'revolving'
 export type SavingsSource = 'funds' | 'remaining_expendable'
 export type Currency = 'PHP' | 'USD'
 
@@ -30,19 +30,31 @@ export interface ExpendableEntry {
 export interface Debt {
   id: number
   name: string
-  total_amount: number
-  remaining: number
   type: DebtType
-  interest_rate: number
-  notes?: string
 }
 
-export interface DebtPayment {
+/** One installment of a fixed debt. */
+export interface DebtScheduleRow {
   id: number
   debt_id: number
-  amount_paid: number
-  date: string
-  notes?: string
+  due_date: string // ISO yyyy-mm-dd
+  amount: number
+  paid: boolean
+  paid_date?: string
+  paid_amount?: number
+}
+
+/** One statement of a revolving debt. */
+export interface DebtStatement {
+  id: number
+  debt_id: number
+  due_date: string
+  min_due: number
+  total_due: number
+  outstanding: number
+  paid: boolean
+  paid_date?: string
+  paid_amount?: number
 }
 
 export interface SavingsEntry {
@@ -74,7 +86,8 @@ export interface FinanceData {
   bills: Bill[]
   expendable: ExpendableEntry[]
   debts: Debt[]
-  debt_payments: DebtPayment[]
+  debt_schedule: DebtScheduleRow[]
+  debt_statements: DebtStatement[]
   savings: SavingsEntry[]
   savings_transfers: SavingsTransfer[]
   settings: Settings
