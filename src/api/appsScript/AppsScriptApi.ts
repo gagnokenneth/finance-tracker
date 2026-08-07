@@ -68,6 +68,7 @@ export class AppsScriptApi implements FinanceApi {
         throw new Error(
           `The backend did not respond within ${REQUEST_TIMEOUT_MS / 1000}s (${action}). ` +
             'Check Executions in the Apps Script editor.',
+          { cause: err },
         )
       }
       throw err
@@ -82,10 +83,11 @@ export class AppsScriptApi implements FinanceApi {
     let json: { data?: T; error?: string }
     try {
       json = JSON.parse(body) as { data?: T; error?: string }
-    } catch {
+    } catch (err) {
       throw new Error(
         `The backend returned a non-JSON response (HTTP ${res.status}) for ${action}: ` +
           `${body.slice(0, 200)}`,
+        { cause: err },
       )
     }
 
