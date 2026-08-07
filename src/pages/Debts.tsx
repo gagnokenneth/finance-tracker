@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useFinanceData } from '../hooks/useFinanceData.ts'
 import { nextDueDate, totalBalance } from '../lib/debts.ts'
 import { Money } from '../components/Money.tsx'
@@ -10,6 +10,7 @@ import { AddDebtModal } from './debts/AddDebtModal.tsx'
 
 export function Debts() {
   const { data, isLoading, isError } = useFinanceData()
+  const navigate = useNavigate()
   const [adding, setAdding] = useState(false)
 
   if (isLoading) return <p className="text-slate-500">Loading…</p>
@@ -31,7 +32,13 @@ export function Debts() {
       ) : (
         <Table headers={['Name', 'Next Due', 'Total Balance']}>
           {data.debts.map((d) => (
-            <tr key={d.id} className="hover:bg-slate-50">
+            // Row click is a convenience; the name Link is the real target, so
+            // keyboard and screen-reader users still get proper navigation.
+            <tr
+              key={d.id}
+              onClick={() => void navigate(`/debts/${d.id}`)}
+              className="cursor-pointer hover:bg-slate-50"
+            >
               <td className="px-3 py-2">
                 <Link to={`/debts/${d.id}`} className="font-medium text-slate-900 hover:underline">
                   {d.name}
