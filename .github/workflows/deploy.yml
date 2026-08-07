@@ -30,7 +30,12 @@ jobs:
           VITE_APPS_SCRIPT_URL: ${{ secrets.VITE_APPS_SCRIPT_URL }}
           VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
       - run: cp dist/index.html dist/404.html
+      # enablement creates the Pages site via the API when it does not exist yet.
+      # Without it, the first run fails with "Get Pages site failed" until Pages
+      # has been configured by hand in repo settings.
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
