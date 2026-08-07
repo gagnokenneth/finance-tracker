@@ -129,7 +129,7 @@ mode — see below.
 | Symptom | Cause |
 |---|---|
 | Data loads but nothing reaches the Sheet | `VITE_APPS_SCRIPT_URL` missing. `getApi()` falls back to `MockApi` with only a console warning, so the site serves local seed data. |
-| "Signup is closed" | No `signup_code` row in the `settings` sheet. |
+| "That invite code isn't valid or has already been used" | Every code is single-use. Check `invites` for a row with an empty `used_by`. |
 | `unauthorized` on every request | The stored session was signed with a different `SESSION_SECRET`. Sign in again. |
 | Everyone logged out at once | `SESSION_SECRET` changed. |
 | All passwords suddenly wrong | `PW_PEPPER` changed. It must never be rotated. |

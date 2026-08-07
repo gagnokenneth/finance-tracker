@@ -4,6 +4,8 @@
 // Secrets are generated automatically on first use; nothing to paste here.
 // Full steps: docs/superpowers/guides/apps-script-setup.md
 
+var INVITE_COUNT = 50;
+
 var SHEETS = {
   users: ['id', 'username', 'pw_hash', 'currency', 'created'],
   funds: ['id', 'source', 'amount', 'date', 'notes'],
@@ -14,6 +16,7 @@ var SHEETS = {
   debt_statements: ['id', 'user_id', 'debt_id', 'due_date', 'min_due', 'total_due', 'outstanding', 'paid', 'paid_date', 'paid_amount'],
   savings: ['id', 'date', 'amount', 'source', 'total', 'notes'],
   savings_transfers: ['id', 'date', 'amount', 'notes'],
+  invites: ['code', 'used_by', 'used_at'],
   settings: ['key', 'value']
 };
 
@@ -22,7 +25,7 @@ var SHEETS = {
  * so the new shape is applied on the very next request after a deployment,
  * instead of up to an hour later.
  */
-var SCHEMA_VERSION = 2;
+var SCHEMA_VERSION = 3;
 
 var DATA_SHEETS = ['funds', 'bills', 'expendable', 'debts', 'debt_schedule', 'debt_statements', 'savings', 'savings_transfers'];
 
@@ -108,13 +111,56 @@ function ensureSheets() {
     }
     if (headersMatch(sh, name)) continue;
 
-    // Stale shape. The old tab is RENAMED, never deleted: this runs
-    // automatically, and automatic data loss is not an acceptable trade for
-    // saving a manual step. The archived tab stays alongside for inspection.
-    sh.setName(name + '_old_' + timestampSuffix());
+    // Stale shape: dropped and recreated. This DISCARDS the rows in that tab —
+    // deliberate, so a deployment needs no manual sheet surgery. Other tabs
+    // always exist, so deleting this one can never leave the file empty.
+    spreadsheet.deleteSheet(sh);
     writeHeaders(spreadsheet.insertSheet(name), name);
   }
+
+  seedInvites();
   cache.put(readyKey, '1', 3600);
+}
+
+/**
+ * Puts INVITE_COUNT single-use codes in the invites sheet when it is empty, so a
+ * fresh deployment can hand out accounts without inventing codes by hand. Read
+ * them from the sheet; only you can see it.
+ */
+function seedInvites() {
+  var sh = sheet('invites');
+  if (sh.getLastRow() > 1) return; // already seeded
+  var rows = [];
+  for (var i = 0; i < INVITE_COUNT; i++) rows.push([newInviteCode(), '', '']);
+  sh.getRange(2, 1, rows.length, 3).setValues(rows);
+}
+
+/** Eight hex characters from a v4 UUID, grouped for readability. */
+function newInviteCode() {
+  var hex = Utilities.getUuid().replace(/-/g, '').toUpperCase();
+  return hex.slice(0, 4) + '-' + hex.slice(4, 8);
+}
+
+function normalizeCode(c) { return String(c || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, ''); }
+
+/**
+ * Returns the sheet row of a matching unused code, or -1. Codes are compared
+ * with punctuation stripped, so "ab12cd34" and "AB12-CD34" both work.
+ */
+function findUnusedInvite(code) {
+  var wanted = normalizeCode(code);
+  if (!wanted) return -1;
+  var rows = readRows('invites');
+  for (var i = 0; i < rows.length; i++) {
+    if (normalizeCode(rows[i].code) === wanted && blank(rows[i].used_by)) return i + 2;
+  }
+  return -1;
+}
+
+function markInviteUsed(rowIndex, username) {
+  var sh = sheet('invites');
+  sh.getRange(rowIndex, 2).setValue(username);
+  sh.getRange(rowIndex, 3).setValue(new Date().toISOString().slice(0, 10));
 }
 
 function writeHeaders(sh, name) {
@@ -132,10 +178,6 @@ function headersMatch(sh, name) {
     if (String(actual[i]).trim().toLowerCase() !== expected[i]) return false;
   }
   return true;
-}
-
-function timestampSuffix() {
-  return Utilities.formatDate(new Date(), ss().getSpreadsheetTimeZone(), 'yyyyMMdd-HHmmss');
 }
 
 function json(obj) {
@@ -256,9 +298,8 @@ function signup(p) {
   if (username.length < 3) return { error: 'Pick a username of at least 3 characters.' };
   if (!p.derived) return { error: 'Use at least 10 characters.' };
 
-  var expected = settingValue('signup_code');
-  if (!expected) return { error: 'Signup is closed. No signup_code is set in the settings sheet.' };
-  if (String(p.invite_code || '') !== expected) return { error: "That invite code isn't valid." };
+  var inviteRow = findUnusedInvite(p.invite_code);
+  if (inviteRow === -1) return { error: "That invite code isn't valid or has already been used." };
 
   if (findUserByUsername(username)) return { error: 'That username is taken.' };
 
@@ -270,6 +311,7 @@ function signup(p) {
     created: new Date().toISOString().slice(0, 10)
   };
   appendRow('users', user);
+  markInviteUsed(inviteRow, username); // single use — burn it
   SpreadsheetApp.flush();
 
   return { data: sessionResponse(user.id, username) };
@@ -456,14 +498,6 @@ function sumField(rows, field) {
   var t = 0;
   for (var i = 0; i < rows.length; i++) t += num(rows[i][field]);
   return t;
-}
-
-function settingValue(key) {
-  var rows = readRows('settings');
-  for (var i = 0; i < rows.length; i++) {
-    if (String(rows[i].key) === key) return String(rows[i].value);
-  }
-  return '';
 }
 
 /** Global settings only. Currency is per-user and attached by getAll. */

@@ -24,26 +24,28 @@ One-time setup to connect the app to your private Google Sheet and deploy it.
    - `debt_statements`: `id | user_id | debt_id | due_date | min_due | total_due | outstanding | paid | paid_date | paid_amount`
    - `savings`: `id | date | amount | source | total | notes`
    - `savings_transfers`: `id | date | amount | notes`
+   - `invites`: `code | used_by | used_at`
    - `settings`: `key | value`
 
    `debt_schedule` holds the installments of a **fixed** debt; `debt_statements`
    holds the statements of a **revolving** one. A debt uses whichever table
    matches its `type`.
 
-3. In `settings`, add one row — **signup is closed until it exists**:
-   - `key` = `signup_code`, `value` = a code of your choosing
+3. Nothing to add by hand. On the first request the backend generates **50
+   single-use invite codes** into the `invites` sheet. Open that tab, and hand a
+   code to each person who should get an account — one signup burns one code,
+   recorded with the username that used it.
 
-   You hand that code to anyone who should be able to create an account. Change
-   it at any time to stop new signups. Every account then sees only its own data.
+   Delete unused rows to stop new signups; add your own rows to allow more.
 
    (The app also writes `budget_<month>` rows when you set a monthly budget.)
 
-> **Upgrading an existing sheet is automatic.** On the first request after a
-> deployment, the backend compares each tab's header row against the expected
-> columns. A tab whose shape is stale is **renamed** to
-> `<name>_old_<timestamp>` and a fresh one is created in its place — the old rows
-> are archived beside it, never deleted, so nothing is lost if the change was
-> unexpected. Delete the archived tabs yourself once you are satisfied.
+> **Upgrading an existing sheet is automatic, and destructive.** On the first
+> request after a deployment the backend compares each tab's header row against
+> the expected columns. A tab whose shape is stale is **deleted and recreated**,
+> discarding the rows it held. That is deliberate — a deployment needs no manual
+> sheet surgery — but it means a column change wipes that tab. Bumping
+> `SCHEMA_VERSION` in `Code.gs` is what triggers the re-check.
 >
 > Old `allowed_email` rows can stay; they are simply ignored.
 

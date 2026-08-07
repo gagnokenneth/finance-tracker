@@ -39,10 +39,31 @@ interface MockUser {
   pw_hash: string
 }
 
+interface MockInvite {
+  code: string
+  used_by: string
+}
+
 /** One FinanceData blob per user id, so isolation comes for free. */
 interface MockDb {
   users: MockUser[]
+  invites: MockInvite[]
   data: Record<string, FinanceData>
+}
+
+const INVITE_COUNT = 50
+
+/** Eight hex characters, grouped — same shape the backend generates. */
+function newInviteCode(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(4))
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0'))
+    .join('')
+    .toUpperCase()
+  return `${hex.slice(0, 4)}-${hex.slice(4, 8)}`
+}
+
+function normalizeCode(code: string): string {
+  return code.trim().toUpperCase().replace(/[^A-Z0-9]/g, '')
 }
 
 function nextId<T extends { id: number }>(rows: T[]): number {
@@ -73,7 +94,11 @@ export class MockApi implements FinanceApi {
   private loadDb(): MockDb {
     const raw = localStorage.getItem(KEY)
     if (raw) return JSON.parse(raw) as MockDb
-    const fresh: MockDb = { users: [], data: {} }
+    const fresh: MockDb = {
+      users: [],
+      invites: Array.from({ length: INVITE_COUNT }, () => ({ code: newInviteCode(), used_by: '' })),
+      data: {},
+    }
     this.saveDb(fresh)
     return fresh
   }
@@ -109,17 +134,23 @@ export class MockApi implements FinanceApi {
     return value
   }
 
+  /** Mock codes, for local testing. Read them from the console: getApi().mockInvites() */
+  mockInvites(): MockInvite[] {
+    return this.loadDb().invites
+  }
+
   async signup(input: SignupInput): Promise<AuthResult> {
     const db = this.loadDb()
     const username = normalizeUsername(input.username)
-    // Mock has no settings sheet holding a real code, but the field is still
-    // required so the signup form is exercised the way it is on live.
-    if (!input.invite_code.trim()) throw new Error("That invite code isn't valid.")
+    const wanted = normalizeCode(input.invite_code)
+    const invite = db.invites.find((i) => normalizeCode(i.code) === wanted && !i.used_by)
+    if (!invite) throw new Error("That invite code isn't valid or has already been used.")
     if (username.length < 3) throw new Error('Pick a username of at least 3 characters.')
     if (db.users.some((u) => u.username === username)) throw new Error('That username is taken.')
 
     const user: MockUser = { id: nextId(db.users), username, pw_hash: input.derived }
     db.users.push(user)
+    invite.used_by = username // single use — burn it
     db.data[String(user.id)] = createSeed()
     this.saveDb(db)
     return this.delay({ token: mockToken(user), user: { id: user.id, username } })
