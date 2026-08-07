@@ -34,9 +34,9 @@ export function AddDebtModal({ open, onClose }: { open: boolean; onClose: () => 
   if (type === 'fixed' && total && months) {
     try {
       const rows = buildSchedule(firstDue, Number(total), Number(months))
-      preview = `${rows.length} rows @ ${formatMoney(rows[0].amount, currency)}`
+      preview = `${rows.length} payments of ${formatMoney(rows[0].amount, currency)}`
       if (rows[rows.length - 1].amount !== rows[0].amount) {
-        preview += ` (last ${formatMoney(rows[rows.length - 1].amount, currency)})`
+        preview += `, last one ${formatMoney(rows[rows.length - 1].amount, currency)}`
       }
     } catch (err) {
       previewError = err instanceof Error ? err.message : 'Invalid schedule'
@@ -75,7 +75,7 @@ export function AddDebtModal({ open, onClose }: { open: boolean; onClose: () => 
   }
 
   return (
-    <Modal open={open} title="Add Debt" onClose={onClose}>
+    <Modal open={open} title="Add debt" onClose={onClose}>
       <form onSubmit={submit} className="flex flex-col gap-3">
         <Field label="Name">
           <TextInput value={name} onChange={(e) => setName(e.target.value)} required />
@@ -117,8 +117,8 @@ export function AddDebtModal({ open, onClose }: { open: boolean; onClose: () => 
                 required
               />
             </Field>
-            {preview && <p className="text-xs text-slate-500">→ {preview}</p>}
-            {previewError && <p className="text-xs text-red-600">{previewError}</p>}
+            {preview && <p className="text-xs text-ink-soft">→ {preview}</p>}
+            {previewError && <p className="text-xs text-overdue">{previewError}</p>}
           </>
         ) : (
           <>
@@ -164,7 +164,7 @@ export function AddDebtModal({ open, onClose }: { open: boolean; onClose: () => 
         )}
 
         {addDebt.isError && (
-          <p className="text-sm text-red-600">Could not add debt. Please try again.</p>
+          <p className="text-sm text-overdue">That debt didn’t save. Check your connection and try again.</p>
         )}
 
         <div className="mt-1 flex justify-end gap-2">
@@ -172,7 +172,7 @@ export function AddDebtModal({ open, onClose }: { open: boolean; onClose: () => 
             Cancel
           </SecondaryButton>
           <Button type="submit" disabled={addDebt.isPending || previewError !== null}>
-            Add Debt
+            Add debt
           </Button>
         </div>
       </form>

@@ -1,1 +1,48 @@
 @import "tailwindcss";
+
+/*
+ * Design tokens for the debt tracker.
+ *
+ * The app is ~80% figures, so the numerals carry the personality: IBM Plex
+ * Mono for every amount, date and count, IBM Plex Sans for everything else.
+ * Paper is a cool grey rather than a warm cream, so the ink and the money
+ * stay the only warm-neutral contrast on screen.
+ */
+@theme {
+  --font-sans:
+    "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+
+  --color-ink: #101828;
+  --color-ink-soft: #475467;
+  --color-ink-faint: #98a2b3;
+
+  --color-paper: #f6f7f9;
+  --color-edge: #e4e7ec;
+
+  --color-brand: #4338ca;
+  --color-brand-dark: #372fa8;
+
+  --color-overdue: #b42318;
+  --color-soon: #b54708;
+  --color-settled: #067647;
+
+  --color-overdue-wash: #fef3f2;
+  --color-soon-wash: #fffaeb;
+  --color-settled-wash: #ecfdf3;
+}
+
+/* Money and dates must align in columns; Plex Mono is tabular by default,
+   but lining figures are forced here so mixed contexts stay aligned too. */
+.tnum {
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

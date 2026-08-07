@@ -23,8 +23,8 @@ export function ConfirmDialog({
 }) {
   return (
     <Modal open={open} title={title} onClose={onClose}>
-      <p className="text-sm text-slate-700">{message}</p>
-      {error && <p className="mt-2 text-sm text-red-600">Could not delete. Please try again.</p>}
+      <p className="text-sm text-ink">{message}</p>
+      {error && <p className="mt-2 text-sm text-overdue">That didn’t delete. Check your connection and try again.</p>}
       <div className="mt-4 flex justify-end gap-2">
         <SecondaryButton type="button" onClick={onClose}>
           Cancel

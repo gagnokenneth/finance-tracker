@@ -30,18 +30,18 @@ export function EditDebtModal({
   }
 
   return (
-    <Modal open={open} title="Edit Debt" onClose={onClose}>
+    <Modal open={open} title="Rename debt" onClose={onClose}>
       <form onSubmit={submit} className="flex flex-col gap-3">
         <Field label="Name">
           <TextInput value={name} onChange={(e) => setName(e.target.value)} required />
         </Field>
-        {error && <p className="text-sm text-red-600">Could not save. Please try again.</p>}
+        {error && <p className="text-sm text-overdue">That didn’t save. Check your connection and try again.</p>}
         <div className="mt-1 flex justify-end gap-2">
           <SecondaryButton type="button" onClick={onClose}>
             Cancel
           </SecondaryButton>
           <Button type="submit" disabled={pending}>
-            Save
+            Rename
           </Button>
         </div>
       </form>

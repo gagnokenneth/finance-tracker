@@ -3,8 +3,8 @@ import type { Currency } from '../types.ts'
 export const DEFAULT_CURRENCY: Currency = 'PHP'
 
 export const CURRENCY_LABELS: Record<Currency, string> = {
-  PHP: '₱  Philippine Peso (PHP)',
-  USD: '$  US Dollar (USD)',
+  PHP: 'Philippine peso',
+  USD: 'US dollar',
 }
 
 const CACHE_KEY = 'finance.currency'

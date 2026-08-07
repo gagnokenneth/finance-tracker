@@ -2,7 +2,6 @@ import { useFinanceData } from '../hooks/useFinanceData.ts'
 import { useFinanceMutations } from '../hooks/useFinanceMutations.ts'
 import { useCurrency } from '../hooks/useCurrency.ts'
 import { CURRENCY_LABELS } from '../lib/currency.ts'
-import { Card } from '../components/Card.tsx'
 import type { Currency } from '../types.ts'
 
 const OPTIONS: Currency[] = ['PHP', 'USD']
@@ -12,35 +11,55 @@ export function Settings() {
   const { setCurrency } = useFinanceMutations()
   const currency = useCurrency()
 
-  if (isLoading) return <p className="text-slate-500">Loading…</p>
-  if (isError) return <p className="text-red-600">Failed to load settings.</p>
+  if (isLoading) return <p className="text-ink-soft">Loading…</p>
+  if (isError) return <p className="text-overdue">Could not load settings. Reload to try again.</p>
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-semibold text-slate-900">Settings</h1>
-      <Card title="Currency">
-        <div className="flex flex-col gap-2">
-          {OPTIONS.map((c) => (
-            <label key={c} className="flex items-center gap-2 text-sm text-slate-700">
-              <input
-                type="radio"
-                name="currency"
-                value={c}
-                checked={currency === c}
-                disabled={setCurrency.isPending}
-                onChange={() => setCurrency.mutate(c)}
-              />
-              {CURRENCY_LABELS[c]}
-            </label>
-          ))}
-        </div>
-        <p className="mt-3 text-xs text-slate-500">
-          Changes the displayed symbol only — amounts are not converted.
+      <h1 className="text-2xl font-semibold tracking-tight text-ink">Settings</h1>
+
+      <section className="rounded-2xl border border-edge bg-white p-6">
+        <h2 className="text-xs font-semibold tracking-wide text-ink-soft uppercase">Currency</h2>
+        <p className="mt-1 text-sm text-ink-soft">
+          Changes the symbol on every amount. Nothing is converted.
         </p>
+
+        <div className="mt-4 grid gap-2 sm:grid-cols-2">
+          {OPTIONS.map((c) => {
+            const active = currency === c
+            return (
+              <label
+                key={c}
+                className={`flex cursor-pointer items-center gap-3 rounded-xl border p-4 transition-colors ${
+                  active ? 'border-brand bg-brand/5' : 'border-edge hover:bg-paper'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="currency"
+                  value={c}
+                  checked={active}
+                  disabled={setCurrency.isPending}
+                  onChange={() => setCurrency.mutate(c)}
+                  className="accent-brand"
+                />
+                <span>
+                  <span className="block font-mono text-lg text-ink">
+                    {c === 'PHP' ? '₱' : '$'}
+                  </span>
+                  <span className="block text-sm text-ink-soft">{CURRENCY_LABELS[c]}</span>
+                </span>
+              </label>
+            )
+          })}
+        </div>
+
         {setCurrency.isError && (
-          <p className="mt-2 text-sm text-red-600">Could not save. Please try again.</p>
+          <p className="mt-3 text-sm text-overdue">
+            That didn&rsquo;t save. Check your connection and try again.
+          </p>
         )}
-      </Card>
+      </section>
     </div>
   )
 }

@@ -18,10 +18,10 @@ export function Modal({
         type="button"
         aria-label="Close"
         onClick={onClose}
-        className="absolute inset-0 bg-slate-900/40"
+        className="absolute inset-0 bg-ink/40 backdrop-blur-[2px]"
       />
-      <div className="relative z-10 max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl border border-slate-200 bg-white p-4 shadow-lg">
-        <h2 className="mb-3 text-base font-semibold text-slate-900">{title}</h2>
+      <div className="relative z-10 max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl border border-edge bg-white p-6 shadow-xl shadow-ink/10">
+        <h2 className="mb-4 text-base font-semibold tracking-tight text-ink">{title}</h2>
         {children}
       </div>
     </div>

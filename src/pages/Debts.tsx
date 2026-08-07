@@ -1,58 +1,93 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { useFinanceData } from '../hooks/useFinanceData.ts'
-import { nextDueDate, totalBalance } from '../lib/debts.ts'
+import { nextDueDate, scheduleFor, statementsFor, totalBalance } from '../lib/debts.ts'
 import { Money } from '../components/Money.tsx'
-import { Table } from '../components/Table.tsx'
 import { DueBadge } from '../components/DueBadge.tsx'
+import { InstallmentStrip } from '../components/InstallmentStrip.tsx'
 import { Button } from '../components/ui.tsx'
 import { AddDebtModal } from './debts/AddDebtModal.tsx'
+import type { Debt, FinanceData } from '../types.ts'
+
+function DebtRow({ debt, data }: { debt: Debt; data: FinanceData }) {
+  const rows =
+    debt.type === 'fixed'
+      ? scheduleFor(data.debt_schedule, debt.id)
+      : statementsFor(data.debt_statements, debt.id)
+  const paid = rows.filter((r) => r.paid).length
+
+  return (
+    <Link
+      to={`/debts/${debt.id}`}
+      className="block rounded-xl border border-edge bg-white p-5 transition-shadow hover:shadow-md hover:shadow-ink/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+    >
+      <div className="flex items-start justify-between gap-4">
+        <span className="font-semibold tracking-tight text-ink">{debt.name}</span>
+        <Money
+          value={totalBalance(debt, data.debt_schedule, data.debt_statements)}
+          className="text-base font-semibold"
+        />
+      </div>
+
+      <div className="mt-4">
+        {debt.type === 'fixed' ? (
+          <InstallmentStrip kind="fixed" paid={paid} total={rows.length} />
+        ) : (
+          <InstallmentStrip kind="revolving" paid={paid} />
+        )}
+      </div>
+
+      <div className="mt-4 flex items-center gap-2 text-xs text-ink-faint">
+        <span>Next</span>
+        <DueBadge dueDate={nextDueDate(debt, data.debt_schedule, data.debt_statements)} />
+      </div>
+    </Link>
+  )
+}
 
 export function Debts() {
   const { data, isLoading, isError } = useFinanceData()
-  const navigate = useNavigate()
   const [adding, setAdding] = useState(false)
 
-  if (isLoading) return <p className="text-slate-500">Loading…</p>
-  if (isError || !data) return <p className="text-red-600">Failed to load debts.</p>
+  if (isLoading) return <p className="text-ink-soft">Loading…</p>
+  if (isError || !data) return <p className="text-overdue">Could not load your debts. Reload to try again.</p>
+
+  const owed = data.debts.reduce(
+    (sum, d) => sum + totalBalance(d, data.debt_schedule, data.debt_statements),
+    0,
+  )
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-slate-900">Debts</h1>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-ink">Debts</h1>
+          {data.debts.length > 0 && (
+            <p className="mt-1 text-sm text-ink-soft">
+              <Money value={owed} className="font-semibold" /> left across{' '}
+              <span className="tnum font-mono">{data.debts.length}</span>{' '}
+              {data.debts.length === 1 ? 'debt' : 'debts'}
+            </p>
+          )}
+        </div>
         <Button type="button" onClick={() => setAdding(true)}>
-          + Add Debt
+          Add debt
         </Button>
       </div>
 
       {data.debts.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center">
-          <p className="text-slate-500">No debts yet.</p>
+        <div className="rounded-xl border border-dashed border-edge bg-white p-12 text-center">
+          <p className="font-medium text-ink">Nothing tracked yet</p>
+          <p className="mt-1 text-sm text-ink-soft">
+            Add a loan or a credit card to start counting down payments.
+          </p>
         </div>
       ) : (
-        <Table headers={['Name', 'Next Due', 'Total Balance']}>
+        <div className="space-y-3">
           {data.debts.map((d) => (
-            // Row click is a convenience; the name Link is the real target, so
-            // keyboard and screen-reader users still get proper navigation.
-            <tr
-              key={d.id}
-              onClick={() => void navigate(`/debts/${d.id}`)}
-              className="cursor-pointer hover:bg-slate-50"
-            >
-              <td className="px-3 py-2">
-                <Link to={`/debts/${d.id}`} className="font-medium text-slate-900 hover:underline">
-                  {d.name}
-                </Link>
-              </td>
-              <td className="px-3 py-2">
-                <DueBadge dueDate={nextDueDate(d, data.debt_schedule, data.debt_statements)} />
-              </td>
-              <td className="px-3 py-2">
-                <Money value={totalBalance(d, data.debt_schedule, data.debt_statements)} />
-              </td>
-            </tr>
+            <DebtRow key={d.id} debt={d} data={data} />
           ))}
-        </Table>
+        </div>
       )}
 
       {/* Mounted only while open, so the form resets without a manual reset(). */}

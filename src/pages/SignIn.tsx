@@ -10,12 +10,19 @@ export function SignIn() {
   }, [live, renderButton])
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-white to-slate-100 px-4">
-      <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-lg shadow-slate-900/5">
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Finance Tracker</h1>
+    <div className="flex min-h-screen items-center justify-center bg-paper px-4">
+      <div className="w-full max-w-sm rounded-2xl border border-edge bg-white p-8 shadow-lg shadow-ink/5">
+        {/* A settled strip: the state this app exists to get you to. */}
+        <div aria-hidden className="flex gap-[3px]">
+          {Array.from({ length: 12 }, (_, i) => (
+            <span key={i} className="h-1.5 flex-1 rounded-[2px] bg-settled" />
+          ))}
+        </div>
+
+        <h1 className="mt-6 text-2xl font-semibold tracking-tight text-ink">Finance Tracker</h1>
         {/* Names only what the app currently exposes — bills and savings are
             no longer reachable, so listing them would be inaccurate. */}
-        <p className="mt-2 text-sm text-slate-500">
+        <p className="mt-2 text-sm text-ink-soft">
           Keep track of what you owe, and what&rsquo;s left to pay.
         </p>
 
@@ -26,7 +33,7 @@ export function SignIn() {
             <button
               type="button"
               onClick={signIn}
-              className="w-full rounded-lg bg-slate-900 py-2.5 text-sm font-medium text-white hover:bg-slate-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
+              className="w-full rounded-lg bg-ink py-2.5 text-sm font-medium text-white transition-colors hover:bg-ink/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
             >
               Sign in with Google
             </button>

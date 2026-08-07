@@ -39,10 +39,10 @@ export const ROW_STATUS_LABEL: Record<RowStatus, string> = {
  * meaning alone — always pair with ROW_STATUS_LABEL.
  */
 export const ROW_STATUS_CLASS: Record<RowStatus, string> = {
-  late: 'bg-red-50 text-red-700 ring-red-600/20',
-  'due-soon': 'bg-orange-50 text-orange-700 ring-orange-600/20',
-  upcoming: 'bg-yellow-50 text-yellow-800 ring-yellow-600/20',
-  paid: 'bg-green-50 text-green-700 ring-green-600/20',
+  late: 'bg-overdue-wash text-overdue ring-overdue/20',
+  'due-soon': 'bg-soon-wash text-soon ring-soon/20',
+  upcoming: 'bg-paper text-ink-soft ring-ink-faint/30',
+  paid: 'bg-settled-wash text-settled ring-settled/20',
 }
 
 /** Earliest unpaid row by due date, or null when everything is settled. */

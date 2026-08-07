@@ -67,7 +67,7 @@ export function RowFormModal({
   }
 
   const isEdit = initial !== null
-  const noun = kind === 'schedule' ? 'Row' : 'Statement'
+  const noun = kind === 'schedule' ? 'payment' : 'statement'
 
   return (
     <Modal open={open} title={`${isEdit ? 'Edit' : 'Add'} ${noun}`} onClose={onClose}>
@@ -127,7 +127,7 @@ export function RowFormModal({
           </>
         )}
 
-        <label className="flex items-center gap-2 text-sm text-slate-700">
+        <label className="flex items-center gap-2 text-sm text-ink">
           <input type="checkbox" checked={paid} onChange={(e) => setPaid(e.target.checked)} />
           Paid
         </label>
@@ -155,7 +155,7 @@ export function RowFormModal({
           </>
         )}
 
-        {error && <p className="text-sm text-red-600">Could not save. Please try again.</p>}
+        {error && <p className="text-sm text-overdue">That didn’t save. Check your connection and try again.</p>}
 
         <div className="mt-1 flex justify-end gap-2">
           <SecondaryButton type="button" onClick={onClose}>

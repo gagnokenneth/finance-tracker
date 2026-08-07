@@ -7,8 +7,9 @@ import { Money } from '../components/Money.tsx'
 import { Table } from '../components/Table.tsx'
 import { DueBadge } from '../components/DueBadge.tsx'
 import { StatusBadge } from '../components/StatusBadge.tsx'
+import { InstallmentStrip } from '../components/InstallmentStrip.tsx'
 import { ConfirmDialog } from '../components/ConfirmDialog.tsx'
-import { Button, SecondaryButton } from '../components/ui.tsx'
+import { Button, SecondaryButton, RowButton } from '../components/ui.tsx'
 import { EditDebtModal } from './debts/EditDebtModal.tsx'
 import { PayModal } from './debts/PayModal.tsx'
 import type { PayResult } from './debts/PayModal.tsx'
@@ -19,8 +20,8 @@ import type { NewScheduleRow, NewStatement } from '../api/FinanceApi.ts'
 type AnyRow = DebtScheduleRow | DebtStatement
 type RowForm = { mode: 'add' } | { mode: 'edit'; row: AnyRow }
 
-const FIXED_HEADERS = ['Due Date', 'Amount', 'Status', '']
-const REVOLVING_HEADERS = ['Due Date', 'Min Due', 'Total Due', 'Outstanding', 'Status', '']
+const FIXED_HEADERS = ['Due date', 'Amount', 'Status', '']
+const REVOLVING_HEADERS = ['Due date', 'Min due', 'Total due', 'Outstanding', 'Status', '']
 
 export function DebtDetail() {
   const { id } = useParams()
@@ -43,16 +44,17 @@ export function DebtDetail() {
   const [rowForm, setRowForm] = useState<RowForm | null>(null)
   const [deletingRow, setDeletingRow] = useState<AnyRow | null>(null)
 
-  if (isLoading) return <p className="text-slate-500">Loading…</p>
-  if (isError || !data) return <p className="text-red-600">Failed to load debts.</p>
+  if (isLoading) return <p className="text-ink-soft">Loading…</p>
+  if (isError || !data)
+    return <p className="text-overdue">Could not load your debts. Reload to try again.</p>
 
   const debtId = Number(id)
   const debt = data.debts.find((d) => d.id === debtId)
   if (!debt) {
     return (
-      <p className="text-slate-500">
-        Debt not found.{' '}
-        <Link to="/debts" className="text-slate-900 underline">
+      <p className="text-ink-soft">
+        That debt no longer exists.{' '}
+        <Link to="/debts" className="font-medium text-brand underline underline-offset-2">
           Back to debts
         </Link>
       </p>
@@ -63,6 +65,7 @@ export function DebtDetail() {
   const rows: AnyRow[] = isFixed
     ? scheduleFor(data.debt_schedule, debt.id)
     : statementsFor(data.debt_statements, debt.id)
+  const paidCount = rows.filter((r) => r.paid).length
 
   const balance = totalBalance(debt, data.debt_schedule, data.debt_statements)
   const next = nextDueDate(debt, data.debt_schedule, data.debt_statements)
@@ -124,12 +127,12 @@ export function DebtDetail() {
     row.paid ? (
       <span className="inline-flex flex-wrap items-center gap-2">
         <StatusBadge status="paid" />
-        <span className="text-xs text-slate-500">
+        <span className="tnum font-mono text-xs text-ink-faint">
           {row.paid_date}
           {row.paid_amount !== undefined && (
             <>
-              {' — '}
-              <Money value={row.paid_amount} className="text-xs" />
+              {' · '}
+              <Money value={row.paid_amount} className="text-xs !text-ink-faint" />
             </>
           )}
         </span>
@@ -138,112 +141,127 @@ export function DebtDetail() {
       <StatusBadge status={dueStatus(row.due_date)} />
     )
 
-  const actionCell = (row: AnyRow) => (
-    <div className="flex flex-wrap gap-2">
-      {!row.paid && (
-        <button
-          type="button"
-          onClick={() => setPayRow(row)}
-          className="rounded-md bg-slate-900 px-2 py-1 text-xs font-medium text-white hover:bg-slate-700"
-        >
-          Pay
-        </button>
-      )}
-      <button
-        type="button"
-        onClick={() => setRowForm({ mode: 'edit', row })}
-        className="rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100"
-      >
-        Edit
-      </button>
-      <button
-        type="button"
-        onClick={() => setDeletingRow(row)}
-        className="rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
-      >
-        Delete
-      </button>
-    </div>
-  )
-
-  const rowNoun = isFixed ? 'schedule rows' : 'statements'
+  const rowNoun = isFixed ? 'scheduled payments' : 'statements'
 
   return (
     <div className="space-y-6">
-      <Link to="/debts" className="text-sm text-slate-500 hover:underline">
+      <Link
+        to="/debts"
+        className="inline-block text-sm text-ink-soft underline-offset-2 hover:text-ink hover:underline"
+      >
         ← Debts
       </Link>
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <h1 className="text-xl font-semibold text-slate-900">{debt.name}</h1>
-          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
-            {debt.type}
-          </span>
+      {/* Hero: the payoff strip leads, because "how close am I to done" is the
+          question this page exists to answer. */}
+      <section className="rounded-2xl border border-edge bg-white p-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-ink">{debt.name}</h1>
+            <p className="mt-1 text-xs font-semibold tracking-wide text-ink-faint uppercase">
+              {isFixed ? 'Fixed term' : 'Revolving'}
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <SecondaryButton type="button" onClick={() => setEditingDebt(true)}>
+              Rename
+            </SecondaryButton>
+            <SecondaryButton
+              type="button"
+              onClick={() => setDeletingDebt(true)}
+              className="!text-overdue hover:!bg-overdue-wash"
+            >
+              Delete
+            </SecondaryButton>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <SecondaryButton type="button" onClick={() => setEditingDebt(true)}>
-            Edit
-          </SecondaryButton>
-          <button
-            type="button"
-            onClick={() => setDeletingDebt(true)}
-            className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50"
-          >
-            Delete
-          </button>
-        </div>
-      </div>
 
-      <p className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
-        <span>
-          Total balance <Money value={balance} className="font-semibold" />
-        </span>
-        <span className="text-slate-300">·</span>
-        <span className="flex items-center gap-2">
-          Next due <DueBadge dueDate={next} />
-        </span>
-      </p>
+        <div className="mt-6">
+          {isFixed ? (
+            <InstallmentStrip kind="fixed" paid={paidCount} total={rows.length} />
+          ) : (
+            <InstallmentStrip kind="revolving" paid={paidCount} />
+          )}
+        </div>
+
+        <dl className="mt-6 flex flex-wrap gap-x-10 gap-y-4 border-t border-edge pt-5">
+          <div>
+            <dt className="text-xs font-semibold tracking-wide text-ink-faint uppercase">
+              Balance left
+            </dt>
+            <dd className="mt-1">
+              <Money value={balance} className="text-xl font-semibold" />
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs font-semibold tracking-wide text-ink-faint uppercase">
+              Next payment
+            </dt>
+            <dd className="mt-1.5">
+              <DueBadge dueDate={next} />
+            </dd>
+          </div>
+        </dl>
+      </section>
 
       {rows.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center">
-          <p className="text-slate-500">No {rowNoun} yet.</p>
+        <div className="rounded-xl border border-dashed border-edge bg-white p-12 text-center">
+          <p className="font-medium text-ink">No {rowNoun} yet</p>
+          <p className="mt-1 text-sm text-ink-soft">
+            {isFixed
+              ? 'Add the payments you owe on this loan.'
+              : 'Add a statement when it arrives.'}
+          </p>
         </div>
       ) : (
         <Table headers={isFixed ? FIXED_HEADERS : REVOLVING_HEADERS}>
           {rows.map((row) => (
-            <tr key={row.id} className={row.paid ? 'bg-green-50/70' : undefined}>
-              <td className="px-3 py-2 tabular-nums">{row.due_date}</td>
+            <tr key={row.id} className={row.paid ? 'bg-settled-wash/40' : undefined}>
+              <td className="tnum px-4 py-3 font-mono text-sm">{row.due_date}</td>
               {'amount' in row ? (
-                <td className="px-3 py-2">
+                <td className="px-4 py-3">
                   <Money value={row.amount} />
                 </td>
               ) : (
                 <>
-                  <td className="px-3 py-2">
+                  <td className="px-4 py-3">
                     <Money value={row.min_due} />
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-4 py-3">
                     <Money value={row.total_due} />
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-4 py-3">
                     <Money value={row.outstanding} />
                   </td>
                 </>
               )}
-              <td className="px-3 py-2">{statusCell(row)}</td>
-              <td className="px-3 py-2">{actionCell(row)}</td>
+              <td className="px-4 py-3">{statusCell(row)}</td>
+              <td className="px-4 py-3">
+                <div className="flex flex-wrap justify-end gap-1.5">
+                  {!row.paid && (
+                    <RowButton tone="primary" type="button" onClick={() => setPayRow(row)}>
+                      Pay
+                    </RowButton>
+                  )}
+                  <RowButton type="button" onClick={() => setRowForm({ mode: 'edit', row })}>
+                    Edit
+                  </RowButton>
+                  <RowButton tone="danger" type="button" onClick={() => setDeletingRow(row)}>
+                    Delete
+                  </RowButton>
+                </div>
+              </td>
             </tr>
           ))}
         </Table>
       )}
 
       {(rowError || deleteRowError) && (
-        <p className="text-sm text-red-600">Something went wrong. Please try again.</p>
+        <p className="text-sm text-overdue">That didn&rsquo;t save. Check your connection and try again.</p>
       )}
 
       <Button type="button" onClick={() => setRowForm({ mode: 'add' })}>
-        {isFixed ? '+ Add row' : '+ Add statement'}
+        {isFixed ? 'Add payment' : 'Add statement'}
       </Button>
 
       {editingDebt && (
@@ -261,14 +279,12 @@ export function DebtDetail() {
 
       <ConfirmDialog
         open={deletingDebt}
-        title="Delete Debt"
+        title="Delete debt"
         message={`Delete ${debt.name} and its ${rows.length} ${rowNoun}?`}
         confirmLabel="Delete"
         pending={deleteDebt.isPending}
         error={deleteDebt.isError}
-        onConfirm={() =>
-          deleteDebt.mutate(debt.id, { onSuccess: () => void navigate('/debts') })
-        }
+        onConfirm={() => deleteDebt.mutate(debt.id, { onSuccess: () => void navigate('/debts') })}
         onClose={() => setDeletingDebt(false)}
       />
 
@@ -297,8 +313,8 @@ export function DebtDetail() {
 
       <ConfirmDialog
         open={deletingRow !== null}
-        title={isFixed ? 'Delete Row' : 'Delete Statement'}
-        message={`Delete the ${deletingRow?.due_date ?? ''} ${isFixed ? 'installment' : 'statement'}?`}
+        title={isFixed ? 'Delete payment' : 'Delete statement'}
+        message={`Delete the ${deletingRow?.due_date ?? ''} ${isFixed ? 'payment' : 'statement'}?`}
         confirmLabel="Delete"
         pending={deleteRowPending}
         error={deleteRowError}

@@ -3,10 +3,10 @@ import { StatusBadge } from './StatusBadge.tsx'
 
 /** Due date plus its status. The label carries the meaning; colour reinforces it. */
 export function DueBadge({ dueDate }: { dueDate: string | null }) {
-  if (!dueDate) return <span className="text-slate-400">—</span>
+  if (!dueDate) return <span className="font-mono text-sm text-ink-faint">—</span>
   return (
     <span className="inline-flex items-center gap-2">
-      <span className="tabular-nums">{dueDate}</span>
+      <span className="tnum font-mono text-sm text-ink">{dueDate}</span>
       <StatusBadge status={dueStatus(dueDate)} />
     </span>
   )

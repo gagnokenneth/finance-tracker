@@ -39,7 +39,7 @@ export function PayModal({
   }
 
   return (
-    <Modal open={open} title="Record Payment" onClose={onClose}>
+    <Modal open={open} title="Record payment" onClose={onClose}>
       <form onSubmit={submit} className="flex flex-col gap-3">
         <Field label="Payment date">
           <TextInput type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
@@ -54,13 +54,13 @@ export function PayModal({
             required
           />
         </Field>
-        {error && <p className="text-sm text-red-600">Could not save the payment. Try again.</p>}
+        {error && <p className="text-sm text-overdue">That payment didn’t save. Check your connection and try again.</p>}
         <div className="mt-1 flex justify-end gap-2">
           <SecondaryButton type="button" onClick={onClose}>
             Cancel
           </SecondaryButton>
           <Button type="submit" disabled={pending}>
-            Confirm
+            Record payment
           </Button>
         </div>
       </form>
