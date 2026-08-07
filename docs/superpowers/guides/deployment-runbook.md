@@ -1,7 +1,7 @@
 # Deployment Runbook
 
 End-to-end, from nothing deployed to a working site at
-`https://gagnokenneth.github.io/expense/`.
+`https://gagnokenneth.github.io/finance-tracker/`.
 
 Do the phases in order — each one produces a value the next one needs.
 
@@ -28,7 +28,7 @@ Do the phases in order — each one produces a value the next one needs.
    https://gagnokenneth.github.io
    ```
 
-   Origin only. No `/expense` path, no trailing slash — Google matches the
+   Origin only. No `/finance-tracker` path, no trailing slash — Google matches the
    origin exactly and a path here is the most common cause of
    `origin_mismatch` at sign-in.
 
@@ -131,7 +131,7 @@ refresh, and publishes to Pages.
 
 ## Verify the deploy
 
-1. Open `https://gagnokenneth.github.io/expense/` — the sign-in card appears.
+1. Open `https://gagnokenneth.github.io/finance-tracker/` — the sign-in card appears.
 2. Sign in. The Debts page loads.
 3. Open a debt, then **hard-reload that URL**. It should still work — this is
    what the `404.html` copy is for.
@@ -149,6 +149,6 @@ mode — see below.
 | `origin_mismatch` at sign-in | Authorized JavaScript origin has a path or trailing slash. Must be exactly `https://gagnokenneth.github.io`. |
 | "No allowed users yet" | Expected before you add the `allowed_email` row. |
 | `unauthorized` after signing in | The signed-in address is not the one in `allowed_email`. |
-| Blank page, 404s for JS/CSS | `base` in `vite.config.ts` no longer matches the repo name. It is `/expense/`. |
+| Blank page, 404s for JS/CSS | `base` in `vite.config.ts` no longer matches the repo name. It is `/finance-tracker/`. |
 | Backend changes have no effect | Apps Script deployment still points at an old version. Deploy a new version. |
 | Signed out after about an hour | Expected. Google ID tokens expire; sign in again. |

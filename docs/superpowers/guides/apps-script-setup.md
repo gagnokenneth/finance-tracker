@@ -95,11 +95,11 @@ add repository secrets:
 
 Then **Settings → Pages → Build and deployment → Source = GitHub Actions**.
 Pushing to `master` runs `.github/workflows/deploy.yml`, which builds in live
-mode and publishes to `https://<username>.github.io/expense/`.
+mode and publishes to `https://<username>.github.io/finance-tracker/`.
 
 ## Notes
 
-- The repo is named `expense`, so Vite `base` is `/expense/`. If you rename the
+- The repo is named `finance-tracker`, so Vite `base` is `/finance-tracker/`. If you rename the
   repo, update `base` in `vite.config.ts`.
 - ID tokens expire ~1 hour; the app drops you back to the sign-in screen when the
   backend reports `unauthorized`.
