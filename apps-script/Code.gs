@@ -17,6 +17,13 @@ var SHEETS = {
   settings: ['key', 'value']
 };
 
+/**
+ * Bump this whenever a sheet's columns change. It busts the ensureSheets cache
+ * so the new shape is applied on the very next request after a deployment,
+ * instead of up to an hour later.
+ */
+var SCHEMA_VERSION = 2;
+
 var DATA_SHEETS = ['funds', 'bills', 'expendable', 'debts', 'debt_schedule', 'debt_statements', 'savings', 'savings_transfers'];
 
 /**
@@ -79,25 +86,56 @@ function doPost(e) {
  * them could mislabel columns of real data.
  */
 function ensureSheets() {
-  // Nine getSheetByName calls on every request add up. Once the structure is
-  // confirmed, skip the check for an hour. A tab deleted by hand therefore
-  // takes up to an hour to reappear.
+  // Confirming nine tabs on every request adds up, so the result is cached.
+  // The key carries SCHEMA_VERSION, so a deployment that changes columns
+  // re-checks immediately rather than waiting for the cache to expire.
   var cache = CacheService.getScriptCache();
-  if (cache.get('sheets_ready')) return;
+  var readyKey = 'sheets_ready_v' + SCHEMA_VERSION;
+  if (cache.get(readyKey)) return;
 
   var spreadsheet = ss();
   for (var name in SHEETS) {
     if (!Object.prototype.hasOwnProperty.call(SHEETS, name)) continue;
     var sh = spreadsheet.getSheetByName(name);
+
     if (!sh) {
-      sh = spreadsheet.insertSheet(name);
-    } else if (sh.getLastRow() > 0) {
-      continue; // already has content, including its header row
+      writeHeaders(spreadsheet.insertSheet(name), name);
+      continue;
     }
-    sh.getRange(1, 1, 1, SHEETS[name].length).setValues([SHEETS[name]]);
-    sh.setFrozenRows(1);
+    if (sh.getLastRow() === 0) {
+      writeHeaders(sh, name);
+      continue;
+    }
+    if (headersMatch(sh, name)) continue;
+
+    // Stale shape. The old tab is RENAMED, never deleted: this runs
+    // automatically, and automatic data loss is not an acceptable trade for
+    // saving a manual step. The archived tab stays alongside for inspection.
+    sh.setName(name + '_old_' + timestampSuffix());
+    writeHeaders(spreadsheet.insertSheet(name), name);
   }
-  cache.put('sheets_ready', '1', 3600);
+  cache.put(readyKey, '1', 3600);
+}
+
+function writeHeaders(sh, name) {
+  sh.getRange(1, 1, 1, SHEETS[name].length).setValues([SHEETS[name]]);
+  sh.setFrozenRows(1);
+}
+
+/** True when row 1 is exactly the expected columns, in order. */
+function headersMatch(sh, name) {
+  var expected = SHEETS[name];
+  var width = sh.getLastColumn();
+  if (width < expected.length) return false;
+  var actual = sh.getRange(1, 1, 1, width).getValues()[0];
+  for (var i = 0; i < expected.length; i++) {
+    if (String(actual[i]).trim().toLowerCase() !== expected[i]) return false;
+  }
+  return true;
+}
+
+function timestampSuffix() {
+  return Utilities.formatDate(new Date(), ss().getSpreadsheetTimeZone(), 'yyyyMMdd-HHmmss');
 }
 
 function json(obj) {

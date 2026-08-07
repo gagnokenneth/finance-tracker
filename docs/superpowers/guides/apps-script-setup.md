@@ -38,10 +38,14 @@ One-time setup to connect the app to your private Google Sheet and deploy it.
 
    (The app also writes `budget_<month>` rows when you set a monthly budget.)
 
-> **Upgrading an existing sheet.** Data is now per-user and there is no
-> migration, by design. Delete the `debts`, `debt_schedule` and `debt_statements`
-> tabs so they are recreated with a `user_id` column, and delete any
-> `allowed_email` rows from `settings`.
+> **Upgrading an existing sheet is automatic.** On the first request after a
+> deployment, the backend compares each tab's header row against the expected
+> columns. A tab whose shape is stale is **renamed** to
+> `<name>_old_<timestamp>` and a fresh one is created in its place — the old rows
+> are archived beside it, never deleted, so nothing is lost if the change was
+> unexpected. Delete the archived tabs yourself once you are satisfied.
+>
+> Old `allowed_email` rows can stay; they are simply ignored.
 
 > Tip: format the `date` / `due_date` columns as Plain text to avoid timezone
 > surprises; the backend also normalizes Date cells to `yyyy-MM-dd`.
