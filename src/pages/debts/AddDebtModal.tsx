@@ -1,0 +1,207 @@
+import { useState } from 'react'
+import type { FormEvent } from 'react'
+import { useFinanceMutations } from '../../hooks/useFinanceMutations.ts'
+import { buildSchedule } from '../../lib/debtSchedule.ts'
+import { formatMoney } from '../../lib/money.ts'
+import { useCurrency } from '../../hooks/useCurrency.ts'
+import { isoDate } from '../../lib/currentMonth.ts'
+import { Modal } from '../../components/Modal.tsx'
+import { Field, TextInput, SelectInput, Button } from '../../components/ui.tsx'
+import type { DebtType } from '../../types.ts'
+
+export function AddDebtModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { addDebt } = useFinanceMutations()
+  const currency = useCurrency()
+
+  const [name, setName] = useState('')
+  const [type, setType] = useState<DebtType>('fixed')
+
+  // fixed
+  const [firstDue, setFirstDue] = useState(isoDate())
+  const [total, setTotal] = useState('')
+  const [months, setMonths] = useState('')
+
+  // revolving
+  const [dueDate, setDueDate] = useState(isoDate())
+  const [minDue, setMinDue] = useState('')
+  const [totalDue, setTotalDue] = useState('')
+  const [outstanding, setOutstanding] = useState('')
+
+  const reset = () => {
+    setName('')
+    setType('fixed')
+    setFirstDue(isoDate())
+    setTotal('')
+    setMonths('')
+    setDueDate(isoDate())
+    setMinDue('')
+    setTotalDue('')
+    setOutstanding('')
+  }
+
+  const close = () => {
+    reset()
+    onClose()
+  }
+
+  // Preview doubles as validation: buildSchedule throws on bad input, and the
+  // message it throws is the one worth showing.
+  let preview: string | null = null
+  let previewError: string | null = null
+  if (type === 'fixed' && total && months) {
+    try {
+      const rows = buildSchedule(firstDue, Number(total), Number(months))
+      preview = `${rows.length} rows @ ${formatMoney(rows[0].amount, currency)}`
+      if (rows[rows.length - 1].amount !== rows[0].amount) {
+        preview += ` (last ${formatMoney(rows[rows.length - 1].amount, currency)})`
+      }
+    } catch (err) {
+      previewError = err instanceof Error ? err.message : 'Invalid schedule'
+    }
+  }
+
+  const submit = (e: FormEvent) => {
+    e.preventDefault()
+    if (!name) return
+
+    if (type === 'fixed') {
+      if (previewError || !total || !months) return
+      addDebt.mutate(
+        { name, type: 'fixed', rows: buildSchedule(firstDue, Number(total), Number(months)) },
+        { onSuccess: close },
+      )
+      return
+    }
+
+    addDebt.mutate(
+      {
+        name,
+        type: 'revolving',
+        rows: [
+          {
+            due_date: dueDate,
+            min_due: Number(minDue),
+            total_due: Number(totalDue),
+            outstanding: Number(outstanding),
+            paid: false,
+          },
+        ],
+      },
+      { onSuccess: close },
+    )
+  }
+
+  return (
+    <Modal open={open} title="Add Debt" onClose={close}>
+      <form onSubmit={submit} className="flex flex-col gap-3">
+        <Field label="Name">
+          <TextInput
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Honda Giorno+"
+            required
+          />
+        </Field>
+        <Field label="Type">
+          <SelectInput value={type} onChange={(e) => setType(e.target.value as DebtType)}>
+            <option value="fixed">Fixed</option>
+            <option value="revolving">Revolving</option>
+          </SelectInput>
+        </Field>
+
+        {type === 'fixed' ? (
+          <>
+            <Field label="First due date">
+              <TextInput
+                type="date"
+                value={firstDue}
+                onChange={(e) => setFirstDue(e.target.value)}
+                required
+              />
+            </Field>
+            <Field label="Total balance">
+              <TextInput
+                type="number"
+                step="0.01"
+                min="0"
+                value={total}
+                onChange={(e) => setTotal(e.target.value)}
+                required
+              />
+            </Field>
+            <Field label="Number of months">
+              <TextInput
+                type="number"
+                step="1"
+                min="1"
+                value={months}
+                onChange={(e) => setMonths(e.target.value)}
+                required
+              />
+            </Field>
+            {preview && <p className="text-xs text-slate-500">→ {preview}</p>}
+            {previewError && <p className="text-xs text-red-600">{previewError}</p>}
+          </>
+        ) : (
+          <>
+            <Field label="Payment due date">
+              <TextInput
+                type="date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                required
+              />
+            </Field>
+            <Field label="Minimum amount due">
+              <TextInput
+                type="number"
+                step="0.01"
+                min="0"
+                value={minDue}
+                onChange={(e) => setMinDue(e.target.value)}
+                required
+              />
+            </Field>
+            <Field label="Total amount due">
+              <TextInput
+                type="number"
+                step="0.01"
+                min="0"
+                value={totalDue}
+                onChange={(e) => setTotalDue(e.target.value)}
+                required
+              />
+            </Field>
+            <Field label="Outstanding balance">
+              <TextInput
+                type="number"
+                step="0.01"
+                min="0"
+                value={outstanding}
+                onChange={(e) => setOutstanding(e.target.value)}
+                required
+              />
+            </Field>
+          </>
+        )}
+
+        {addDebt.isError && (
+          <p className="text-sm text-red-600">Could not add debt. Please try again.</p>
+        )}
+
+        <div className="mt-1 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={close}
+            className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100"
+          >
+            Cancel
+          </button>
+          <Button type="submit" disabled={addDebt.isPending || previewError !== null}>
+            Add Debt
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
