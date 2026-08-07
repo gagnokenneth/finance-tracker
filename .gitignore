@@ -12,6 +12,12 @@ dist
 dist-ssr
 *.local
 
+# Local env files. .env.local already matches *.local, but a plain .env would
+# otherwise be committable — and it holds the Apps Script URL and client ID.
+.env
+.env.*
+!.env.example
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
