@@ -10,6 +10,9 @@ import type {
   StatementPatch,
   NewSavings,
   NewSavingsTransfer,
+  AuthResult,
+  SignupInput,
+  LoginInput,
 } from '../FinanceApi.ts'
 import type {
   FinanceData,
@@ -20,7 +23,7 @@ import type {
   SavingsTransfer,
   Currency,
 } from '../../types.ts'
-import { getToken, clearToken } from '../../auth/token.ts'
+import { readToken, clearToken } from '../../auth/session.ts'
 
 /**
  * Apps Script is slow: a cold start plus the tokeninfo round trip plus sheet
@@ -45,7 +48,7 @@ export class AppsScriptApi implements FinanceApi {
   }
 
   private async call<T>(action: string, payload?: unknown): Promise<T> {
-    const token = getToken()
+    const token = readToken()
 
     // Without a deadline a stalled Apps Script request never settles, and the
     // UI shows a spinner forever with nothing in the console to look at.
@@ -96,6 +99,14 @@ export class AppsScriptApi implements FinanceApi {
       throw new Error(json.error)
     }
     return json.data as T
+  }
+
+  signup(input: SignupInput): Promise<AuthResult> {
+    return this.call<AuthResult>('signup', input)
+  }
+
+  login(input: LoginInput): Promise<AuthResult> {
+    return this.call<AuthResult>('login', input)
   }
 
   getAll(): Promise<FinanceData> {

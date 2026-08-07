@@ -1,21 +1,39 @@
 // Finance Tracker — Google Apps Script web app backend.
-// Bind this script to the Google Sheet that holds the data sheets, paste CLIENT_ID,
-// then Deploy > New deployment > Web app (Execute as: Me, Access: Anyone).
+// Bind this script to the Google Sheet that holds the data sheets, then
+// Deploy > New deployment > Web app (Execute as: Me, Access: Anyone).
+// Secrets are generated automatically on first use; nothing to paste here.
 // Full steps: docs/superpowers/guides/apps-script-setup.md
 
-var CLIENT_ID = 'PASTE_YOUR_OAUTH_WEB_CLIENT_ID_HERE';
+var INVITE_COUNT = 50;
 
 var SHEETS = {
+  users: ['id', 'username', 'pw_hash', 'currency', 'created'],
   funds: ['id', 'source', 'amount', 'date', 'notes'],
   bills: ['id', 'name', 'amount', 'due_date', 'paid', 'notes'],
   expendable: ['id', 'month', 'daily_amount', 'date', 'notes'],
-  debts: ['id', 'name', 'type'],
-  debt_schedule: ['id', 'debt_id', 'due_date', 'amount', 'paid', 'paid_date', 'paid_amount'],
-  debt_statements: ['id', 'debt_id', 'due_date', 'min_due', 'total_due', 'outstanding', 'paid', 'paid_date', 'paid_amount'],
+  debts: ['id', 'user_id', 'name', 'type'],
+  debt_schedule: ['id', 'user_id', 'debt_id', 'due_date', 'amount', 'paid', 'paid_date', 'paid_amount'],
+  debt_statements: ['id', 'user_id', 'debt_id', 'due_date', 'min_due', 'total_due', 'outstanding', 'paid', 'paid_date', 'paid_amount'],
   savings: ['id', 'date', 'amount', 'source', 'total', 'notes'],
   savings_transfers: ['id', 'date', 'amount', 'notes'],
+  invites: ['code', 'used_by', 'used_at'],
   settings: ['key', 'value']
 };
+
+/**
+ * Bump this whenever a sheet's columns change. It busts the ensureSheets cache
+ * so the new shape is applied on the very next request after a deployment,
+ * instead of up to an hour later.
+ */
+var SCHEMA_VERSION = 4;
+
+/*
+ * Tabs whose stale shape may be DISCARDED and recreated. Deliberately excludes
+ * users and invites: a column change there would otherwise delete every account
+ * and password hash on the next request, re-seed fresh codes, and lock everyone
+ * out with no recovery path.
+ */
+var REBUILDABLE_SHEETS = ['debts', 'debt_schedule', 'debt_statements'];
 
 var DATA_SHEETS = ['funds', 'bills', 'expendable', 'debts', 'debt_schedule', 'debt_statements', 'savings', 'savings_transfers'];
 
@@ -43,35 +61,27 @@ function doGet() {
 
 function doPost(e) {
   try {
+    initSecrets();
     var body = JSON.parse(e.postData.contents);
-
-    // Identity is checked before anything touches the spreadsheet, so an
-    // anonymous caller can never trigger sheet creation.
-    var email = verify(body.token);
-    if (!email) return json({ error: 'unauthorized' });
-
     ensureSheets();
 
-    var allowed = readSettings().allowedEmails;
-    // The whitelist is the security boundary, so it is never auto-populated:
-    // seeding the first caller would hand the data to whoever arrived first.
-    if (allowed.length === 0) {
-      return json({
-        error:
-          'This backend has no allowed users yet. In the settings sheet, add a row with key "allowed_email" and your Google address as the value, then reload.'
-      });
-    }
-    if (allowed.indexOf(email) === -1) return json({ error: 'unauthorized' });
+    var action = body.action;
+    // These two are the only unauthenticated actions.
+    if (action === 'signup') return json(signup(body.payload || {}));
+    if (action === 'login') return json(login(body.payload || {}));
 
-    var result = dispatch(body.action, body.payload);
+    var session = verifyToken(body.token);
+    if (!session || !session.uid) return json({ error: 'unauthorized' });
+
+    // uid always comes from the verified token, never from the payload.
+    var result = dispatch(action, body.payload, session.uid);
 
     // Writes answer with the whole updated dataset, read back in this SAME
-    // execution. That saves the client a second request — each one costs over a
-    // second of Apps Script overhead — and removes the race where a separate
-    // read execution observes state from before the write.
-    if (RETURNS_DATA[body.action]) {
-      SpreadsheetApp.flush(); // commit pending writes before reading them back
-      return json({ data: getAll() });
+    // execution: one request instead of two, and no window where a separate
+    // read observes state from before the write.
+    if (RETURNS_DATA[action]) {
+      SpreadsheetApp.flush();
+      return json({ data: getAll(session.uid) });
     }
     return json({ data: result });
   } catch (err) {
@@ -87,65 +97,309 @@ function doPost(e) {
  * them could mislabel columns of real data.
  */
 function ensureSheets() {
-  // Nine getSheetByName calls on every request add up. Once the structure is
-  // confirmed, skip the check for an hour. A tab deleted by hand therefore
-  // takes up to an hour to reappear.
+  // Confirming nine tabs on every request adds up, so the result is cached.
+  // The key carries SCHEMA_VERSION, so a deployment that changes columns
+  // re-checks immediately rather than waiting for the cache to expire.
   var cache = CacheService.getScriptCache();
-  if (cache.get('sheets_ready')) return;
+  var readyKey = 'sheets_ready_v' + SCHEMA_VERSION;
+  if (cache.get(readyKey)) return;
 
+  // Two requests arriving with a cold cache would both try to delete and
+  // recreate the same tab; the second throws. Serialise, then re-check.
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    if (cache.get(readyKey)) return;
+    rebuildSheets(cache, readyKey);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function rebuildSheets(cache, readyKey) {
   var spreadsheet = ss();
   for (var name in SHEETS) {
     if (!Object.prototype.hasOwnProperty.call(SHEETS, name)) continue;
     var sh = spreadsheet.getSheetByName(name);
+
     if (!sh) {
-      sh = spreadsheet.insertSheet(name);
-    } else if (sh.getLastRow() > 0) {
-      continue; // already has content, including its header row
+      writeHeaders(spreadsheet.insertSheet(name), name);
+      continue;
     }
-    sh.getRange(1, 1, 1, SHEETS[name].length).setValues([SHEETS[name]]);
-    sh.setFrozenRows(1);
+    if (sh.getLastRow() === 0) {
+      writeHeaders(sh, name);
+      continue;
+    }
+    if (headersMatch(sh, name)) continue;
+    // A stale shape outside the rebuildable set is left exactly as it is; losing
+    // accounts is never an acceptable side effect of a deploy.
+    if (REBUILDABLE_SHEETS.indexOf(name) === -1) continue;
+
+    // Dropped and recreated. This DISCARDS the rows in that tab — deliberate, so
+    // a deployment needs no manual sheet surgery. Other tabs always exist, so
+    // deleting this one can never leave the file empty.
+    spreadsheet.deleteSheet(sh);
+    writeHeaders(spreadsheet.insertSheet(name), name);
   }
-  cache.put('sheets_ready', '1', 3600);
+
+  seedInvites();
+  cache.put(readyKey, '1', 3600);
+}
+
+/**
+ * Puts INVITE_COUNT single-use codes in the invites sheet when it is empty, so a
+ * fresh deployment can hand out accounts without inventing codes by hand. Read
+ * them from the sheet; only you can see it.
+ */
+function seedInvites() {
+  // A one-way marker, not row count: clearing the sheet is how the owner closes
+  // signups, and re-seeding would silently reopen them.
+  if (props().getProperty('INVITES_SEEDED')) return;
+  props().setProperty('INVITES_SEEDED', '1');
+  var sh = sheet('invites');
+  if (sh.getLastRow() > 1) return;
+  var rows = [];
+  for (var i = 0; i < INVITE_COUNT; i++) rows.push([newInviteCode(), '', '']);
+  sh.getRange(2, 1, rows.length, 3).setValues(rows);
+}
+
+/** Eight hex characters from a v4 UUID, grouped for readability. */
+function newInviteCode() {
+  var hex = Utilities.getUuid().replace(/-/g, '').toUpperCase();
+  return hex.slice(0, 4) + '-' + hex.slice(4, 8);
+}
+
+function normalizeCode(c) { return String(c || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, ''); }
+
+/**
+ * Returns the sheet row of a matching unused code, or -1. Codes are compared
+ * with punctuation stripped, so "ab12cd34" and "AB12-CD34" both work.
+ */
+function findUnusedInvite(code) {
+  var wanted = normalizeCode(code);
+  if (!wanted) return -1;
+  var rows = readRows('invites');
+  for (var i = 0; i < rows.length; i++) {
+    if (normalizeCode(rows[i].code) === wanted && blank(rows[i].used_by)) return i + 2;
+  }
+  return -1;
+}
+
+function markInviteUsed(rowIndex, username) {
+  var sh = sheet('invites');
+  sh.getRange(rowIndex, 2).setValue(username);
+  sh.getRange(rowIndex, 3).setValue(new Date().toISOString().slice(0, 10));
+}
+
+function writeHeaders(sh, name) {
+  sh.getRange(1, 1, 1, SHEETS[name].length).setValues([SHEETS[name]]);
+  sh.setFrozenRows(1);
+}
+
+/** True when row 1 is exactly the expected columns, in order. */
+function headersMatch(sh, name) {
+  var expected = SHEETS[name];
+  var width = sh.getLastColumn();
+  if (width < expected.length) return false;
+  var actual = sh.getRange(1, 1, 1, width).getValues()[0];
+  for (var i = 0; i < expected.length; i++) {
+    if (String(actual[i]).trim().toLowerCase() !== expected[i]) return false;
+  }
+  return true;
 }
 
 function json(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
 }
 
+function props() { return PropertiesService.getScriptProperties(); }
+
 /**
- * Verifies a Google ID token and returns its email.
+ * Generates the two secrets on first use so there is no manual setup step.
  *
- * The tokeninfo call is a network round trip from inside Apps Script, and it
- * previously ran on every single request. Successful results are cached against
- * a hash of the token — never the token itself, since cache keys are visible in
- * the script's cache and capped in length anyway.
- *
- * Trade-off: a token revoked mid-session stays accepted until the entry expires.
- * Tokens only live about an hour, so the exposure is bounded and small.
+ * PW_PEPPER must never be rotated: it is mixed into every stored password hash,
+ * so changing it invalidates every account.
  */
-var TOKEN_CACHE_SECONDS = 300;
+function initSecrets() {
+  var p = props();
+  if (!p.getProperty('PW_PEPPER')) p.setProperty('PW_PEPPER', Utilities.getUuid() + Utilities.getUuid());
+  if (!p.getProperty('SESSION_SECRET')) p.setProperty('SESSION_SECRET', Utilities.getUuid() + Utilities.getUuid());
+}
 
-function verify(token) {
+function pepper() { return props().getProperty('PW_PEPPER'); }
+function sessionSecret() { return props().getProperty('SESSION_SECRET'); }
+
+/**
+ * The client already ran 210k PBKDF2 iterations against a salt derived from the
+ * username. This adds the server-held pepper, so a leaked spreadsheet does not
+ * contain anything an attacker can start guessing against.
+ */
+function hashCredential(derived) {
+  return Utilities.base64Encode(
+    Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(derived) + pepper())
+  );
+}
+
+function signToken(payloadObj) {
+  var payload = Utilities.base64EncodeWebSafe(JSON.stringify(payloadObj));
+  return payload + '.' + Utilities.base64EncodeWebSafe(
+    Utilities.computeHmacSha256Signature(payload, sessionSecret())
+  );
+}
+
+/**
+ * Returns { uid, username } or null. No expiry is enforced — sessions do not
+ * expire by design; rotating SESSION_SECRET is the only revocation lever.
+ */
+function verifyToken(token) {
   if (!token) return null;
-
-  var cache = CacheService.getScriptCache();
-  var key = 'tok_' + Utilities.base64EncodeWebSafe(
-    Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, token)
+  var parts = String(token).split('.');
+  if (parts.length !== 2) return null;
+  var expected = Utilities.base64EncodeWebSafe(
+    Utilities.computeHmacSha256Signature(parts[0], sessionSecret())
   );
-  var cached = cache.get(key);
-  if (cached) return cached;
+  if (!constantTimeEquals(parts[1], expected)) return null;
+  try {
+    return JSON.parse(Utilities.newBlob(Utilities.base64DecodeWebSafe(parts[0])).getDataAsString());
+  } catch (err) {
+    return null;
+  }
+}
 
-  var resp = UrlFetchApp.fetch(
-    'https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(token),
-    { muteHttpExceptions: true }
-  );
-  if (resp.getResponseCode() !== 200) return null;
-  var info = JSON.parse(resp.getContentText());
-  if (CLIENT_ID && info.aud !== CLIENT_ID) return null;
-  if (!info.email) return null;
+/** Compares without revealing where the first difference is. */
+function constantTimeEquals(a, b) {
+  a = String(a); b = String(b);
+  if (a.length !== b.length) return false;
+  var diff = 0;
+  for (var i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
 
-  cache.put(key, info.email, TOKEN_CACHE_SECONDS);
-  return info.email;
+/*
+ * Failed-attempt throttle for the public /exec endpoint.
+ *
+ * Only failures are counted, and the window's end is stored rather than re-set
+ * on each write. Counting successes and extending the TTL would let an attacker
+ * hammering one username keep that account locked out indefinitely — punishing
+ * the owner instead of the attacker.
+ */
+function failureState(key) {
+  var raw = CacheService.getScriptCache().get('rl_' + key);
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch (err) { return null; }
+}
+
+function tooManyFailures(key, max) {
+  var st = failureState(key);
+  return !!st && new Date().getTime() <= st.until && st.n >= max;
+}
+
+function recordFailure(key, seconds) {
+  var now = new Date().getTime();
+  var st = failureState(key);
+  if (!st || now > st.until) st = { n: 0, until: now + seconds * 1000 };
+  st.n += 1;
+  var remaining = Math.max(1, Math.ceil((st.until - now) / 1000));
+  CacheService.getScriptCache().put('rl_' + key, JSON.stringify(st), remaining);
+}
+
+function normalizeUsername(u) { return String(u || '').trim().toLowerCase(); }
+
+/*
+ * ASCII only, and must match isValidUsername in src/auth/password.ts.
+ *
+ * Beyond being a sane identifier rule, this keeps the token payload Latin-1:
+ * signToken base64-encodes UTF-8 bytes while the client decodes with atob, so a
+ * non-ASCII username would render as mojibake.
+ */
+function isValidUsername(u) { return /^[a-z0-9][a-z0-9._-]{2,31}$/.test(u); }
+
+function findUserByUsername(username) {
+  var rows = readRows('users');
+  for (var i = 0; i < rows.length; i++) {
+    if (normalizeUsername(rows[i].username) === username) {
+      return {
+        id: num(rows[i].id),
+        username: String(rows[i].username),
+        pw_hash: String(rows[i].pw_hash)
+      };
+    }
+  }
+  return null;
+}
+
+function userById(id) {
+  var rows = readRows('users');
+  for (var i = 0; i < rows.length; i++) {
+    if (num(rows[i].id) === num(id)) {
+      return {
+        id: num(rows[i].id),
+        username: String(rows[i].username),
+        currency: rows[i].currency ? String(rows[i].currency) : 'PHP'
+      };
+    }
+  }
+  return null;
+}
+
+function sessionResponse(uid, username) {
+  return { token: signToken({ uid: uid, username: username }), user: { id: uid, username: username } };
+}
+
+function signup(p) {
+  var username = normalizeUsername(p.username);
+  if (!isValidUsername(username)) {
+    return { error: 'Use 3-32 characters: letters, numbers, dot, dash or underscore.' };
+  }
+  // Password length is a client-side policy (MIN_PASSWORD_LENGTH); the server
+  // only ever sees the derived value, so all it can check is that shape.
+  if (!/^[0-9a-f]{64}$/.test(String(p.derived || ''))) {
+    return { error: 'Could not read those credentials. Try again.' };
+  }
+
+  /*
+   * Locked: this endpoint is public, and without serialisation two concurrent
+   * signups both read the same nextId('users') and the same unused invite row.
+   * That yields two accounts sharing one id — and a shared id means they read
+   * and write each other's data, because every query is scoped by uid.
+   */
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    var inviteRow = findUnusedInvite(p.invite_code);
+    if (inviteRow === -1) return { error: "That invite code isn't valid or has already been used." };
+    if (findUserByUsername(username)) return { error: 'That username is taken.' };
+
+    var user = {
+      id: nextId('users'),
+      username: username,
+      pw_hash: hashCredential(p.derived),
+      currency: 'PHP',
+      created: new Date().toISOString().slice(0, 10)
+    };
+    appendRow('users', user);
+    markInviteUsed(inviteRow, username); // single use — burn it
+    SpreadsheetApp.flush();
+    return { data: sessionResponse(user.id, username) };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function login(p) {
+  var username = normalizeUsername(p.username);
+  var key = 'login_' + username;
+  if (tooManyFailures(key, 5)) {
+    return { error: 'Too many attempts. Wait a minute and try again.' };
+  }
+  var user = findUserByUsername(username);
+  // Identical message whether the user is missing or the password is wrong, so
+  // this cannot be used to discover which usernames exist.
+  if (!user || !constantTimeEquals(user.pw_hash, hashCredential(p.derived))) {
+    recordFailure(key, 60);
+    return { error: 'Wrong username or password.' };
+  }
+  return { data: sessionResponse(user.id, user.username) };
 }
 
 function ss() { return SpreadsheetApp.getActiveSpreadsheet(); }
@@ -225,21 +479,19 @@ function appendRows(name, objs) {
   sh.getRange(sh.getLastRow() + 1, 1, values.length, headers.length).setValues(values);
 }
 
-/** Writes only the keys present in patch. id and debt_id are never patchable. */
-function patchRow(name, id, patch) {
-  var rowIndex = findSheetRow(name, id);
-  if (rowIndex === -1) throw new Error(name + ' ' + id + ' not found');
+/** Writes only the keys present in patch. Identity columns are never patchable. */
+function patchRowAt(name, rowIndex, patch) {
   var sh = sheet(name);
   var headers = SHEETS[name];
   for (var c = 0; c < headers.length; c++) {
     var h = headers[c];
-    if (h === 'id' || h === 'debt_id') continue;
+    if (h === 'id' || h === 'user_id' || h === 'debt_id') continue;
     if (!Object.prototype.hasOwnProperty.call(patch, h)) continue;
     var v = patch[h];
     sh.getRange(rowIndex, c + 1).setValue(v === undefined || v === null ? '' : v);
   }
-  // No read-back: callers of this are all RETURNS_DATA actions, so doPost reads
-  // the whole dataset once instead of re-reading this sheet here.
+  // No read-back: callers are all RETURNS_DATA actions, so doPost reads the
+  // whole dataset once instead of re-reading this sheet here.
   return null;
 }
 
@@ -255,11 +507,6 @@ function normalizePaidPatch(patch) {
     patch.paid_amount = '';
   }
   return patch;
-}
-
-function deleteRowById(name, id) {
-  var rowIndex = findSheetRow(name, id);
-  if (rowIndex !== -1) sheet(name).deleteRow(rowIndex);
 }
 
 /** Deletes bottom-up so earlier row indices stay valid as rows are removed. */
@@ -316,99 +563,95 @@ function sumField(rows, field) {
   return t;
 }
 
+/** Global settings only. Currency is per-user and attached by getAll. */
 function readSettings() {
   var rows = readRows('settings');
   var monthlyBudgets = {};
-  var allowedEmails = [];
-  var currency = 'PHP';
   for (var i = 0; i < rows.length; i++) {
     var k = String(rows[i].key);
-    var v = rows[i].value;
-    if (k.indexOf('budget_') === 0) monthlyBudgets[k.substring(7)] = num(v);
-    else if (k === 'allowed_email' && v) allowedEmails.push(String(v));
-    else if (k === 'currency' && v) currency = String(v);
+    if (k.indexOf('budget_') === 0) monthlyBudgets[k.substring(7)] = num(rows[i].value);
   }
-  return { monthlyBudgets: monthlyBudgets, allowedEmails: allowedEmails, currency: currency };
+  return { monthlyBudgets: monthlyBudgets };
 }
 
-/** Inserts or updates a single key in the settings sheet. */
-function upsertSetting(key, value) {
-  var sh = sheet('settings');
-  var values = sh.getDataRange().getValues();
-  for (var i = 1; i < values.length; i++) {
-    if (String(values[i][0]) === key) {
-      sh.getRange(i + 1, 2).setValue(value);
-      return null;
+/** Rows of `name` belonging to this user. */
+function readOwnedRows(name, uid) {
+  var rows = readRows(name);
+  var out = [];
+  for (var i = 0; i < rows.length; i++) {
+    if (num(rows[i].user_id) === num(uid)) out.push(rows[i]);
+  }
+  return out;
+}
+
+/**
+ * 1-based sheet row for a row the caller owns. Throws 'not found' when the row
+ * is missing OR belongs to someone else — identical either way, so ids cannot be
+ * probed for existence.
+ *
+ * Reads only the id and user_id columns, which are always the first two on owned
+ * sheets, and returns the location so callers do not look the row up a second
+ * time.
+ */
+function ownedRowIndex(name, id, uid) {
+  var sh = sheet(name);
+  var last = sh.getLastRow();
+  if (last >= 2) {
+    var vals = sh.getRange(2, 1, last - 1, 2).getValues();
+    for (var i = 0; i < vals.length; i++) {
+      if (num(vals[i][0]) === num(id)) {
+        if (num(vals[i][1]) !== num(uid)) throw new Error('not found');
+        return i + 2;
+      }
     }
   }
-  sh.appendRow([key, value]);
-  return null;
+  throw new Error('not found');
 }
 
-function getAll() {
+/** Ownership check where the row's position is not needed. */
+function assertOwned(name, id, uid) {
+  ownedRowIndex(name, id, uid);
+}
+
+function getAll(uid) {
   var data = {};
   DATA_SHEETS.forEach(function (name) {
     // Inactive sheets are reported as empty rather than read — see ACTIVE_SHEETS.
     if (ACTIVE_SHEETS.indexOf(name) === -1) { data[name] = []; return; }
-    data[name] = readRows(name).map(function (r) { return coerce(name, r); });
+    data[name] = readOwnedRows(name, uid).map(function (r) { return coerce(name, r); });
   });
+  var user = userById(uid);
   data.settings = readSettings();
+  data.settings.currency = user ? user.currency : 'PHP';
   return data;
 }
 
-function dispatch(action, p) {
+/*
+ * Only per-user debt actions are served. The funds / bills / expendable /
+ * savings sheets have no user_id column, so serving their actions would let any
+ * authenticated user read and write another user's rows. Their pages are
+ * unreachable in the frontend; re-enabling one means giving its sheet a user_id
+ * and scoping its handlers first.
+ */
+function dispatch(action, p, uid) {
   switch (action) {
-    case 'getAll': return getAll();
-    case 'addFund': return addFund(p);
-    case 'addBill': return addBill(p);
-    case 'setBillPaid': return setBillPaid(p);
-    case 'addExpendable': return addExpendable(p);
-    case 'setMonthlyBudget': return setMonthlyBudget(p);
-    case 'addDebt': return addDebt(p);
-    case 'updateDebt': return updateDebt(p);
-    case 'deleteDebt': return deleteDebt(p);
-    case 'addScheduleRow': return addChildRow('debt_schedule', p);
-    case 'updateScheduleRow': return updateChildRow('debt_schedule', p);
-    case 'deleteScheduleRow': return deleteChildRow('debt_schedule', p);
-    case 'addStatement': return addChildRow('debt_statements', p);
-    case 'updateStatement': return updateChildRow('debt_statements', p);
-    case 'deleteStatement': return deleteChildRow('debt_statements', p);
-    case 'setCurrency': return upsertSetting('currency', p.currency);
-    case 'addSavings': return addSavings(p);
-    case 'transferSavingsToFunds': return transferSavingsToFunds(p);
+    case 'getAll': return getAll(uid);
+    case 'addDebt': return addDebt(p, uid);
+    case 'updateDebt': return updateDebt(p, uid);
+    case 'deleteDebt': return deleteDebt(p, uid);
+    case 'addScheduleRow': return addChildRow('debt_schedule', p, uid);
+    case 'updateScheduleRow': return updateChildRow('debt_schedule', p, uid);
+    case 'deleteScheduleRow': return deleteChildRow('debt_schedule', p, uid);
+    case 'addStatement': return addChildRow('debt_statements', p, uid);
+    case 'updateStatement': return updateChildRow('debt_statements', p, uid);
+    case 'deleteStatement': return deleteChildRow('debt_statements', p, uid);
+    case 'setCurrency': return setCurrency(p, uid);
     default: throw new Error('Unknown action: ' + action);
   }
 }
 
-function addFund(p) {
-  var fund = { id: nextId('funds'), source: p.source, amount: p.amount, date: p.date, notes: p.notes || '' };
-  appendRow('funds', fund);
-  return coerce('funds', fund);
-}
-
-function addBill(p) {
-  var bill = { id: nextId('bills'), name: p.name, amount: p.amount, due_date: p.due_date, paid: p.paid === true, notes: p.notes || '' };
-  appendRow('bills', bill);
-  return coerce('bills', bill);
-}
-
-function setBillPaid(p) {
-  setCell('bills', p.id, 'paid', p.paid === true);
-  return getById('bills', p.id);
-}
-
-function addExpendable(p) {
-  var entry = { id: nextId('expendable'), month: p.month, daily_amount: p.daily_amount, date: p.date, notes: p.notes || '' };
-  appendRow('expendable', entry);
-  return coerce('expendable', entry);
-}
-
-function setMonthlyBudget(p) {
-  return upsertSetting('budget_' + p.month, p.amount);
-}
-
-function addDebt(p) {
-  var debt = { id: nextId('debts'), name: p.name, type: p.type };
+function addDebt(p, uid) {
+  var debt = { id: nextId('debts'), user_id: uid, name: p.name, type: p.type };
   appendRow('debts', debt);
 
   var target = p.type === 'fixed' ? 'debt_schedule' : 'debt_statements';
@@ -418,49 +661,53 @@ function addDebt(p) {
     var copy = {};
     for (var k in row) if (Object.prototype.hasOwnProperty.call(row, k)) copy[k] = row[k];
     copy.id = baseId + i;
+    copy.user_id = uid;
     copy.debt_id = debt.id;
     return copy;
   });
   appendRows(target, prepared);
 
-  return coerce('debts', debt);
-}
-
-function updateDebt(p) {
-  setCell('debts', p.id, 'name', p.patch.name);
   return null; // RETURNS_DATA action — doPost reads the dataset back
 }
 
-function deleteDebt(p) {
-  deleteRowsWhere('debt_schedule', 'debt_id', p.id);
-  deleteRowsWhere('debt_statements', 'debt_id', p.id);
-  deleteRowById('debts', p.id);
+function updateDebt(p, uid) {
+  var rowIndex = ownedRowIndex('debts', p.id, uid);
+  sheet('debts').getRange(rowIndex, SHEETS.debts.indexOf('name') + 1).setValue(p.patch.name);
   return null;
 }
 
-function addChildRow(name, p) {
+function deleteDebt(p, uid) {
+  var rowIndex = ownedRowIndex('debts', p.id, uid);
+  deleteRowsWhere('debt_schedule', 'debt_id', p.id);
+  deleteRowsWhere('debt_statements', 'debt_id', p.id);
+  sheet('debts').deleteRow(rowIndex);
+  return null;
+}
+
+function addChildRow(name, p, uid) {
+  assertOwned('debts', p.debtId, uid); // the parent debt must be yours
   var row = {};
   for (var k in p.input) if (Object.prototype.hasOwnProperty.call(p.input, k)) row[k] = p.input[k];
   row.id = nextId(name);
+  row.user_id = uid;
   row.debt_id = p.debtId;
   appendRow(name, row);
-  return coerce(name, row);
-}
-
-function updateChildRow(name, p) {
-  return patchRow(name, p.id, normalizePaidPatch(p.patch));
-}
-
-function deleteChildRow(name, p) {
-  deleteRowById(name, p.id);
   return null;
 }
 
-function addSavings(p) {
-  var prior = sumField(readRows('savings'), 'amount') - sumField(readRows('savings_transfers'), 'amount');
-  var entry = { id: nextId('savings'), date: p.date, amount: p.amount, source: p.source, total: prior + num(p.amount), notes: p.notes || '' };
-  appendRow('savings', entry);
-  return coerce('savings', entry);
+function updateChildRow(name, p, uid) {
+  var rowIndex = ownedRowIndex(name, p.id, uid);
+  return patchRowAt(name, rowIndex, normalizePaidPatch(p.patch));
+}
+
+function deleteChildRow(name, p, uid) {
+  sheet(name).deleteRow(ownedRowIndex(name, p.id, uid));
+  return null;
+}
+
+function setCurrency(p, uid) {
+  setCell('users', uid, 'currency', p.currency);
+  return null;
 }
 
 function transferSavingsToFunds(p) {

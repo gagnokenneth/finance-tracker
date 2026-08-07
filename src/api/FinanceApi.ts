@@ -29,7 +29,28 @@ export type NewDebt =
 export type ScheduleRowPatch = Partial<NewScheduleRow>
 export type StatementPatch = Partial<NewStatement>
 
+export interface AuthResult {
+  token: string
+  user: { id: number; username: string }
+}
+
+export interface SignupInput {
+  username: string
+  derived: string
+  invite_code: string
+}
+
+export interface LoginInput {
+  username: string
+  derived: string
+}
+
 export interface FinanceApi {
+  /** Unauthenticated. Creates an account and returns a session. */
+  signup(input: SignupInput): Promise<AuthResult>
+  /** Unauthenticated. Returns a session for valid credentials. */
+  login(input: LoginInput): Promise<AuthResult>
+
   /** Read every sheet at once (all module views derive from this). */
   getAll(): Promise<FinanceData>
 

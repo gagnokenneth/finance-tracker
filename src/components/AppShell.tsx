@@ -62,7 +62,7 @@ export function AppShell() {
           ))}
         </nav>
         <div className="border-t border-edge px-5 py-4">
-          <div className="truncate text-sm font-medium text-ink">{user?.name}</div>
+          <div className="truncate text-sm font-medium text-ink">{user?.username}</div>
           <button
             type="button"
             onClick={signOut}

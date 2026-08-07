@@ -10,6 +10,9 @@ import type {
   StatementPatch,
   NewSavings,
   NewSavingsTransfer,
+  AuthResult,
+  SignupInput,
+  LoginInput,
 } from '../FinanceApi.ts'
 import type {
   FinanceData,
@@ -24,8 +27,23 @@ import type {
   Currency,
 } from '../../types.ts'
 import { createSeed } from './seed.ts'
+import { readToken, decodeSession } from '../../auth/session.ts'
+import { normalizeUsername, isValidUsername, USERNAME_RULE } from '../../auth/password.ts'
 
 const KEY = 'finance-mock-db'
+
+interface MockUser {
+  id: number
+  username: string
+  /** The client-derived value, stored as-is. Mock only — no server pepper here. */
+  pw_hash: string
+}
+
+/** One FinanceData blob per user id, so isolation comes for free. */
+interface MockDb {
+  users: MockUser[]
+  data: Record<string, FinanceData>
+}
 
 function nextId<T extends { id: number }>(rows: T[]): number {
   return rows.reduce((max, r) => Math.max(max, r.id), 0) + 1
@@ -42,23 +60,80 @@ function clearPaidFields(row: DebtScheduleRow | DebtStatement): void {
   }
 }
 
+function mockToken(user: MockUser): string {
+  // Same two-part shape the real backend produces, so decodeSession works
+  // unchanged. The signature part is a placeholder: mock does not verify.
+  const payload = btoa(JSON.stringify({ uid: user.id, username: user.username }))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+  return `${payload}.mock`
+}
+
 export class MockApi implements FinanceApi {
-  private load(): FinanceData {
+  private loadDb(): MockDb {
     const raw = localStorage.getItem(KEY)
-    if (raw) return JSON.parse(raw) as FinanceData
-    const seed = createSeed()
-    this.save(seed)
-    return seed
+    // Fields are backfilled rather than trusted: this database is persisted JSON
+    // that outlives code changes, so a browser holding an older shape must not
+    // crash on a field added later.
+    const stored = raw ? (JSON.parse(raw) as Partial<MockDb>) : null
+    const db: MockDb = { users: stored?.users ?? [], data: stored?.data ?? {} }
+    if (!raw) this.saveDb(db)
+    return db
+  }
+
+  private saveDb(db: MockDb): void {
+    localStorage.setItem(KEY, JSON.stringify(db))
+  }
+
+  /** The signed-in user's id, from the same token store the real adapter uses. */
+  private uid(): string {
+    const session = decodeSession(readToken())
+    if (!session) throw new Error('unauthorized')
+    return String(session.id)
+  }
+
+  private load(): FinanceData {
+    const db = this.loadDb()
+    const key = this.uid()
+    const data = db.data[key]
+    if (!data) throw new Error('unauthorized')
+    return data
   }
 
   private save(data: FinanceData): void {
-    localStorage.setItem(KEY, JSON.stringify(data))
+    const db = this.loadDb()
+    db.data[this.uid()] = data
+    this.saveDb(db)
   }
 
   // Simulate a little latency so loading states are exercised in the UI.
   private async delay<T>(value: T): Promise<T> {
     await new Promise((r) => setTimeout(r, 80))
     return value
+  }
+
+  async signup(input: SignupInput): Promise<AuthResult> {
+    const db = this.loadDb()
+    const username = normalizeUsername(input.username)
+    // Mock mode takes no invite code — local development should not need one.
+    // The live backend still requires and burns a real code.
+    if (!isValidUsername(username)) throw new Error(`Use ${USERNAME_RULE}`)
+    if (db.users.some((u) => u.username === username)) throw new Error('That username is taken.')
+
+    const user: MockUser = { id: nextId(db.users), username, pw_hash: input.derived }
+    db.users.push(user)
+    db.data[String(user.id)] = createSeed()
+    this.saveDb(db)
+    return this.delay({ token: mockToken(user), user: { id: user.id, username } })
+  }
+
+  async login(input: LoginInput): Promise<AuthResult> {
+    const db = this.loadDb()
+    const username = normalizeUsername(input.username)
+    const user = db.users.find((u) => u.username === username)
+    // Same message either way, matching the backend.
+    if (!user || user.pw_hash !== input.derived) throw new Error('Wrong username or password.')
+    return this.delay({ token: mockToken(user), user: { id: user.id, username } })
   }
 
   async getAll(): Promise<FinanceData> {

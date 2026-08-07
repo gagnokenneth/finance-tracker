@@ -76,7 +76,7 @@ export interface SavingsTransfer {
 export interface Settings {
   // monthly expendable budget keyed by yyyy-mm
   monthlyBudgets: Record<string, number>
-  allowedEmails: string[]
+  /** Per-user: comes from the caller's own row, not a global setting. */
   currency: Currency
 }
 

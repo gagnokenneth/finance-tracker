@@ -25,7 +25,6 @@ export function createSeed(): FinanceData {
     ],
     settings: {
       monthlyBudgets: { '2026-06': 900 },
-      allowedEmails: ['ken.gagno@vibeteams.ai'],
       currency: 'PHP',
     },
   }
