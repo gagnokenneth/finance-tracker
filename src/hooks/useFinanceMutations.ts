@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { getApi } from '../api/index.ts'
 import { financeKey } from './useFinanceData.ts'
 import { writeCachedCurrency } from '../lib/currency.ts'
-import type { Currency } from '../types.ts'
+import type { Currency, FinanceData } from '../types.ts'
 import type {
   NewFund,
   NewBill,
@@ -38,54 +38,64 @@ export function useFinanceMutations() {
     onSuccess,
   })
 
-  const addDebt = useMutation({ mutationFn: (i: NewDebt) => getApi().addDebt(i), onSuccess })
+  /*
+   * Debt and currency writes return the whole updated dataset, so the response
+   * goes straight into the cache. No invalidate, which means no second request
+   * and no window where a follow-up read could observe pre-write state.
+   */
+  const applyData = (data: FinanceData) => {
+    qc.setQueryData(financeKey, data)
+  }
+
+  const addDebt = useMutation({
+    mutationFn: (i: NewDebt) => getApi().addDebt(i),
+    onSuccess: applyData,
+  })
   const updateDebt = useMutation({
     mutationFn: (v: { id: number; name: string }) => getApi().updateDebt(v.id, { name: v.name }),
-    onSuccess,
+    onSuccess: applyData,
   })
   const deleteDebt = useMutation({
     mutationFn: (id: number) => getApi().deleteDebt(id),
-    onSuccess,
+    onSuccess: applyData,
   })
 
   const addScheduleRow = useMutation({
     mutationFn: (v: { debtId: number; input: NewScheduleRow }) =>
       getApi().addScheduleRow(v.debtId, v.input),
-    onSuccess,
+    onSuccess: applyData,
   })
   const updateScheduleRow = useMutation({
     mutationFn: (v: { id: number; patch: ScheduleRowPatch }) =>
       getApi().updateScheduleRow(v.id, v.patch),
-    onSuccess,
+    onSuccess: applyData,
   })
   const deleteScheduleRow = useMutation({
     mutationFn: (id: number) => getApi().deleteScheduleRow(id),
-    onSuccess,
+    onSuccess: applyData,
   })
 
   const addStatement = useMutation({
     mutationFn: (v: { debtId: number; input: NewStatement }) =>
       getApi().addStatement(v.debtId, v.input),
-    onSuccess,
+    onSuccess: applyData,
   })
   const updateStatement = useMutation({
     mutationFn: (v: { id: number; patch: StatementPatch }) =>
       getApi().updateStatement(v.id, v.patch),
-    onSuccess,
+    onSuccess: applyData,
   })
   const deleteStatement = useMutation({
     mutationFn: (id: number) => getApi().deleteStatement(id),
-    onSuccess,
+    onSuccess: applyData,
   })
 
-  // Needs its own onSuccess: it also refreshes the localStorage cache that
-  // keeps the right symbol on first paint. The second argument is the value
-  // that was passed to mutate().
   const setCurrency = useMutation({
     mutationFn: (c: Currency) => getApi().setCurrency(c),
-    onSuccess: (_data, c) => {
+    onSuccess: (data, c) => {
+      // Also refresh the cache that gives the right symbol on first paint.
       writeCachedCurrency(c)
-      void qc.invalidateQueries({ queryKey: financeKey })
+      applyData(data)
     },
   })
 

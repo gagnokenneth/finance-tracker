@@ -16,9 +16,6 @@ import type {
   FundEntry,
   Bill,
   ExpendableEntry,
-  Debt,
-  DebtScheduleRow,
-  DebtStatement,
   SavingsEntry,
   SavingsTransfer,
   Currency,
@@ -125,44 +122,44 @@ export class AppsScriptApi implements FinanceApi {
     await this.call<null>('setMonthlyBudget', { month, amount })
   }
 
-  addDebt(input: NewDebt): Promise<Debt> {
-    return this.call<Debt>('addDebt', input)
+  addDebt(input: NewDebt): Promise<FinanceData> {
+    return this.call<FinanceData>('addDebt', input)
   }
 
-  updateDebt(id: number, patch: { name: string }): Promise<Debt> {
-    return this.call<Debt>('updateDebt', { id, patch })
+  updateDebt(id: number, patch: { name: string }): Promise<FinanceData> {
+    return this.call<FinanceData>('updateDebt', { id, patch })
   }
 
-  async deleteDebt(id: number): Promise<void> {
-    await this.call<null>('deleteDebt', { id })
+  deleteDebt(id: number): Promise<FinanceData> {
+    return this.call<FinanceData>('deleteDebt', { id })
   }
 
-  addScheduleRow(debtId: number, input: NewScheduleRow): Promise<DebtScheduleRow> {
-    return this.call<DebtScheduleRow>('addScheduleRow', { debtId, input })
+  addScheduleRow(debtId: number, input: NewScheduleRow): Promise<FinanceData> {
+    return this.call<FinanceData>('addScheduleRow', { debtId, input })
   }
 
-  updateScheduleRow(id: number, patch: ScheduleRowPatch): Promise<DebtScheduleRow> {
-    return this.call<DebtScheduleRow>('updateScheduleRow', { id, patch })
+  updateScheduleRow(id: number, patch: ScheduleRowPatch): Promise<FinanceData> {
+    return this.call<FinanceData>('updateScheduleRow', { id, patch })
   }
 
-  async deleteScheduleRow(id: number): Promise<void> {
-    await this.call<null>('deleteScheduleRow', { id })
+  deleteScheduleRow(id: number): Promise<FinanceData> {
+    return this.call<FinanceData>('deleteScheduleRow', { id })
   }
 
-  addStatement(debtId: number, input: NewStatement): Promise<DebtStatement> {
-    return this.call<DebtStatement>('addStatement', { debtId, input })
+  addStatement(debtId: number, input: NewStatement): Promise<FinanceData> {
+    return this.call<FinanceData>('addStatement', { debtId, input })
   }
 
-  updateStatement(id: number, patch: StatementPatch): Promise<DebtStatement> {
-    return this.call<DebtStatement>('updateStatement', { id, patch })
+  updateStatement(id: number, patch: StatementPatch): Promise<FinanceData> {
+    return this.call<FinanceData>('updateStatement', { id, patch })
   }
 
-  async deleteStatement(id: number): Promise<void> {
-    await this.call<null>('deleteStatement', { id })
+  deleteStatement(id: number): Promise<FinanceData> {
+    return this.call<FinanceData>('deleteStatement', { id })
   }
 
-  async setCurrency(currency: Currency): Promise<void> {
-    await this.call<null>('setCurrency', { currency })
+  setCurrency(currency: Currency): Promise<FinanceData> {
+    return this.call<FinanceData>('setCurrency', { currency })
   }
 
   addSavings(input: NewSavings): Promise<SavingsEntry> {

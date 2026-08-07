@@ -105,7 +105,7 @@ export class MockApi implements FinanceApi {
     return this.delay(undefined)
   }
 
-  async addDebt(input: NewDebt): Promise<Debt> {
+  async addDebt(input: NewDebt): Promise<FinanceData> {
     const data = this.load()
     const debt: Debt = { id: nextId(data.debts), name: input.name, type: input.type }
     data.debts.push(debt)
@@ -119,82 +119,80 @@ export class MockApi implements FinanceApi {
       }
     }
     this.save(data)
-    return this.delay(debt)
+    return this.delay(data)
   }
 
-  async updateDebt(id: number, patch: { name: string }): Promise<Debt> {
+  async updateDebt(id: number, patch: { name: string }): Promise<FinanceData> {
     const data = this.load()
     const debt = data.debts.find((d) => d.id === id)
     if (!debt) throw new Error(`Debt ${id} not found`)
     debt.name = patch.name
     this.save(data)
-    return this.delay(debt)
+    return this.delay(data)
   }
 
-  async deleteDebt(id: number): Promise<void> {
+  async deleteDebt(id: number): Promise<FinanceData> {
     const data = this.load()
     data.debts = data.debts.filter((d) => d.id !== id)
     data.debt_schedule = data.debt_schedule.filter((r) => r.debt_id !== id)
     data.debt_statements = data.debt_statements.filter((r) => r.debt_id !== id)
     this.save(data)
-    return this.delay(undefined)
+    return this.delay(data)
   }
 
-  async addScheduleRow(debtId: number, input: NewScheduleRow): Promise<DebtScheduleRow> {
+  async addScheduleRow(debtId: number, input: NewScheduleRow): Promise<FinanceData> {
     const data = this.load()
-    const row: DebtScheduleRow = { id: nextId(data.debt_schedule), debt_id: debtId, ...input }
-    data.debt_schedule.push(row)
+    data.debt_schedule.push({ id: nextId(data.debt_schedule), debt_id: debtId, ...input })
     this.save(data)
-    return this.delay(row)
+    return this.delay(data)
   }
 
-  async updateScheduleRow(id: number, patch: ScheduleRowPatch): Promise<DebtScheduleRow> {
+  async updateScheduleRow(id: number, patch: ScheduleRowPatch): Promise<FinanceData> {
     const data = this.load()
     const row = data.debt_schedule.find((r) => r.id === id)
     if (!row) throw new Error(`Schedule row ${id} not found`)
     Object.assign(row, patch)
     clearPaidFields(row)
     this.save(data)
-    return this.delay(row)
+    return this.delay(data)
   }
 
-  async deleteScheduleRow(id: number): Promise<void> {
+  async deleteScheduleRow(id: number): Promise<FinanceData> {
     const data = this.load()
     data.debt_schedule = data.debt_schedule.filter((r) => r.id !== id)
     this.save(data)
-    return this.delay(undefined)
+    return this.delay(data)
   }
 
-  async addStatement(debtId: number, input: NewStatement): Promise<DebtStatement> {
+  async addStatement(debtId: number, input: NewStatement): Promise<FinanceData> {
     const data = this.load()
-    const row: DebtStatement = { id: nextId(data.debt_statements), debt_id: debtId, ...input }
-    data.debt_statements.push(row)
+    data.debt_statements.push({ id: nextId(data.debt_statements), debt_id: debtId, ...input })
     this.save(data)
-    return this.delay(row)
+    return this.delay(data)
   }
 
-  async updateStatement(id: number, patch: StatementPatch): Promise<DebtStatement> {
+  async updateStatement(id: number, patch: StatementPatch): Promise<FinanceData> {
     const data = this.load()
     const row = data.debt_statements.find((r) => r.id === id)
     if (!row) throw new Error(`Statement ${id} not found`)
     Object.assign(row, patch)
     clearPaidFields(row)
     this.save(data)
-    return this.delay(row)
+    return this.delay(data)
   }
 
-  async deleteStatement(id: number): Promise<void> {
+  async deleteStatement(id: number): Promise<FinanceData> {
     const data = this.load()
     data.debt_statements = data.debt_statements.filter((r) => r.id !== id)
     this.save(data)
-    return this.delay(undefined)
+    return this.delay(data)
   }
 
-  async setCurrency(currency: Currency): Promise<void> {
+  async setCurrency(currency: Currency): Promise<FinanceData> {
     const data = this.load()
     data.settings.currency = currency
     this.save(data)
-    return this.delay(undefined)
+    return this.delay(data)
   }
 
   async addSavings(input: NewSavings): Promise<SavingsEntry> {

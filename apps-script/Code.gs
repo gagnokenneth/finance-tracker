@@ -19,6 +19,24 @@ var SHEETS = {
 
 var DATA_SHEETS = ['funds', 'bills', 'expendable', 'debts', 'debt_schedule', 'debt_statements', 'savings', 'savings_transfers'];
 
+/**
+ * Sheets getAll actually reads. Every sheet read is a separate round trip, so
+ * reading the ones no screen displays is pure latency.
+ *
+ * IMPORTANT: if you re-enable Funds, Bills, Expendable or Savings in the
+ * frontend, add their sheet names here. Otherwise those pages render empty even
+ * though the rows exist.
+ */
+var ACTIVE_SHEETS = ['debts', 'debt_schedule', 'debt_statements'];
+
+/** Actions that return the full dataset instead of the affected row. */
+var RETURNS_DATA = {
+  addDebt: true, updateDebt: true, deleteDebt: true,
+  addScheduleRow: true, updateScheduleRow: true, deleteScheduleRow: true,
+  addStatement: true, updateStatement: true, deleteStatement: true,
+  setCurrency: true
+};
+
 function doGet() {
   return json({ data: 'finance api ok' });
 }
@@ -45,7 +63,17 @@ function doPost(e) {
     }
     if (allowed.indexOf(email) === -1) return json({ error: 'unauthorized' });
 
-    return json({ data: dispatch(body.action, body.payload) });
+    var result = dispatch(body.action, body.payload);
+
+    // Writes answer with the whole updated dataset, read back in this SAME
+    // execution. That saves the client a second request — each one costs over a
+    // second of Apps Script overhead — and removes the race where a separate
+    // read execution observes state from before the write.
+    if (RETURNS_DATA[body.action]) {
+      SpreadsheetApp.flush(); // commit pending writes before reading them back
+      return json({ data: getAll() });
+    }
+    return json({ data: result });
   } catch (err) {
     return json({ error: String((err && err.message) || err) });
   }
@@ -59,6 +87,12 @@ function doPost(e) {
  * them could mislabel columns of real data.
  */
 function ensureSheets() {
+  // Nine getSheetByName calls on every request add up. Once the structure is
+  // confirmed, skip the check for an hour. A tab deleted by hand therefore
+  // takes up to an hour to reappear.
+  var cache = CacheService.getScriptCache();
+  if (cache.get('sheets_ready')) return;
+
   var spreadsheet = ss();
   for (var name in SHEETS) {
     if (!Object.prototype.hasOwnProperty.call(SHEETS, name)) continue;
@@ -71,14 +105,36 @@ function ensureSheets() {
     sh.getRange(1, 1, 1, SHEETS[name].length).setValues([SHEETS[name]]);
     sh.setFrozenRows(1);
   }
+  cache.put('sheets_ready', '1', 3600);
 }
 
 function json(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
 }
 
+/**
+ * Verifies a Google ID token and returns its email.
+ *
+ * The tokeninfo call is a network round trip from inside Apps Script, and it
+ * previously ran on every single request. Successful results are cached against
+ * a hash of the token — never the token itself, since cache keys are visible in
+ * the script's cache and capped in length anyway.
+ *
+ * Trade-off: a token revoked mid-session stays accepted until the entry expires.
+ * Tokens only live about an hour, so the exposure is bounded and small.
+ */
+var TOKEN_CACHE_SECONDS = 300;
+
 function verify(token) {
   if (!token) return null;
+
+  var cache = CacheService.getScriptCache();
+  var key = 'tok_' + Utilities.base64EncodeWebSafe(
+    Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, token)
+  );
+  var cached = cache.get(key);
+  if (cached) return cached;
+
   var resp = UrlFetchApp.fetch(
     'https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(token),
     { muteHttpExceptions: true }
@@ -86,7 +142,10 @@ function verify(token) {
   if (resp.getResponseCode() !== 200) return null;
   var info = JSON.parse(resp.getContentText());
   if (CLIENT_ID && info.aud !== CLIENT_ID) return null;
-  return info.email || null;
+  if (!info.email) return null;
+
+  cache.put(key, info.email, TOKEN_CACHE_SECONDS);
+  return info.email;
 }
 
 function ss() { return SpreadsheetApp.getActiveSpreadsheet(); }
@@ -179,7 +238,9 @@ function patchRow(name, id, patch) {
     var v = patch[h];
     sh.getRange(rowIndex, c + 1).setValue(v === undefined || v === null ? '' : v);
   }
-  return getById(name, id);
+  // No read-back: callers of this are all RETURNS_DATA actions, so doPost reads
+  // the whole dataset once instead of re-reading this sheet here.
+  return null;
 }
 
 /**
@@ -204,23 +265,36 @@ function deleteRowById(name, id) {
 /** Deletes bottom-up so earlier row indices stay valid as rows are removed. */
 function deleteRowsWhere(name, col, value) {
   var sh = sheet(name);
-  var values = sh.getDataRange().getValues();
+  var last = sh.getLastRow();
+  if (last < 2) return;
   var colIdx = SHEETS[name].indexOf(col);
-  for (var i = values.length - 1; i >= 1; i--) {
-    if (num(values[i][colIdx]) === num(value)) sh.deleteRow(i + 1);
+  // Only the matched column is read, not the whole grid.
+  var vals = sh.getRange(2, colIdx + 1, last - 1, 1).getValues();
+  // Bottom-up so earlier row indices stay valid as rows are removed.
+  for (var i = vals.length - 1; i >= 0; i--) {
+    if (num(vals[i][0]) === num(value)) sh.deleteRow(i + 2);
   }
 }
 
+/** Reads only the id column, not every column of every row. */
+function idColumn(name) {
+  var sh = sheet(name);
+  var last = sh.getLastRow();
+  if (last < 2) return [];
+  return sh.getRange(2, 1, last - 1, 1).getValues();
+}
+
 function nextId(name) {
-  var rows = readRows(name);
+  var ids = idColumn(name);
   var max = 0;
-  for (var i = 0; i < rows.length; i++) { var id = num(rows[i].id); if (id > max) max = id; }
+  for (var i = 0; i < ids.length; i++) { var id = num(ids[i][0]); if (id > max) max = id; }
   return max + 1;
 }
 
+/** 1-based sheet row for an id, or -1. Reads only the id column. */
 function findSheetRow(name, id) {
-  var values = sheet(name).getDataRange().getValues();
-  for (var i = 1; i < values.length; i++) if (num(values[i][0]) === num(id)) return i + 1;
+  var ids = idColumn(name);
+  for (var i = 0; i < ids.length; i++) if (num(ids[i][0]) === num(id)) return i + 2;
   return -1;
 }
 
@@ -274,6 +348,8 @@ function upsertSetting(key, value) {
 function getAll() {
   var data = {};
   DATA_SHEETS.forEach(function (name) {
+    // Inactive sheets are reported as empty rather than read — see ACTIVE_SHEETS.
+    if (ACTIVE_SHEETS.indexOf(name) === -1) { data[name] = []; return; }
     data[name] = readRows(name).map(function (r) { return coerce(name, r); });
   });
   data.settings = readSettings();
@@ -352,7 +428,7 @@ function addDebt(p) {
 
 function updateDebt(p) {
   setCell('debts', p.id, 'name', p.patch.name);
-  return getById('debts', p.id);
+  return null; // RETURNS_DATA action — doPost reads the dataset back
 }
 
 function deleteDebt(p) {

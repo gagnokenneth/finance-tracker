@@ -3,7 +3,6 @@ import type {
   FundEntry,
   Bill,
   ExpendableEntry,
-  Debt,
   DebtScheduleRow,
   DebtStatement,
   SavingsEntry,
@@ -42,21 +41,31 @@ export interface FinanceApi {
   addExpendable(input: NewExpendable): Promise<ExpendableEntry>
   setMonthlyBudget(month: string, amount: number): Promise<void>
 
-  addDebt(input: NewDebt): Promise<Debt>
-  updateDebt(id: number, patch: { name: string }): Promise<Debt>
+  /*
+   * Debt and currency writes return the whole updated dataset rather than the
+   * affected row.
+   *
+   * Two reasons. It halves the work: the caller can drop the response straight
+   * into its cache instead of firing a second read, and on Apps Script each
+   * request costs over a second of fixed overhead. And it removes a race — a
+   * follow-up read runs as a separate Apps Script execution, which can observe
+   * state from before the write it is meant to reflect.
+   */
+  addDebt(input: NewDebt): Promise<FinanceData>
+  updateDebt(id: number, patch: { name: string }): Promise<FinanceData>
   /** Deletes the debt and every row belonging to it. */
-  deleteDebt(id: number): Promise<void>
+  deleteDebt(id: number): Promise<FinanceData>
 
-  addScheduleRow(debtId: number, input: NewScheduleRow): Promise<DebtScheduleRow>
+  addScheduleRow(debtId: number, input: NewScheduleRow): Promise<FinanceData>
   /** Paying is an update: { paid: true, paid_date, paid_amount }. */
-  updateScheduleRow(id: number, patch: ScheduleRowPatch): Promise<DebtScheduleRow>
-  deleteScheduleRow(id: number): Promise<void>
+  updateScheduleRow(id: number, patch: ScheduleRowPatch): Promise<FinanceData>
+  deleteScheduleRow(id: number): Promise<FinanceData>
 
-  addStatement(debtId: number, input: NewStatement): Promise<DebtStatement>
-  updateStatement(id: number, patch: StatementPatch): Promise<DebtStatement>
-  deleteStatement(id: number): Promise<void>
+  addStatement(debtId: number, input: NewStatement): Promise<FinanceData>
+  updateStatement(id: number, patch: StatementPatch): Promise<FinanceData>
+  deleteStatement(id: number): Promise<FinanceData>
 
-  setCurrency(currency: Currency): Promise<void>
+  setCurrency(currency: Currency): Promise<FinanceData>
 
   /** Adds a savings entry; returns it with its computed running total. */
   addSavings(input: NewSavings): Promise<SavingsEntry>
