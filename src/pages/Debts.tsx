@@ -6,6 +6,7 @@ import { Money } from '../components/Money.tsx'
 import { DueBadge } from '../components/DueBadge.tsx'
 import { InstallmentStrip } from '../components/InstallmentStrip.tsx'
 import { Button } from '../components/ui.tsx'
+import { LoadError } from '../components/LoadError.tsx'
 import { AddDebtModal } from './debts/AddDebtModal.tsx'
 import type { Debt, FinanceData } from '../types.ts'
 
@@ -46,11 +47,11 @@ function DebtRow({ debt, data }: { debt: Debt; data: FinanceData }) {
 }
 
 export function Debts() {
-  const { data, isLoading, isError } = useFinanceData()
+  const { data, isLoading, isError, error } = useFinanceData()
   const [adding, setAdding] = useState(false)
 
   if (isLoading) return <p className="text-ink-soft">Loading…</p>
-  if (isError || !data) return <p className="text-overdue">Could not load your debts. Reload to try again.</p>
+  if (isError || !data) return <LoadError error={error} />
 
   const owed = data.debts.reduce(
     (sum, d) => sum + totalBalance(d, data.debt_schedule, data.debt_statements),

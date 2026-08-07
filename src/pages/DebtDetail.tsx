@@ -9,6 +9,7 @@ import { DueBadge } from '../components/DueBadge.tsx'
 import { StatusBadge } from '../components/StatusBadge.tsx'
 import { InstallmentStrip } from '../components/InstallmentStrip.tsx'
 import { ConfirmDialog } from '../components/ConfirmDialog.tsx'
+import { LoadError } from '../components/LoadError.tsx'
 import { Button, SecondaryButton, RowButton } from '../components/ui.tsx'
 import { EditDebtModal } from './debts/EditDebtModal.tsx'
 import { PayModal } from './debts/PayModal.tsx'
@@ -26,7 +27,7 @@ const REVOLVING_HEADERS = ['Due date', 'Min due', 'Total due', 'Outstanding', 'S
 export function DebtDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { data, isLoading, isError } = useFinanceData()
+  const { data, isLoading, isError, error } = useFinanceData()
   const {
     updateDebt,
     deleteDebt,
@@ -45,8 +46,7 @@ export function DebtDetail() {
   const [deletingRow, setDeletingRow] = useState<AnyRow | null>(null)
 
   if (isLoading) return <p className="text-ink-soft">Loading…</p>
-  if (isError || !data)
-    return <p className="text-overdue">Could not load your debts. Reload to try again.</p>
+  if (isError || !data) return <LoadError error={error} />
 
   const debtId = Number(id)
   const debt = data.debts.find((d) => d.id === debtId)

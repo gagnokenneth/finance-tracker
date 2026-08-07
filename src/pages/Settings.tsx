@@ -2,17 +2,18 @@ import { useFinanceData } from '../hooks/useFinanceData.ts'
 import { useFinanceMutations } from '../hooks/useFinanceMutations.ts'
 import { useCurrency } from '../hooks/useCurrency.ts'
 import { CURRENCY_LABELS } from '../lib/currency.ts'
+import { LoadError } from '../components/LoadError.tsx'
 import type { Currency } from '../types.ts'
 
 const OPTIONS: Currency[] = ['PHP', 'USD']
 
 export function Settings() {
-  const { isLoading, isError } = useFinanceData()
+  const { isLoading, isError, error } = useFinanceData()
   const { setCurrency } = useFinanceMutations()
   const currency = useCurrency()
 
   if (isLoading) return <p className="text-ink-soft">Loading…</p>
-  if (isError) return <p className="text-overdue">Could not load settings. Reload to try again.</p>
+  if (isError) return <LoadError error={error} />
 
   return (
     <div className="space-y-6">

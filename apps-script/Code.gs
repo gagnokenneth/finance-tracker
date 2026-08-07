@@ -26,11 +26,50 @@ function doGet() {
 function doPost(e) {
   try {
     var body = JSON.parse(e.postData.contents);
+
+    // Identity is checked before anything touches the spreadsheet, so an
+    // anonymous caller can never trigger sheet creation.
     var email = verify(body.token);
-    if (!email || !isAllowed(email)) return json({ error: 'unauthorized' });
+    if (!email) return json({ error: 'unauthorized' });
+
+    ensureSheets();
+
+    var allowed = readSettings().allowedEmails;
+    // The whitelist is the security boundary, so it is never auto-populated:
+    // seeding the first caller would hand the data to whoever arrived first.
+    if (allowed.length === 0) {
+      return json({
+        error:
+          'This backend has no allowed users yet. In the settings sheet, add a row with key "allowed_email" and your Google address as the value, then reload.'
+      });
+    }
+    if (allowed.indexOf(email) === -1) return json({ error: 'unauthorized' });
+
     return json({ data: dispatch(body.action, body.payload) });
   } catch (err) {
     return json({ error: String((err && err.message) || err) });
+  }
+}
+
+/**
+ * Creates any missing tab and writes its header row. Idempotent, so it can run
+ * on every request: a fully set-up spreadsheet costs one lookup per tab.
+ *
+ * Headers on an EXISTING non-empty sheet are left alone — silently rewriting
+ * them could mislabel columns of real data.
+ */
+function ensureSheets() {
+  var spreadsheet = ss();
+  for (var name in SHEETS) {
+    if (!Object.prototype.hasOwnProperty.call(SHEETS, name)) continue;
+    var sh = spreadsheet.getSheetByName(name);
+    if (!sh) {
+      sh = spreadsheet.insertSheet(name);
+    } else if (sh.getLastRow() > 0) {
+      continue; // already has content, including its header row
+    }
+    sh.getRange(1, 1, 1, SHEETS[name].length).setValues([SHEETS[name]]);
+    sh.setFrozenRows(1);
   }
 }
 
@@ -48,10 +87,6 @@ function verify(token) {
   var info = JSON.parse(resp.getContentText());
   if (CLIENT_ID && info.aud !== CLIENT_ID) return null;
   return info.email || null;
-}
-
-function isAllowed(email) {
-  return readSettings().allowedEmails.indexOf(email) !== -1;
 }
 
 function ss() { return SpreadsheetApp.getActiveSpreadsheet(); }

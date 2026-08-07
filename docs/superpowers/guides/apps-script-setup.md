@@ -4,9 +4,16 @@ One-time setup to connect the app to your private Google Sheet and deploy it.
 
 ## 1. Create the Google Sheet
 
-1. Create a new Google Sheet (this is your private database).
-2. Create one tab per sheet, with the **exact** lowercase names and a header row
-   matching these columns (row 1 = headers):
+1. Create a new Google Sheet (this is your private database). An empty one is
+   fine.
+2. **You do not need to create the tabs by hand.** On the first signed-in
+   request, the backend creates every missing tab and writes its header row, so
+   you can skip ahead to step 2 and let it build the structure for you.
+
+   Headers on a tab that already has content are never rewritten — silently
+   relabelling columns of real data would be worse than failing.
+
+   For reference, this is what it creates:
 
    - `funds`: `id | source | amount | date | notes`
    - `bills`: `id | name | amount | due_date | paid | notes`
@@ -22,7 +29,11 @@ One-time setup to connect the app to your private Google Sheet and deploy it.
    holds the statements of a **revolving** one. A debt uses whichever table
    matches its `type`.
 
-3. In `settings`, add at least one whitelist row:
+3. In `settings`, add at least one whitelist row. **This is the one row you must
+   add yourself** — the whitelist is the security boundary, so it is never
+   auto-populated. Seeding it with the first caller would hand your data to
+   whoever reached the URL first. Until you add it, the app shows: *"This
+   backend has no allowed users yet…"*
    - `key` = `allowed_email`, `value` = your Google email (e.g. `you@gmail.com`)
    - Optionally seed a budget: `key` = `budget_2026-06`, `value` = `900`
    - Optionally set the currency: `key` = `currency`, `value` = `PHP` or `USD`
