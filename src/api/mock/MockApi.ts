@@ -31,6 +31,17 @@ function nextId<T extends { id: number }>(rows: T[]): number {
   return rows.reduce((max, r) => Math.max(max, r.id), 0) + 1
 }
 
+/**
+ * An unpaid row must not keep a payment date. Cleared explicitly rather than
+ * relying on JSON dropping undefined, so both adapters behave the same way.
+ */
+function clearPaidFields(row: DebtScheduleRow | DebtStatement): void {
+  if (!row.paid) {
+    delete row.paid_date
+    delete row.paid_amount
+  }
+}
+
 export class MockApi implements FinanceApi {
   private load(): FinanceData {
     const raw = localStorage.getItem(KEY)
@@ -141,9 +152,8 @@ export class MockApi implements FinanceApi {
     const data = this.load()
     const row = data.debt_schedule.find((r) => r.id === id)
     if (!row) throw new Error(`Schedule row ${id} not found`)
-    // Undefined values drop out on the JSON round-trip, which is how clearing
-    // a paid flag removes paid_date / paid_amount entirely.
     Object.assign(row, patch)
+    clearPaidFields(row)
     this.save(data)
     return this.delay(row)
   }
@@ -168,6 +178,7 @@ export class MockApi implements FinanceApi {
     const row = data.debt_statements.find((r) => r.id === id)
     if (!row) throw new Error(`Statement ${id} not found`)
     Object.assign(row, patch)
+    clearPaidFields(row)
     this.save(data)
     return this.delay(row)
   }

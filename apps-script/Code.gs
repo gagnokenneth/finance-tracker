@@ -9,14 +9,15 @@ var SHEETS = {
   funds: ['id', 'source', 'amount', 'date', 'notes'],
   bills: ['id', 'name', 'amount', 'due_date', 'paid', 'notes'],
   expendable: ['id', 'month', 'daily_amount', 'date', 'notes'],
-  debts: ['id', 'name', 'total_amount', 'remaining', 'type', 'interest_rate', 'notes'],
-  debt_payments: ['id', 'debt_id', 'amount_paid', 'date', 'notes'],
+  debts: ['id', 'name', 'type'],
+  debt_schedule: ['id', 'debt_id', 'due_date', 'amount', 'paid', 'paid_date', 'paid_amount'],
+  debt_statements: ['id', 'debt_id', 'due_date', 'min_due', 'total_due', 'outstanding', 'paid', 'paid_date', 'paid_amount'],
   savings: ['id', 'date', 'amount', 'source', 'total', 'notes'],
   savings_transfers: ['id', 'date', 'amount', 'notes'],
   settings: ['key', 'value']
 };
 
-var DATA_SHEETS = ['funds', 'bills', 'expendable', 'debts', 'debt_payments', 'savings', 'savings_transfers'];
+var DATA_SHEETS = ['funds', 'bills', 'expendable', 'debts', 'debt_schedule', 'debt_statements', 'savings', 'savings_transfers'];
 
 function doGet() {
   return json({ data: 'finance api ok' });
@@ -68,6 +69,15 @@ function fmtDate(v) {
 
 function num(v) { return v === '' || v === null || v === undefined ? 0 : Number(v); }
 
+function blank(v) { return v === '' || v === null || v === undefined; }
+
+function bool(v) { return v === true || String(v).toUpperCase() === 'TRUE'; }
+
+/** Optional cells come back as undefined so they are omitted from the JSON. */
+function optNum(v) { return blank(v) ? undefined : Number(v); }
+
+function optDate(v) { return blank(v) ? undefined : fmtDate(v); }
+
 function readRows(name) {
   var values = sheet(name).getDataRange().getValues();
   if (values.length < 2) return [];
@@ -86,8 +96,16 @@ function coerce(name, r) {
   if (name === 'funds') return { id: num(r.id), source: String(r.source), amount: num(r.amount), date: fmtDate(r.date), notes: r.notes ? String(r.notes) : undefined };
   if (name === 'bills') return { id: num(r.id), name: String(r.name), amount: num(r.amount), due_date: fmtDate(r.due_date), paid: r.paid === true || String(r.paid).toUpperCase() === 'TRUE', notes: r.notes ? String(r.notes) : undefined };
   if (name === 'expendable') return { id: num(r.id), month: String(r.month), daily_amount: num(r.daily_amount), date: fmtDate(r.date), notes: r.notes ? String(r.notes) : undefined };
-  if (name === 'debts') return { id: num(r.id), name: String(r.name), total_amount: num(r.total_amount), remaining: num(r.remaining), type: String(r.type), interest_rate: num(r.interest_rate), notes: r.notes ? String(r.notes) : undefined };
-  if (name === 'debt_payments') return { id: num(r.id), debt_id: num(r.debt_id), amount_paid: num(r.amount_paid), date: fmtDate(r.date), notes: r.notes ? String(r.notes) : undefined };
+  if (name === 'debts') return { id: num(r.id), name: String(r.name), type: String(r.type) };
+  if (name === 'debt_schedule') return {
+    id: num(r.id), debt_id: num(r.debt_id), due_date: fmtDate(r.due_date), amount: num(r.amount),
+    paid: bool(r.paid), paid_date: optDate(r.paid_date), paid_amount: optNum(r.paid_amount)
+  };
+  if (name === 'debt_statements') return {
+    id: num(r.id), debt_id: num(r.debt_id), due_date: fmtDate(r.due_date),
+    min_due: num(r.min_due), total_due: num(r.total_due), outstanding: num(r.outstanding),
+    paid: bool(r.paid), paid_date: optDate(r.paid_date), paid_amount: optNum(r.paid_amount)
+  };
   if (name === 'savings') return { id: num(r.id), date: fmtDate(r.date), amount: num(r.amount), source: String(r.source), total: num(r.total), notes: r.notes ? String(r.notes) : undefined };
   if (name === 'savings_transfers') return { id: num(r.id), date: fmtDate(r.date), amount: num(r.amount), notes: r.notes ? String(r.notes) : undefined };
   return r;
@@ -98,6 +116,64 @@ function appendRow(name, obj) {
     return obj[h] !== undefined && obj[h] !== null ? obj[h] : '';
   });
   sheet(name).appendRow(row);
+}
+
+/** Batch append — one setValues call instead of N appendRow round-trips. */
+function appendRows(name, objs) {
+  if (!objs.length) return;
+  var sh = sheet(name);
+  var headers = SHEETS[name];
+  var values = objs.map(function (obj) {
+    return headers.map(function (h) {
+      return obj[h] !== undefined && obj[h] !== null ? obj[h] : '';
+    });
+  });
+  sh.getRange(sh.getLastRow() + 1, 1, values.length, headers.length).setValues(values);
+}
+
+/** Writes only the keys present in patch. id and debt_id are never patchable. */
+function patchRow(name, id, patch) {
+  var rowIndex = findSheetRow(name, id);
+  if (rowIndex === -1) throw new Error(name + ' ' + id + ' not found');
+  var sh = sheet(name);
+  var headers = SHEETS[name];
+  for (var c = 0; c < headers.length; c++) {
+    var h = headers[c];
+    if (h === 'id' || h === 'debt_id') continue;
+    if (!Object.prototype.hasOwnProperty.call(patch, h)) continue;
+    var v = patch[h];
+    sh.getRange(rowIndex, c + 1).setValue(v === undefined || v === null ? '' : v);
+  }
+  return getById(name, id);
+}
+
+/**
+ * JSON.stringify drops undefined, so a "clear the paid flag" patch arrives
+ * without paid_date / paid_amount. Clear them explicitly, or the row would
+ * keep a stale payment date next to paid = false.
+ */
+function normalizePaidPatch(patch) {
+  if (Object.prototype.hasOwnProperty.call(patch, 'paid') && !bool(patch.paid)) {
+    patch.paid = false;
+    patch.paid_date = '';
+    patch.paid_amount = '';
+  }
+  return patch;
+}
+
+function deleteRowById(name, id) {
+  var rowIndex = findSheetRow(name, id);
+  if (rowIndex !== -1) sheet(name).deleteRow(rowIndex);
+}
+
+/** Deletes bottom-up so earlier row indices stay valid as rows are removed. */
+function deleteRowsWhere(name, col, value) {
+  var sh = sheet(name);
+  var values = sh.getDataRange().getValues();
+  var colIdx = SHEETS[name].indexOf(col);
+  for (var i = values.length - 1; i >= 1; i--) {
+    if (num(values[i][colIdx]) === num(value)) sh.deleteRow(i + 1);
+  }
 }
 
 function nextId(name) {
@@ -135,13 +211,29 @@ function readSettings() {
   var rows = readRows('settings');
   var monthlyBudgets = {};
   var allowedEmails = [];
+  var currency = 'PHP';
   for (var i = 0; i < rows.length; i++) {
     var k = String(rows[i].key);
     var v = rows[i].value;
     if (k.indexOf('budget_') === 0) monthlyBudgets[k.substring(7)] = num(v);
     else if (k === 'allowed_email' && v) allowedEmails.push(String(v));
+    else if (k === 'currency' && v) currency = String(v);
   }
-  return { monthlyBudgets: monthlyBudgets, allowedEmails: allowedEmails };
+  return { monthlyBudgets: monthlyBudgets, allowedEmails: allowedEmails, currency: currency };
+}
+
+/** Inserts or updates a single key in the settings sheet. */
+function upsertSetting(key, value) {
+  var sh = sheet('settings');
+  var values = sh.getDataRange().getValues();
+  for (var i = 1; i < values.length; i++) {
+    if (String(values[i][0]) === key) {
+      sh.getRange(i + 1, 2).setValue(value);
+      return null;
+    }
+  }
+  sh.appendRow([key, value]);
+  return null;
 }
 
 function getAll() {
@@ -162,7 +254,15 @@ function dispatch(action, p) {
     case 'addExpendable': return addExpendable(p);
     case 'setMonthlyBudget': return setMonthlyBudget(p);
     case 'addDebt': return addDebt(p);
-    case 'payDebt': return payDebt(p);
+    case 'updateDebt': return updateDebt(p);
+    case 'deleteDebt': return deleteDebt(p);
+    case 'addScheduleRow': return addChildRow('debt_schedule', p);
+    case 'updateScheduleRow': return updateChildRow('debt_schedule', p);
+    case 'deleteScheduleRow': return deleteChildRow('debt_schedule', p);
+    case 'addStatement': return addChildRow('debt_statements', p);
+    case 'updateStatement': return updateChildRow('debt_statements', p);
+    case 'deleteStatement': return deleteChildRow('debt_statements', p);
+    case 'setCurrency': return upsertSetting('currency', p.currency);
     case 'addSavings': return addSavings(p);
     case 'transferSavingsToFunds': return transferSavingsToFunds(p);
     default: throw new Error('Unknown action: ' + action);
@@ -193,36 +293,56 @@ function addExpendable(p) {
 }
 
 function setMonthlyBudget(p) {
-  var key = 'budget_' + p.month;
-  var values = sheet('settings').getDataRange().getValues();
-  for (var i = 1; i < values.length; i++) {
-    if (String(values[i][0]) === key) {
-      sheet('settings').getRange(i + 1, 2).setValue(p.amount);
-      return null;
-    }
-  }
-  sheet('settings').appendRow([key, p.amount]);
-  return null;
+  return upsertSetting('budget_' + p.month, p.amount);
 }
 
 function addDebt(p) {
-  var debt = {
-    id: nextId('debts'), name: p.name, total_amount: p.total_amount, remaining: p.remaining,
-    type: p.type, interest_rate: p.interest_rate, notes: p.notes || ''
-  };
+  var debt = { id: nextId('debts'), name: p.name, type: p.type };
   appendRow('debts', debt);
+
+  var target = p.type === 'fixed' ? 'debt_schedule' : 'debt_statements';
+  var rows = p.rows || [];
+  var baseId = nextId(target);
+  var prepared = rows.map(function (row, i) {
+    var copy = {};
+    for (var k in row) if (Object.prototype.hasOwnProperty.call(row, k)) copy[k] = row[k];
+    copy.id = baseId + i;
+    copy.debt_id = debt.id;
+    return copy;
+  });
+  appendRows(target, prepared);
+
   return coerce('debts', debt);
 }
 
-function payDebt(p) {
-  var payment = { id: nextId('debt_payments'), debt_id: p.debt_id, amount_paid: p.amount_paid, date: p.date, notes: p.notes || '' };
-  appendRow('debt_payments', payment);
-  var debt = getById('debts', p.debt_id);
-  if (!debt) throw new Error('Debt not found');
-  var newRemaining = debt.remaining - num(p.amount_paid);
-  setCell('debts', p.debt_id, 'remaining', newRemaining);
-  debt.remaining = newRemaining;
-  return { payment: coerce('debt_payments', payment), debt: debt };
+function updateDebt(p) {
+  setCell('debts', p.id, 'name', p.patch.name);
+  return getById('debts', p.id);
+}
+
+function deleteDebt(p) {
+  deleteRowsWhere('debt_schedule', 'debt_id', p.id);
+  deleteRowsWhere('debt_statements', 'debt_id', p.id);
+  deleteRowById('debts', p.id);
+  return null;
+}
+
+function addChildRow(name, p) {
+  var row = {};
+  for (var k in p.input) if (Object.prototype.hasOwnProperty.call(p.input, k)) row[k] = p.input[k];
+  row.id = nextId(name);
+  row.debt_id = p.debtId;
+  appendRow(name, row);
+  return coerce(name, row);
+}
+
+function updateChildRow(name, p) {
+  return patchRow(name, p.id, normalizePaidPatch(p.patch));
+}
+
+function deleteChildRow(name, p) {
+  deleteRowById(name, p.id);
+  return null;
 }
 
 function addSavings(p) {

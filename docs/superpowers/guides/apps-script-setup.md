@@ -11,17 +11,28 @@ One-time setup to connect the app to your private Google Sheet and deploy it.
    - `funds`: `id | source | amount | date | notes`
    - `bills`: `id | name | amount | due_date | paid | notes`
    - `expendable`: `id | month | daily_amount | date | notes`
-   - `debts`: `id | name | total_amount | remaining | type | interest_rate | notes`
-   - `debt_payments`: `id | debt_id | amount_paid | date | notes`
+   - `debts`: `id | name | type`
+   - `debt_schedule`: `id | debt_id | due_date | amount | paid | paid_date | paid_amount`
+   - `debt_statements`: `id | debt_id | due_date | min_due | total_due | outstanding | paid | paid_date | paid_amount`
    - `savings`: `id | date | amount | source | total | notes`
    - `savings_transfers`: `id | date | amount | notes`
    - `settings`: `key | value`
 
+   `debt_schedule` holds the installments of a **fixed** debt; `debt_statements`
+   holds the statements of a **revolving** one. A debt uses whichever table
+   matches its `type`.
+
 3. In `settings`, add at least one whitelist row:
    - `key` = `allowed_email`, `value` = your Google email (e.g. `you@gmail.com`)
    - Optionally seed a budget: `key` = `budget_2026-06`, `value` = `900`
+   - Optionally set the currency: `key` = `currency`, `value` = `PHP` or `USD`
+     (defaults to `PHP` when absent; the Settings page writes this row)
 
    (The app also writes `budget_<month>` rows when you set a monthly budget.)
+
+> **Upgrading an existing sheet.** The debt model changed and there is no
+> migration, by design. Delete the old `debts` and `debt_payments` tabs, then
+> recreate `debts` with the three columns above and add the two new tabs.
 
 > Tip: format the `date` / `due_date` columns as Plain text to avoid timezone
 > surprises; the backend also normalizes Date cells to `yyyy-MM-dd`.
