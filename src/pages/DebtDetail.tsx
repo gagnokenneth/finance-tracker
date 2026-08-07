@@ -2,17 +2,11 @@ import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useFinanceData } from '../hooks/useFinanceData.ts'
 import { useFinanceMutations } from '../hooks/useFinanceMutations.ts'
-import {
-  nextDueDate,
-  scheduleFor,
-  statementsFor,
-  totalBalance,
-  dueStatus,
-  DUE_STATUS_LABEL,
-} from '../lib/debts.ts'
+import { nextDueDate, scheduleFor, statementsFor, totalBalance, dueStatus } from '../lib/debts.ts'
 import { Money } from '../components/Money.tsx'
 import { Table } from '../components/Table.tsx'
 import { DueBadge } from '../components/DueBadge.tsx'
+import { StatusBadge } from '../components/StatusBadge.tsx'
 import { ConfirmDialog } from '../components/ConfirmDialog.tsx'
 import { Button, SecondaryButton } from '../components/ui.tsx'
 import { EditDebtModal } from './debts/EditDebtModal.tsx'
@@ -128,17 +122,20 @@ export function DebtDetail() {
 
   const statusCell = (row: AnyRow) =>
     row.paid ? (
-      <span className="text-slate-600">
-        Paid {row.paid_date}
-        {row.paid_amount !== undefined && (
-          <>
-            {' — '}
-            <Money value={row.paid_amount} />
-          </>
-        )}
+      <span className="inline-flex flex-wrap items-center gap-2">
+        <StatusBadge status="paid" />
+        <span className="text-xs text-slate-500">
+          {row.paid_date}
+          {row.paid_amount !== undefined && (
+            <>
+              {' — '}
+              <Money value={row.paid_amount} className="text-xs" />
+            </>
+          )}
+        </span>
       </span>
     ) : (
-      DUE_STATUS_LABEL[dueStatus(row.due_date)]
+      <StatusBadge status={dueStatus(row.due_date)} />
     )
 
   const actionCell = (row: AnyRow) => (
@@ -215,7 +212,7 @@ export function DebtDetail() {
       ) : (
         <Table headers={isFixed ? FIXED_HEADERS : REVOLVING_HEADERS}>
           {rows.map((row) => (
-            <tr key={row.id}>
+            <tr key={row.id} className={row.paid ? 'bg-green-50/70' : undefined}>
               <td className="px-3 py-2 tabular-nums">{row.due_date}</td>
               {'amount' in row ? (
                 <td className="px-3 py-2">

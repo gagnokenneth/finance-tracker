@@ -78,12 +78,7 @@ export function AddDebtModal({ open, onClose }: { open: boolean; onClose: () => 
     <Modal open={open} title="Add Debt" onClose={onClose}>
       <form onSubmit={submit} className="flex flex-col gap-3">
         <Field label="Name">
-          <TextInput
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Honda Giorno+"
-            required
-          />
+          <TextInput value={name} onChange={(e) => setName(e.target.value)} required />
         </Field>
         <Field label="Type">
           <SelectInput value={type} onChange={(e) => setType(e.target.value as DebtType)}>

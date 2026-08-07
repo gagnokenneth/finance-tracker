@@ -24,17 +24,25 @@ export function dueStatus(dueDate: string, today: string = isoDate()): DueStatus
   return 'upcoming'
 }
 
-export const DUE_STATUS_LABEL: Record<DueStatus, string> = {
+/** A row is either settled, or unpaid at some distance from its due date. */
+export type RowStatus = DueStatus | 'paid'
+
+export const ROW_STATUS_LABEL: Record<RowStatus, string> = {
   late: 'Late',
   'due-soon': 'Due soon',
   upcoming: 'Upcoming',
+  paid: 'Paid',
 }
 
-/** Colour never carries meaning alone — always pair with DUE_STATUS_LABEL. */
-export const DUE_STATUS_CLASS: Record<DueStatus, string> = {
+/**
+ * Graded by urgency: red → orange → yellow → green. Colour never carries
+ * meaning alone — always pair with ROW_STATUS_LABEL.
+ */
+export const ROW_STATUS_CLASS: Record<RowStatus, string> = {
   late: 'bg-red-50 text-red-700 ring-red-600/20',
-  'due-soon': 'bg-amber-50 text-amber-700 ring-amber-600/20',
-  upcoming: 'bg-slate-50 text-slate-600 ring-slate-500/20',
+  'due-soon': 'bg-orange-50 text-orange-700 ring-orange-600/20',
+  upcoming: 'bg-yellow-50 text-yellow-800 ring-yellow-600/20',
+  paid: 'bg-green-50 text-green-700 ring-green-600/20',
 }
 
 /** Earliest unpaid row by due date, or null when everything is settled. */
