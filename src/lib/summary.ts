@@ -1,4 +1,5 @@
 import type { FinanceData } from '../types.ts'
+import { totalBalance } from './debts.ts'
 
 export interface Summary {
   totalFunds: number
@@ -23,8 +24,12 @@ export function computeSummary(data: FinanceData, month: string): Summary {
     data.expendable.filter((e) => e.month === month).map((e) => e.daily_amount),
   )
   const remainingExpendable = monthlyExpendable - spentThisMonth
-  const totalDebt = sum(data.debts.map((d) => d.remaining))
-  const debtPayments = sum(data.debt_payments.map((p) => p.amount_paid))
+  const totalDebt = sum(
+    data.debts.map((d) => totalBalance(d, data.debt_schedule, data.debt_statements)),
+  )
+  const debtPayments =
+    sum(data.debt_schedule.filter((r) => r.paid).map((r) => r.paid_amount ?? r.amount)) +
+    sum(data.debt_statements.filter((r) => r.paid).map((r) => r.paid_amount ?? r.min_due))
   const savingsTotal =
     sum(data.savings.map((s) => s.amount)) -
     sum(data.savings_transfers.map((t) => t.amount))

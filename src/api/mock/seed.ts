@@ -14,12 +14,9 @@ export function createSeed(): FinanceData {
       { id: 1, month: '2026-06', daily_amount: 100, date: '2026-06-02' },
       { id: 2, month: '2026-06', daily_amount: 50, date: '2026-06-03' },
     ],
-    debts: [
-      { id: 1, name: 'Credit Card', total_amount: 2000, remaining: 1200, type: 'straight', interest_rate: 0 },
-    ],
-    debt_payments: [
-      { id: 1, debt_id: 1, amount_paid: 800, date: '2026-06-07' },
-    ],
+    debts: [],
+    debt_schedule: [],
+    debt_statements: [],
     savings: [
       { id: 1, date: '2026-06-01', amount: 500, source: 'funds', total: 500 },
     ],
@@ -29,6 +26,7 @@ export function createSeed(): FinanceData {
     settings: {
       monthlyBudgets: { '2026-06': 900 },
       allowedEmails: ['ken.gagno@vibeteams.ai'],
+      currency: 'PHP',
     },
   }
 }

@@ -4,7 +4,10 @@ import type {
   NewBill,
   NewExpendable,
   NewDebt,
-  NewDebtPayment,
+  NewScheduleRow,
+  NewStatement,
+  ScheduleRowPatch,
+  StatementPatch,
   NewSavings,
   NewSavingsTransfer,
 } from '../FinanceApi.ts'
@@ -14,9 +17,11 @@ import type {
   Bill,
   ExpendableEntry,
   Debt,
-  DebtPayment,
+  DebtScheduleRow,
+  DebtStatement,
   SavingsEntry,
   SavingsTransfer,
+  Currency,
 } from '../../types.ts'
 import { getToken, clearToken } from '../../auth/token.ts'
 
@@ -81,8 +86,40 @@ export class AppsScriptApi implements FinanceApi {
     return this.call<Debt>('addDebt', input)
   }
 
-  payDebt(input: NewDebtPayment): Promise<{ payment: DebtPayment; debt: Debt }> {
-    return this.call<{ payment: DebtPayment; debt: Debt }>('payDebt', input)
+  updateDebt(id: number, patch: { name: string }): Promise<Debt> {
+    return this.call<Debt>('updateDebt', { id, patch })
+  }
+
+  async deleteDebt(id: number): Promise<void> {
+    await this.call<null>('deleteDebt', { id })
+  }
+
+  addScheduleRow(debtId: number, input: NewScheduleRow): Promise<DebtScheduleRow> {
+    return this.call<DebtScheduleRow>('addScheduleRow', { debtId, input })
+  }
+
+  updateScheduleRow(id: number, patch: ScheduleRowPatch): Promise<DebtScheduleRow> {
+    return this.call<DebtScheduleRow>('updateScheduleRow', { id, patch })
+  }
+
+  async deleteScheduleRow(id: number): Promise<void> {
+    await this.call<null>('deleteScheduleRow', { id })
+  }
+
+  addStatement(debtId: number, input: NewStatement): Promise<DebtStatement> {
+    return this.call<DebtStatement>('addStatement', { debtId, input })
+  }
+
+  updateStatement(id: number, patch: StatementPatch): Promise<DebtStatement> {
+    return this.call<DebtStatement>('updateStatement', { id, patch })
+  }
+
+  async deleteStatement(id: number): Promise<void> {
+    await this.call<null>('deleteStatement', { id })
+  }
+
+  async setCurrency(currency: Currency): Promise<void> {
+    await this.call<null>('setCurrency', { currency })
   }
 
   addSavings(input: NewSavings): Promise<SavingsEntry> {
