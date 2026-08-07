@@ -14,7 +14,7 @@ import { Money } from '../components/Money.tsx'
 import { Table } from '../components/Table.tsx'
 import { DueBadge } from '../components/DueBadge.tsx'
 import { ConfirmDialog } from '../components/ConfirmDialog.tsx'
-import { Button } from '../components/ui.tsx'
+import { Button, SecondaryButton } from '../components/ui.tsx'
 import { EditDebtModal } from './debts/EditDebtModal.tsx'
 import { PayModal } from './debts/PayModal.tsx'
 import type { PayResult } from './debts/PayModal.tsx'
@@ -185,13 +185,9 @@ export function DebtDetail() {
           </span>
         </div>
         <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => setEditingDebt(true)}
-            className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100"
-          >
+          <SecondaryButton type="button" onClick={() => setEditingDebt(true)}>
             Edit
-          </button>
+          </SecondaryButton>
           <button
             type="button"
             onClick={() => setDeletingDebt(true)}

@@ -6,7 +6,7 @@ import { formatMoney } from '../../lib/money.ts'
 import { useCurrency } from '../../hooks/useCurrency.ts'
 import { isoDate } from '../../lib/currentMonth.ts'
 import { Modal } from '../../components/Modal.tsx'
-import { Field, TextInput, SelectInput, Button } from '../../components/ui.tsx'
+import { Field, TextInput, SelectInput, Button, SecondaryButton } from '../../components/ui.tsx'
 import type { DebtType } from '../../types.ts'
 
 export function AddDebtModal({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -26,23 +26,6 @@ export function AddDebtModal({ open, onClose }: { open: boolean; onClose: () => 
   const [minDue, setMinDue] = useState('')
   const [totalDue, setTotalDue] = useState('')
   const [outstanding, setOutstanding] = useState('')
-
-  const reset = () => {
-    setName('')
-    setType('fixed')
-    setFirstDue(isoDate())
-    setTotal('')
-    setMonths('')
-    setDueDate(isoDate())
-    setMinDue('')
-    setTotalDue('')
-    setOutstanding('')
-  }
-
-  const close = () => {
-    reset()
-    onClose()
-  }
 
   // Preview doubles as validation: buildSchedule throws on bad input, and the
   // message it throws is the one worth showing.
@@ -68,7 +51,7 @@ export function AddDebtModal({ open, onClose }: { open: boolean; onClose: () => 
       if (previewError || !total || !months) return
       addDebt.mutate(
         { name, type: 'fixed', rows: buildSchedule(firstDue, Number(total), Number(months)) },
-        { onSuccess: close },
+        { onSuccess: onClose },
       )
       return
     }
@@ -87,12 +70,12 @@ export function AddDebtModal({ open, onClose }: { open: boolean; onClose: () => 
           },
         ],
       },
-      { onSuccess: close },
+      { onSuccess: onClose },
     )
   }
 
   return (
-    <Modal open={open} title="Add Debt" onClose={close}>
+    <Modal open={open} title="Add Debt" onClose={onClose}>
       <form onSubmit={submit} className="flex flex-col gap-3">
         <Field label="Name">
           <TextInput
@@ -190,13 +173,9 @@ export function AddDebtModal({ open, onClose }: { open: boolean; onClose: () => 
         )}
 
         <div className="mt-1 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={close}
-            className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100"
-          >
+          <SecondaryButton type="button" onClick={onClose}>
             Cancel
-          </button>
+          </SecondaryButton>
           <Button type="submit" disabled={addDebt.isPending || previewError !== null}>
             Add Debt
           </Button>

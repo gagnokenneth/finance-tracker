@@ -31,6 +31,32 @@ export function SelectInput(props: SelectHTMLAttributes<HTMLSelectElement>) {
   )
 }
 
+/** Neutral action — Cancel, and anything that isn't the primary submit. */
+export function SecondaryButton(props: ButtonHTMLAttributes<HTMLButtonElement>) {
+  const { className, children, ...rest } = props
+  return (
+    <button
+      {...rest}
+      className={`rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50 ${className ?? ''}`}
+    >
+      {children}
+    </button>
+  )
+}
+
+/** Destructive confirmation — the button that actually deletes. */
+export function DangerButton(props: ButtonHTMLAttributes<HTMLButtonElement>) {
+  const { className, children, ...rest } = props
+  return (
+    <button
+      {...rest}
+      className={`rounded-md bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 ${className ?? ''}`}
+    >
+      {children}
+    </button>
+  )
+}
+
 export function Button(props: ButtonHTMLAttributes<HTMLButtonElement>) {
   const { className, children, ...rest } = props
   return (

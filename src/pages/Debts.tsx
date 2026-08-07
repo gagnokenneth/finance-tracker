@@ -55,7 +55,8 @@ export function Debts() {
         </Table>
       )}
 
-      <AddDebtModal open={adding} onClose={() => setAdding(false)} />
+      {/* Mounted only while open, so the form resets without a manual reset(). */}
+      {adding && <AddDebtModal open onClose={() => setAdding(false)} />}
     </div>
   )
 }

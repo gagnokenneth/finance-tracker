@@ -1,4 +1,5 @@
 import { Modal } from './Modal.tsx'
+import { SecondaryButton, DangerButton } from './ui.tsx'
 
 /** Confirmation for destructive actions. Every use here deletes something. */
 export function ConfirmDialog({
@@ -25,21 +26,12 @@ export function ConfirmDialog({
       <p className="text-sm text-slate-700">{message}</p>
       {error && <p className="mt-2 text-sm text-red-600">Could not delete. Please try again.</p>}
       <div className="mt-4 flex justify-end gap-2">
-        <button
-          type="button"
-          onClick={onClose}
-          className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100"
-        >
+        <SecondaryButton type="button" onClick={onClose}>
           Cancel
-        </button>
-        <button
-          type="button"
-          onClick={onConfirm}
-          disabled={pending}
-          className="rounded-md bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
-        >
+        </SecondaryButton>
+        <DangerButton type="button" onClick={onConfirm} disabled={pending}>
           {confirmLabel}
-        </button>
+        </DangerButton>
       </div>
     </Modal>
   )

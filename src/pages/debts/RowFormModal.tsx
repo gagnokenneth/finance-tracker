@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { Modal } from '../../components/Modal.tsx'
-import { Field, TextInput, Button } from '../../components/ui.tsx'
+import { Field, TextInput, Button, SecondaryButton } from '../../components/ui.tsx'
 import { isoDate } from '../../lib/currentMonth.ts'
 import type { DebtScheduleRow, DebtStatement } from '../../types.ts'
 import type { NewScheduleRow, NewStatement } from '../../api/FinanceApi.ts'
@@ -158,13 +158,9 @@ export function RowFormModal({
         {error && <p className="text-sm text-red-600">Could not save. Please try again.</p>}
 
         <div className="mt-1 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100"
-          >
+          <SecondaryButton type="button" onClick={onClose}>
             Cancel
-          </button>
+          </SecondaryButton>
           <Button type="submit" disabled={pending}>
             Save
           </Button>
