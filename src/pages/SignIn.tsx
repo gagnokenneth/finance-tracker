@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import { useAuth } from '../auth/useAuth.ts'
 import { MIN_PASSWORD_LENGTH } from '../auth/password.ts'
 import { Field, TextInput } from '../components/ui.tsx'
+import { isLiveApi } from '../api/index.ts'
 
 type Mode = 'signin' | 'signup'
 
@@ -16,6 +17,7 @@ export function SignIn() {
   const [pending, setPending] = useState(false)
 
   const creating = mode === 'signup'
+  const needsInvite = isLiveApi()
   const submitLabel = pending
     ? creating
       ? 'Creating account…'
@@ -87,7 +89,7 @@ export function SignIn() {
               required
             />
           </Field>
-          {creating && (
+          {creating && needsInvite && (
             <Field label="Invite code">
               <TextInput
                 value={inviteCode}
