@@ -18,6 +18,9 @@ dist-ssr
 .env.*
 !.env.example
 
+# Local-only docs: guides, specs and plans kept on this machine, never pushed.
+docs/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
