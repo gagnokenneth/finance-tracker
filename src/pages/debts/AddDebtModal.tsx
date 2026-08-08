@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useFinanceMutations } from '../../hooks/useFinanceMutations.ts'
-import { buildSchedule } from '../../lib/debtSchedule.ts'
+import { buildSchedule, MAX_GENERATED_MONTHS, ScheduleInputError } from '../../lib/debtSchedule.ts'
 import { formatMoney } from '../../lib/money.ts'
 import { useCurrency } from '../../hooks/useCurrency.ts'
 import { isoDate } from '../../lib/currentMonth.ts'
@@ -39,7 +39,12 @@ export function AddDebtModal({ open, onClose }: { open: boolean; onClose: () => 
         preview += `, last one ${formatMoney(rows[rows.length - 1].amount, currency)}`
       }
     } catch (err) {
-      previewError = err instanceof Error ? err.message : 'Invalid schedule'
+      // Only ScheduleInputError is written for the reader. Anything else is a
+      // bug in here, and showing its message would blame the typist for it —
+      // but it still has to be caught, since this runs during render and the
+      // app has no error boundary to fall back on.
+      previewError =
+        err instanceof ScheduleInputError ? err.message : 'Could not build a schedule from those values'
     }
   }
 
@@ -112,6 +117,7 @@ export function AddDebtModal({ open, onClose }: { open: boolean; onClose: () => 
                 type="number"
                 step="1"
                 min="1"
+                max={MAX_GENERATED_MONTHS}
                 value={months}
                 onChange={(e) => setMonths(e.target.value)}
                 required
