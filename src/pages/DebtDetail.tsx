@@ -10,6 +10,7 @@ import { StatusBadge } from '../components/StatusBadge.tsx'
 import { InstallmentStrip } from '../components/InstallmentStrip.tsx'
 import { ConfirmDialog } from '../components/ConfirmDialog.tsx'
 import { LoadError } from '../components/LoadError.tsx'
+import { LoadingScreen } from '../components/LoadingScreen.tsx'
 import { Button, SecondaryButton, RowButton } from '../components/ui.tsx'
 import { EditDebtModal } from './debts/EditDebtModal.tsx'
 import { PayModal } from './debts/PayModal.tsx'
@@ -45,7 +46,7 @@ export function DebtDetail() {
   const [rowForm, setRowForm] = useState<RowForm | null>(null)
   const [deletingRow, setDeletingRow] = useState<AnyRow | null>(null)
 
-  if (isLoading) return <p className="text-ink-soft">Loading…</p>
+  if (isLoading) return <LoadingScreen />
   if (isError || !data) return <LoadError error={error} />
 
   const debtId = Number(id)

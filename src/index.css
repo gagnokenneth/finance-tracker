@@ -38,11 +38,15 @@
   font-variant-numeric: tabular-nums lining-nums;
 }
 
+/* Capping the duration alone is not enough: an infinite animation shortened to
+   0.01ms strobes instead of stopping, so the iteration count has to be capped
+   with it. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
 }

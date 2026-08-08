@@ -7,16 +7,19 @@ import { Card } from '../components/Card.tsx'
 import { Money } from '../components/Money.tsx'
 import { Table } from '../components/Table.tsx'
 import { Field, TextInput, Button } from '../components/ui.tsx'
+import { LoadError } from '../components/LoadError.tsx'
+import { LoadingScreen } from '../components/LoadingScreen.tsx'
 
 export function Bills() {
-  const { data, isLoading } = useFinanceData()
+  const { data, isLoading, isError, error } = useFinanceData()
   const { addBill, setBillPaid } = useFinanceMutations()
   const [name, setName] = useState('')
   const [amount, setAmount] = useState('')
   const [dueDate, setDueDate] = useState(isoDate())
   const [notes, setNotes] = useState('')
 
-  if (isLoading || !data) return <p className="text-slate-500">Loading…</p>
+  if (isLoading) return <LoadingScreen />
+  if (isError || !data) return <LoadError error={error} />
 
   const submit = (e: FormEvent) => {
     e.preventDefault()

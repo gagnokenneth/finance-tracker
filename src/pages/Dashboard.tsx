@@ -3,11 +3,12 @@ import { computeSummary } from '../lib/summary.ts'
 import { monthKey } from '../lib/currentMonth.ts'
 import { Card } from '../components/Card.tsx'
 import { Money } from '../components/Money.tsx'
+import { LoadingScreen } from '../components/LoadingScreen.tsx'
 
 export function Dashboard() {
   const { data, isLoading, isError } = useFinanceData()
 
-  if (isLoading) return <p className="text-slate-500">Loading…</p>
+  if (isLoading) return <LoadingScreen />
   if (isError || !data) return <p className="text-red-600">Failed to load data.</p>
 
   const s = computeSummary(data, monthKey())

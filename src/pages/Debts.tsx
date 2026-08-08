@@ -7,6 +7,7 @@ import { DueBadge } from '../components/DueBadge.tsx'
 import { InstallmentStrip } from '../components/InstallmentStrip.tsx'
 import { Button } from '../components/ui.tsx'
 import { LoadError } from '../components/LoadError.tsx'
+import { LoadingScreen } from '../components/LoadingScreen.tsx'
 import { AddDebtModal } from './debts/AddDebtModal.tsx'
 import type { Debt, FinanceData } from '../types.ts'
 
@@ -50,7 +51,7 @@ export function Debts() {
   const { data, isLoading, isError, error } = useFinanceData()
   const [adding, setAdding] = useState(false)
 
-  if (isLoading) return <p className="text-ink-soft">Loading…</p>
+  if (isLoading) return <LoadingScreen />
   if (isError || !data) return <LoadError error={error} />
 
   const owed = data.debts.reduce(

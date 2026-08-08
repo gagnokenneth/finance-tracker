@@ -1,75 +1,64 @@
-# React + TypeScript + Vite
+# Finance Tracker
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A personal debt-payoff tracker. Track what you owe across multiple debts, record the
+payment schedule and monthly statements for each, and see what is due, soon, or settled.
 
-Currently, two official plugins are available:
+The data lives in a Google Sheet. A Google Apps Script web app sits in front of it as a
+small JSON API, so there is no server to run or pay for — the frontend is a static site
+and the spreadsheet is the database.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Stack
 
-## React Compiler
+React 19 + TypeScript, Vite, Tailwind CSS v4, TanStack Query, React Router.
+Backend is a single Apps Script file (`apps-script/Code.gs`).
 
-The React Compiler is enabled on this template. See [this documentation](https://react.dev/learn/react-compiler) for more information.
+## Running it
 
-Note: This will impact Vite dev & build performances.
+Requires Node 24 (see `.nvmrc` — `nvm use` picks it up). Vite 8 will not start on Node 18.
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+That runs in **mock mode** by default: seeded in-memory data, no Google account, no
+network. Good enough for all UI work.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+To point at a real backend, copy `.env.example` to `.env.local` and set:
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
 ```
+VITE_API_MODE=live
+VITE_APPS_SCRIPT_URL=<your deployed Apps Script web app URL>
+```
+
+If `live` is set without a URL, it falls back to mock and warns in the console.
+
+Scripts: `npm run dev`, `npm run build`, `npm run lint`, `npm run preview`.
+
+## How it fits together
+
+`src/api/` defines a `FinanceApi` interface with two implementations — `MockApi` for
+local seed data and `AppsScriptApi` for the deployed backend. `getApi()` in
+`src/api/index.ts` picks one based on the env vars, so nothing above that layer knows
+which is in use.
+
+Everything above reads through one TanStack Query hook, `useFinanceData()`, which
+fetches the whole dataset under a single `['finance','all']` key. Writes go through
+`useFinanceMutations()`; the debt mutations return the updated dataset and write it
+straight into the cache, avoiding a second round-trip.
+
+Auth is username/password against the Apps Script backend, with sign-up gated by
+single-use invite codes. Mock mode skips the invite code entirely.
+
+## Routes
+
+Only `/debts`, `/debts/:id`, and `/settings` are registered. `Dashboard`, `Funds`,
+`Bills`, `Savings`, and `Expendable` still exist under `src/pages/` from an earlier,
+broader version of the app, but are deliberately unrouted. Unknown paths land on
+`/debts`.
+
+## Notes
+
+- No test suite — changes are verified with `npm run build` (which typechecks),
+  `npm run lint`, and a manual pass.
+- `docs/` is gitignored and local-only.

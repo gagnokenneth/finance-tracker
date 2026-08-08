@@ -8,6 +8,8 @@ import { Card } from '../components/Card.tsx'
 import { Money } from '../components/Money.tsx'
 import { Table } from '../components/Table.tsx'
 import { Field, TextInput, Button } from '../components/ui.tsx'
+import { LoadError } from '../components/LoadError.tsx'
+import { LoadingScreen } from '../components/LoadingScreen.tsx'
 
 function BudgetEditor({ month, current }: { month: string; current: number }) {
   const { setMonthlyBudget } = useFinanceMutations()
@@ -29,14 +31,15 @@ function BudgetEditor({ month, current }: { month: string; current: number }) {
 }
 
 export function Expendable() {
-  const { data, isLoading } = useFinanceData()
+  const { data, isLoading, isError, error } = useFinanceData()
   const { addExpendable } = useFinanceMutations()
   const month = monthKey()
   const [amount, setAmount] = useState('')
   const [date, setDate] = useState(isoDate())
   const [notes, setNotes] = useState('')
 
-  if (isLoading || !data) return <p className="text-slate-500">Loading…</p>
+  if (isLoading) return <LoadingScreen />
+  if (isError || !data) return <LoadError error={error} />
 
   const s = computeSummary(data, month)
   const entries = data.expendable.filter((e) => e.month === month)

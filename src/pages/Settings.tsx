@@ -3,6 +3,7 @@ import { useFinanceMutations } from '../hooks/useFinanceMutations.ts'
 import { useCurrency } from '../hooks/useCurrency.ts'
 import { CURRENCY_LABELS } from '../lib/currency.ts'
 import { LoadError } from '../components/LoadError.tsx'
+import { LoadingScreen } from '../components/LoadingScreen.tsx'
 import type { Currency } from '../types.ts'
 
 const OPTIONS: Currency[] = ['PHP', 'USD']
@@ -12,7 +13,7 @@ export function Settings() {
   const { setCurrency } = useFinanceMutations()
   const currency = useCurrency()
 
-  if (isLoading) return <p className="text-ink-soft">Loading…</p>
+  if (isLoading) return <LoadingScreen />
   if (isError) return <LoadError error={error} />
 
   return (
