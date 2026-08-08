@@ -50,6 +50,41 @@ straight into the cache, avoiding a second round-trip.
 Auth is username/password against the Apps Script backend, with sign-up gated by
 single-use invite codes. Mock mode skips the invite code entirely.
 
+## Caching
+
+Fetched data is held for 5 minutes and is not refetched when the window regains
+focus — the backend can take up to 45 seconds, so refetching on every alt-tab is
+never worth it. The cache is also written to `localStorage`, so reopening the app
+paints immediately instead of waiting on a cold fetch.
+
+Because of that, an edit made **directly in the Google Sheet** can take a few
+minutes to appear. "Refresh data" in the sidebar fetches immediately.
+
+Both the query cache and the cached currency are keyed by user id, and a fresh
+`QueryClient` is built per signed-in user (`src/lib/queryClient.ts`,
+`SessionScopedQuery` in `src/App.tsx`). On a shared browser this is what keeps one
+account's data from reaching the next. Signing out deletes the stored copy; an
+expired token leaves it, so signing back in is still instant.
+
+Bump `CACHE_VERSION` in `src/lib/queryClient.ts` whenever the shape of
+`FinanceData` changes, or stored data from the old shape will be rehydrated into
+code expecting the new one.
+
+## Writes
+
+Edits, deletes and payments are optimistic: the cache is patched from
+`src/lib/optimistic.ts`, the dialog closes on submit, and the backend confirms
+afterwards. If it rejects the write, the snapshot is restored and a toast says so
+— that toast is the only report, since the form is gone by then.
+
+Adds are not optimistic and still wait, because the backend assigns row ids and
+builds a new debt's whole schedule. There is nothing truthful to show until it
+answers.
+
+The rule for anything added to `src/lib/optimistic.ts`: it must produce exactly
+what the backend would return for the same call. If predicting the result needs
+something only the server knows, the write waits instead.
+
 ## Routes
 
 Only `/debts`, `/debts/:id`, and `/settings` are registered. `Dashboard`, `Funds`,

@@ -18,15 +18,11 @@ export interface PayResult {
 export function PayModal({
   open,
   defaultAmount,
-  pending,
-  error,
   onSubmit,
   onClose,
 }: {
   open: boolean
   defaultAmount: number
-  pending?: boolean
-  error?: boolean
   onSubmit: (result: PayResult) => void
   onClose: () => void
 }) {
@@ -54,12 +50,11 @@ export function PayModal({
             required
           />
         </Field>
-        {error && <p className="text-sm text-overdue">That payment didn’t save. Check your connection and try again.</p>}
         <div className="mt-1 flex justify-end gap-2">
           <SecondaryButton type="button" onClick={onClose}>
             Cancel
           </SecondaryButton>
-          <Button type="submit" disabled={pending}>
+          <Button type="submit">
             Record payment
           </Button>
         </div>

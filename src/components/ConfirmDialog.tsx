@@ -7,8 +7,6 @@ export function ConfirmDialog({
   title,
   message,
   confirmLabel,
-  pending,
-  error,
   onConfirm,
   onClose,
 }: {
@@ -16,20 +14,17 @@ export function ConfirmDialog({
   title: string
   message: string
   confirmLabel: string
-  pending?: boolean
-  error?: boolean
   onConfirm: () => void
   onClose: () => void
 }) {
   return (
     <Modal open={open} title={title} onClose={onClose}>
       <p className="text-sm text-ink">{message}</p>
-      {error && <p className="mt-2 text-sm text-overdue">That didn’t delete. Check your connection and try again.</p>}
       <div className="mt-4 flex justify-end gap-2">
         <SecondaryButton type="button" onClick={onClose}>
           Cancel
         </SecondaryButton>
-        <DangerButton type="button" onClick={onConfirm} disabled={pending}>
+        <DangerButton type="button" onClick={onConfirm}>
           {confirmLabel}
         </DangerButton>
       </div>

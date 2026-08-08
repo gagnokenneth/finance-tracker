@@ -1,11 +1,37 @@
 import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
+import { useIsFetching, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../auth/useAuth.ts'
+import { financeKey } from '../hooks/useFinanceData.ts'
 
 const NAV_ITEMS = [
   { to: '/debts', label: 'Debts' },
   { to: '/settings', label: 'Settings' },
 ]
+
+/** The bare underline-on-hover affordance shared by the sidebar's footer actions. */
+const sidebarActionClass =
+  'text-xs font-medium text-ink-soft underline-offset-2 hover:text-ink hover:underline'
+
+/**
+ * Data is held for minutes at a time, so this is the way to ask for it again
+ * without reloading the page — needed most after editing the sheet directly.
+ */
+function RefreshButton() {
+  const qc = useQueryClient()
+  const fetching = useIsFetching({ queryKey: financeKey }) > 0
+
+  return (
+    <button
+      type="button"
+      onClick={() => void qc.invalidateQueries({ queryKey: financeKey })}
+      disabled={fetching}
+      className={`${sidebarActionClass} disabled:no-underline disabled:opacity-60`}
+    >
+      {fetching ? 'Refreshing…' : 'Refresh data'}
+    </button>
+  )
+}
 
 export function AppShell() {
   const { user, signOut } = useAuth()
@@ -63,10 +89,13 @@ export function AppShell() {
         </nav>
         <div className="border-t border-edge px-5 py-4">
           <div className="truncate text-sm font-medium text-ink">{user?.username}</div>
+          <div className="mt-2">
+            <RefreshButton />
+          </div>
           <button
             type="button"
             onClick={signOut}
-            className="mt-2 text-xs font-medium text-ink-soft underline-offset-2 hover:text-ink hover:underline"
+            className={`mt-2 ${sidebarActionClass}`}
           >
             Sign out
           </button>

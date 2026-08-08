@@ -6,9 +6,9 @@ import { Money } from '../components/Money.tsx'
 import { LoadingScreen } from '../components/LoadingScreen.tsx'
 
 export function Dashboard() {
-  const { data, isLoading, isError } = useFinanceData()
+  const { data, isPending, isError } = useFinanceData()
 
-  if (isLoading) return <LoadingScreen />
+  if (isPending) return <LoadingScreen />
   if (isError || !data) return <p className="text-red-600">Failed to load data.</p>
 
   const s = computeSummary(data, monthKey())

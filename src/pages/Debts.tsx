@@ -48,10 +48,10 @@ function DebtRow({ debt, data }: { debt: Debt; data: FinanceData }) {
 }
 
 export function Debts() {
-  const { data, isLoading, isError, error } = useFinanceData()
+  const { data, isPending, isError, error } = useFinanceData()
   const [adding, setAdding] = useState(false)
 
-  if (isLoading) return <LoadingScreen />
+  if (isPending) return <LoadingScreen />
   if (isError || !data) return <LoadError error={error} />
 
   const owed = data.debts.reduce(

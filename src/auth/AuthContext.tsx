@@ -3,6 +3,8 @@ import type { ReactNode } from 'react'
 import { getApi } from '../api/index.ts'
 import type { AuthResult } from '../api/FinanceApi.ts'
 import { deriveCredential } from './password.ts'
+import { clearPersistedCache } from '../lib/queryClient.ts'
+import { clearCachedCurrency } from '../lib/currency.ts'
 import {
   AUTH_EXPIRED_EVENT,
   clearToken,
@@ -59,10 +61,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [authenticate],
   )
 
+  /*
+   * Signing out is deliberate, so the locally stored copy of this user's data
+   * goes with it rather than sitting on disk until it expires. An expired token
+   * is different — that path leaves the cache alone, so signing back in is
+   * still instant.
+   */
   const signOut = useCallback(() => {
+    if (user) {
+      clearPersistedCache(user.id)
+      clearCachedCurrency(user.id)
+    }
     clearToken()
     setUser(null)
-  }, [])
+  }, [user])
 
   // The API layer clears the token when the backend rejects it; this returns the
   // UI to the sign-in screen. Only clearing state, which the lint rule allows.

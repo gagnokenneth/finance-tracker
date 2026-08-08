@@ -13,7 +13,7 @@ import { LoadError } from '../components/LoadError.tsx'
 import { LoadingScreen } from '../components/LoadingScreen.tsx'
 
 export function Savings() {
-  const { data, isLoading, isError, error } = useFinanceData()
+  const { data, isPending, isError, error } = useFinanceData()
   const { addSavings, transferSavings } = useFinanceMutations()
 
   // add-savings form
@@ -27,7 +27,7 @@ export function Savings() {
   const [xferDate, setXferDate] = useState(isoDate())
   const [xferNotes, setXferNotes] = useState('')
 
-  if (isLoading) return <LoadingScreen />
+  if (isPending) return <LoadingScreen />
   if (isError || !data) return <LoadError error={error} />
 
   const s = computeSummary(data, monthKey())

@@ -28,7 +28,7 @@ const REVOLVING_HEADERS = ['Due date', 'Min due', 'Total due', 'Outstanding', 'S
 export function DebtDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { data, isLoading, isError, error } = useFinanceData()
+  const { data, isPending, isError, error } = useFinanceData()
   const {
     updateDebt,
     deleteDebt,
@@ -46,7 +46,7 @@ export function DebtDetail() {
   const [rowForm, setRowForm] = useState<RowForm | null>(null)
   const [deletingRow, setDeletingRow] = useState<AnyRow | null>(null)
 
-  if (isLoading) return <LoadingScreen />
+  if (isPending) return <LoadingScreen />
   if (isError || !data) return <LoadError error={error} />
 
   const debtId = Number(id)
@@ -71,56 +71,52 @@ export function DebtDetail() {
   const balance = totalBalance(debt, data.debt_schedule, data.debt_statements)
   const next = nextDueDate(debt, data.debt_schedule, data.debt_statements)
 
-  const rowPending =
-    addScheduleRow.isPending ||
-    updateScheduleRow.isPending ||
-    addStatement.isPending ||
-    updateStatement.isPending
-  const rowError =
-    addScheduleRow.isError ||
-    updateScheduleRow.isError ||
-    addStatement.isError ||
-    updateStatement.isError
-  const deleteRowPending = deleteScheduleRow.isPending || deleteStatement.isPending
-  const deleteRowError = deleteScheduleRow.isError || deleteStatement.isError
+  // Only the adds keep a dialog open long enough to have a state worth showing;
+  // see the policy note in lib/optimistic.ts.
+  const addPending = addScheduleRow.isPending || addStatement.isPending
+  const addError = addScheduleRow.isError || addStatement.isError
 
   const closeRowForm = () => setRowForm(null)
+
+  // Mutation error state outlives the dialog, so without this a form opened
+  // after a failed add would greet you with the previous failure.
+  const openAddRow = () => {
+    addScheduleRow.reset()
+    addStatement.reset()
+    setRowForm({ mode: 'add' })
+  }
 
   // `'amount' in values` is a real narrowing: only schedule rows carry it.
   const submitRowForm = (values: NewScheduleRow | NewStatement) => {
     const editingId = rowForm?.mode === 'edit' ? rowForm.row.id : null
-    if ('amount' in values) {
-      if (editingId !== null) {
-        updateScheduleRow.mutate({ id: editingId, patch: values }, { onSuccess: closeRowForm })
-      } else {
-        addScheduleRow.mutate({ debtId: debt.id, input: values }, { onSuccess: closeRowForm })
-      }
+    if (editingId !== null) {
+      closeRowForm()
+      if ('amount' in values) updateScheduleRow.mutate({ id: editingId, patch: values })
+      else updateStatement.mutate({ id: editingId, patch: values })
+    } else if ('amount' in values) {
+      addScheduleRow.mutate({ debtId: debt.id, input: values }, { onSuccess: closeRowForm })
     } else {
-      if (editingId !== null) {
-        updateStatement.mutate({ id: editingId, patch: values }, { onSuccess: closeRowForm })
-      } else {
-        addStatement.mutate({ debtId: debt.id, input: values }, { onSuccess: closeRowForm })
-      }
+      addStatement.mutate({ debtId: debt.id, input: values }, { onSuccess: closeRowForm })
     }
   }
 
   const submitPay = (result: PayResult) => {
     if (!payRow) return
-    const done = { onSuccess: () => setPayRow(null) }
+    setPayRow(null)
     if ('amount' in payRow) {
-      updateScheduleRow.mutate({ id: payRow.id, patch: result }, done)
+      updateScheduleRow.mutate({ id: payRow.id, patch: result })
     } else {
-      updateStatement.mutate({ id: payRow.id, patch: result }, done)
+      updateStatement.mutate({ id: payRow.id, patch: result })
     }
   }
 
   const confirmDeleteRow = () => {
     if (!deletingRow) return
-    const done = { onSuccess: () => setDeletingRow(null) }
+    setDeletingRow(null)
     if ('amount' in deletingRow) {
-      deleteScheduleRow.mutate(deletingRow.id, done)
+      deleteScheduleRow.mutate(deletingRow.id)
     } else {
-      deleteStatement.mutate(deletingRow.id, done)
+      deleteStatement.mutate(deletingRow.id)
     }
   }
 
@@ -257,11 +253,7 @@ export function DebtDetail() {
         </Table>
       )}
 
-      {(rowError || deleteRowError) && (
-        <p className="text-sm text-overdue">That didn&rsquo;t save. Check your connection and try again.</p>
-      )}
-
-      <Button type="button" onClick={() => setRowForm({ mode: 'add' })}>
+      <Button type="button" onClick={openAddRow}>
         {isFixed ? 'Add payment' : 'Add statement'}
       </Button>
 
@@ -269,11 +261,10 @@ export function DebtDetail() {
         <EditDebtModal
           open
           currentName={debt.name}
-          pending={updateDebt.isPending}
-          error={updateDebt.isError}
-          onSubmit={(name) =>
-            updateDebt.mutate({ id: debt.id, name }, { onSuccess: () => setEditingDebt(false) })
-          }
+          onSubmit={(name) => {
+            setEditingDebt(false)
+            updateDebt.mutate({ id: debt.id, name })
+          }}
           onClose={() => setEditingDebt(false)}
         />
       )}
@@ -283,9 +274,13 @@ export function DebtDetail() {
         title="Delete debt"
         message={`Delete ${debt.name} and its ${rows.length} ${rowNoun}?`}
         confirmLabel="Delete"
-        pending={deleteDebt.isPending}
-        error={deleteDebt.isError}
-        onConfirm={() => deleteDebt.mutate(debt.id, { onSuccess: () => void navigate('/debts') })}
+        onConfirm={() => {
+          // Leaving first is safe: the debt is already gone from the cached list
+          // this navigates to, and a failure restores it and raises a toast.
+          setDeletingDebt(false)
+          void navigate('/debts')
+          deleteDebt.mutate(debt.id)
+        }}
         onClose={() => setDeletingDebt(false)}
       />
 
@@ -293,8 +288,6 @@ export function DebtDetail() {
         <PayModal
           open
           defaultAmount={'amount' in payRow ? payRow.amount : payRow.min_due}
-          pending={rowPending}
-          error={rowError}
           onSubmit={submitPay}
           onClose={() => setPayRow(null)}
         />
@@ -305,8 +298,8 @@ export function DebtDetail() {
           open
           kind={isFixed ? 'schedule' : 'statement'}
           initial={rowForm.mode === 'edit' ? rowForm.row : null}
-          pending={rowPending}
-          error={rowError}
+          pending={rowForm.mode === 'add' && addPending}
+          error={rowForm.mode === 'add' && addError}
           onSubmit={submitRowForm}
           onClose={closeRowForm}
         />
@@ -317,8 +310,6 @@ export function DebtDetail() {
         title={isFixed ? 'Delete payment' : 'Delete statement'}
         message={`Delete the ${deletingRow?.due_date ?? ''} ${isFixed ? 'payment' : 'statement'}?`}
         confirmLabel="Delete"
-        pending={deleteRowPending}
-        error={deleteRowError}
         onConfirm={confirmDeleteRow}
         onClose={() => setDeletingRow(null)}
       />

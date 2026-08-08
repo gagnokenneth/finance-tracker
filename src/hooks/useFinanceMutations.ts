@@ -1,7 +1,17 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { getApi } from '../api/index.ts'
 import { financeKey } from './useFinanceData.ts'
+import { useAuth } from '../auth/useAuth.ts'
+import { useToast } from './useToast.ts'
 import { writeCachedCurrency } from '../lib/currency.ts'
+import {
+  applyScheduleRowPatch,
+  applyStatementPatch,
+  removeDebt,
+  removeScheduleRow,
+  removeStatement,
+  renameDebt,
+} from '../lib/optimistic.ts'
 import type { Currency, FinanceData } from '../types.ts'
 import type {
   NewFund,
@@ -18,6 +28,8 @@ import type {
 
 export function useFinanceMutations() {
   const qc = useQueryClient()
+  const userId = useAuth().user?.id
+  const showError = useToast()
   const onSuccess = () => {
     void qc.invalidateQueries({ queryKey: financeKey })
   }
@@ -47,17 +59,54 @@ export function useFinanceMutations() {
     qc.setQueryData(financeKey, data)
   }
 
+  /**
+   * Shared wiring for a write whose result the client can predict: patch the
+   * cache now, keep a snapshot, and put the snapshot back if the write is
+   * rejected. The modal is already gone by then, so the failure has to be
+   * announced — silently reverting would read as the change never happening.
+   *
+   * onSuccess still overwrites with the backend's own copy, so a prediction
+   * that was subtly wrong is corrected rather than left to accumulate.
+   */
+  const optimistic = <TVars,>(
+    predict: (data: FinanceData, vars: TVars) => FinanceData,
+    /** null only where the caller shows its own error — never by omission. */
+    failure: string | null,
+  ) => ({
+    onMutate: async (vars: TVars) => {
+      // A read already in flight would otherwise land after the patch and
+      // overwrite it with pre-write state.
+      await qc.cancelQueries({ queryKey: financeKey })
+      const previous = qc.getQueryData<FinanceData>(financeKey)
+      if (previous) qc.setQueryData(financeKey, predict(previous, vars))
+      return { previous }
+    },
+    onError: (_error: unknown, _vars: TVars, context: { previous?: FinanceData } | undefined) => {
+      if (context?.previous) qc.setQueryData(financeKey, context.previous)
+      if (failure) showError(failure)
+      /*
+       * The snapshot is a guess, not the truth. The write may have reached the
+       * sheet before the client gave up on it, and restoring a whole-dataset
+       * snapshot also discards any other write that landed while this one was
+       * in flight. Nothing else would correct either: focus refetching is off
+       * and data stays fresh for minutes.
+       */
+      void qc.invalidateQueries({ queryKey: financeKey })
+    },
+    onSuccess: applyData,
+  })
+
   const addDebt = useMutation({
     mutationFn: (i: NewDebt) => getApi().addDebt(i),
     onSuccess: applyData,
   })
   const updateDebt = useMutation({
     mutationFn: (v: { id: number; name: string }) => getApi().updateDebt(v.id, { name: v.name }),
-    onSuccess: applyData,
+    ...optimistic(renameDebt, 'That rename did not save. The old name is back.'),
   })
   const deleteDebt = useMutation({
     mutationFn: (id: number) => getApi().deleteDebt(id),
-    onSuccess: applyData,
+    ...optimistic(removeDebt, 'That debt could not be deleted. It has been restored.'),
   })
 
   const addScheduleRow = useMutation({
@@ -68,11 +117,11 @@ export function useFinanceMutations() {
   const updateScheduleRow = useMutation({
     mutationFn: (v: { id: number; patch: ScheduleRowPatch }) =>
       getApi().updateScheduleRow(v.id, v.patch),
-    onSuccess: applyData,
+    ...optimistic(applyScheduleRowPatch, 'That installment did not save. The row is back as it was.'),
   })
   const deleteScheduleRow = useMutation({
     mutationFn: (id: number) => getApi().deleteScheduleRow(id),
-    onSuccess: applyData,
+    ...optimistic(removeScheduleRow, 'That installment could not be deleted. It has been restored.'),
   })
 
   const addStatement = useMutation({
@@ -83,18 +132,23 @@ export function useFinanceMutations() {
   const updateStatement = useMutation({
     mutationFn: (v: { id: number; patch: StatementPatch }) =>
       getApi().updateStatement(v.id, v.patch),
-    onSuccess: applyData,
+    ...optimistic(applyStatementPatch, 'That statement did not save. The row is back as it was.'),
   })
   const deleteStatement = useMutation({
     mutationFn: (id: number) => getApi().deleteStatement(id),
-    onSuccess: applyData,
+    ...optimistic(removeStatement, 'That statement could not be deleted. It has been restored.'),
   })
 
   const setCurrency = useMutation({
     mutationFn: (c: Currency) => getApi().setCurrency(c),
+    // Settings renders its own failure line, so this one stays off the toasts.
+    ...optimistic(
+      (data, c: Currency) => ({ ...data, settings: { ...data.settings, currency: c } }),
+      null,
+    ),
     onSuccess: (data, c) => {
       // Also refresh the cache that gives the right symbol on first paint.
-      writeCachedCurrency(c)
+      if (userId !== undefined) writeCachedCurrency(userId, c)
       applyData(data)
     },
   })

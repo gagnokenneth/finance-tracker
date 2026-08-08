@@ -11,14 +11,14 @@ import { LoadError } from '../components/LoadError.tsx'
 import { LoadingScreen } from '../components/LoadingScreen.tsx'
 
 export function Funds() {
-  const { data, isLoading, isError, error } = useFinanceData()
+  const { data, isPending, isError, error } = useFinanceData()
   const { addFund } = useFinanceMutations()
   const [source, setSource] = useState('')
   const [amount, setAmount] = useState('')
   const [date, setDate] = useState(isoDate())
   const [notes, setNotes] = useState('')
 
-  if (isLoading) return <LoadingScreen />
+  if (isPending) return <LoadingScreen />
   if (isError || !data) return <LoadError error={error} />
 
   const submit = (e: FormEvent) => {

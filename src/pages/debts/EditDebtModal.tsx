@@ -10,15 +10,11 @@ import { Field, TextInput, Button, SecondaryButton } from '../../components/ui.t
 export function EditDebtModal({
   open,
   currentName,
-  pending,
-  error,
   onSubmit,
   onClose,
 }: {
   open: boolean
   currentName: string
-  pending?: boolean
-  error?: boolean
   onSubmit: (name: string) => void
   onClose: () => void
 }) {
@@ -35,12 +31,11 @@ export function EditDebtModal({
         <Field label="Name">
           <TextInput value={name} onChange={(e) => setName(e.target.value)} required />
         </Field>
-        {error && <p className="text-sm text-overdue">That didn’t save. Check your connection and try again.</p>}
         <div className="mt-1 flex justify-end gap-2">
           <SecondaryButton type="button" onClick={onClose}>
             Cancel
           </SecondaryButton>
-          <Button type="submit" disabled={pending}>
+          <Button type="submit">
             Rename
           </Button>
         </div>

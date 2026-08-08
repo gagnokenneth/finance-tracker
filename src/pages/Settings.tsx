@@ -9,11 +9,11 @@ import type { Currency } from '../types.ts'
 const OPTIONS: Currency[] = ['PHP', 'USD']
 
 export function Settings() {
-  const { isLoading, isError, error } = useFinanceData()
+  const { isPending, isError, error } = useFinanceData()
   const { setCurrency } = useFinanceMutations()
   const currency = useCurrency()
 
-  if (isLoading) return <LoadingScreen />
+  if (isPending) return <LoadingScreen />
   if (isError) return <LoadError error={error} />
 
   return (
