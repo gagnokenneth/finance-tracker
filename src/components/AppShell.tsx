@@ -74,7 +74,9 @@ export function AppShell() {
       >
         <div className="px-5 py-5">
           <div className="text-base font-semibold tracking-tight text-ink">Finance Tracker</div>
-          <div className="mt-0.5 text-xs text-ink-faint">Debts and bills</div>
+          {/* Deliberately names no module: adding one should not mean editing
+              this line. */}
+          <div className="mt-0.5 text-xs text-ink-faint">Personal finance</div>
         </div>
         <nav className="flex flex-1 flex-col gap-1 px-3">
           {NAV_ITEMS.map((item) => (
