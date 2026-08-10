@@ -8,6 +8,16 @@ import type { NewScheduleRow, NewStatement } from '../../api/FinanceApi.ts'
 
 export type RowKind = 'schedule' | 'statement'
 
+/** An empty box clears the figure; null is what survives the wire. */
+const figure = (value: string): number | null => (value === '' ? null : Number(value))
+
+/** The statement half of this form. Money fields are nullable — see StatementPatch. */
+export type StatementFormValues = Omit<NewStatement, 'min_due' | 'total_due' | 'outstanding'> & {
+  min_due: number | null
+  total_due: number | null
+  outstanding: number | null
+}
+
 /**
  * Add or edit one row, for either debt type. Mount it only while a row is
  * being edited — the initial values are read once, on mount.
@@ -18,6 +28,7 @@ export function RowFormModal({
   initial,
   pending,
   error,
+  title,
   onSubmit,
   onClose,
 }: {
@@ -26,7 +37,8 @@ export function RowFormModal({
   initial: DebtScheduleRow | DebtStatement | null
   pending?: boolean
   error?: boolean
-  onSubmit: (values: NewScheduleRow | NewStatement) => void
+  title?: string
+  onSubmit: (values: NewScheduleRow | StatementFormValues) => void
   onClose: () => void
 }) {
   const asSchedule = initial && 'amount' in initial ? initial : null
@@ -34,10 +46,12 @@ export function RowFormModal({
 
   const [dueDate, setDueDate] = useState(initial?.due_date ?? isoDate())
   const [amount, setAmount] = useState(asSchedule ? String(asSchedule.amount) : '')
-  const [minDue, setMinDue] = useState(asStatement ? String(asStatement.min_due) : '')
-  const [totalDue, setTotalDue] = useState(asStatement ? String(asStatement.total_due) : '')
+  const [minDue, setMinDue] = useState(asStatement?.min_due !== undefined ? String(asStatement.min_due) : '')
+  const [totalDue, setTotalDue] = useState(
+    asStatement?.total_due !== undefined ? String(asStatement.total_due) : '',
+  )
   const [outstanding, setOutstanding] = useState(
-    asStatement ? String(asStatement.outstanding) : '',
+    asStatement?.outstanding !== undefined ? String(asStatement.outstanding) : '',
   )
   const [paid, setPaid] = useState(initial?.paid ?? false)
   const [paidDate, setPaidDate] = useState(initial?.paid_date ?? isoDate())
@@ -58,9 +72,9 @@ export function RowFormModal({
     } else {
       onSubmit({
         due_date: dueDate,
-        min_due: Number(minDue),
-        total_due: Number(totalDue),
-        outstanding: Number(outstanding),
+        min_due: figure(minDue),
+        total_due: figure(totalDue),
+        outstanding: figure(outstanding),
         ...paidFields,
       })
     }
@@ -70,7 +84,7 @@ export function RowFormModal({
   const noun = kind === 'schedule' ? 'payment' : 'statement'
 
   return (
-    <Modal open={open} title={`${isEdit ? 'Edit' : 'Add'} ${noun}`} onClose={onClose}>
+    <Modal open={open} title={title ?? `${isEdit ? 'Edit' : 'Add'} ${noun}`} onClose={onClose}>
       <form onSubmit={submit} className="flex flex-col gap-3">
         <Field label={kind === 'schedule' ? 'Due date' : 'Payment due date'}>
           <TextInput
@@ -101,7 +115,6 @@ export function RowFormModal({
                 min="0"
                 value={minDue}
                 onChange={(e) => setMinDue(e.target.value)}
-                required
               />
             </Field>
             <Field label="Total amount due">
@@ -111,7 +124,6 @@ export function RowFormModal({
                 min="0"
                 value={totalDue}
                 onChange={(e) => setTotalDue(e.target.value)}
-                required
               />
             </Field>
             <Field label="Outstanding balance">
@@ -121,7 +133,6 @@ export function RowFormModal({
                 min="0"
                 value={outstanding}
                 onChange={(e) => setOutstanding(e.target.value)}
-                required
               />
             </Field>
           </>

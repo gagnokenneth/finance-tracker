@@ -2,7 +2,14 @@ import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useFinanceData } from '../hooks/useFinanceData.ts'
 import { useFinanceMutations } from '../hooks/useFinanceMutations.ts'
-import { nextDueDate, scheduleFor, statementsFor, totalBalance, dueStatus } from '../lib/debts.ts'
+import {
+  nextDueDate,
+  scheduleFor,
+  statementsFor,
+  totalBalance,
+  dueStatus,
+  isStatementPriced,
+} from '../lib/debts.ts'
 import { Money } from '../components/Money.tsx'
 import { Table } from '../components/Table.tsx'
 import { DueBadge } from '../components/DueBadge.tsx'
@@ -16,11 +23,17 @@ import { EditDebtModal } from './debts/EditDebtModal.tsx'
 import { PayModal } from '../components/PayModal.tsx'
 import type { PayResult } from '../components/PayModal.tsx'
 import { RowFormModal } from './debts/RowFormModal.tsx'
+import type { StatementFormValues } from './debts/RowFormModal.tsx'
 import type { DebtScheduleRow, DebtStatement } from '../types.ts'
-import type { NewScheduleRow, NewStatement } from '../api/FinanceApi.ts'
+import type { NewScheduleRow } from '../api/FinanceApi.ts'
 
 type AnyRow = DebtScheduleRow | DebtStatement
 type RowForm = { mode: 'add' } | { mode: 'edit'; row: AnyRow }
+
+/** An unpriced statement shows a dash, not a zero it does not mean. */
+function figureCell(value: number | undefined) {
+  return value === undefined ? <span className="text-sm text-ink-faint">—</span> : <Money value={value} />
+}
 
 const FIXED_HEADERS = ['Due date', 'Amount', 'Status', '']
 const REVOLVING_HEADERS = ['Due date', 'Min due', 'Total due', 'Outstanding', 'Status', '']
@@ -87,7 +100,7 @@ export function DebtDetail() {
   }
 
   // `'amount' in values` is a real narrowing: only schedule rows carry it.
-  const submitRowForm = (values: NewScheduleRow | NewStatement) => {
+  const submitRowForm = (values: NewScheduleRow | StatementFormValues) => {
     const editingId = rowForm?.mode === 'edit' ? rowForm.row.id : null
     if (editingId !== null) {
       closeRowForm()
@@ -96,7 +109,21 @@ export function DebtDetail() {
     } else if ('amount' in values) {
       addScheduleRow.mutate({ debtId: debt.id, input: values }, { onSuccess: closeRowForm })
     } else {
-      addStatement.mutate({ debtId: debt.id, input: values }, { onSuccess: closeRowForm })
+      // addStatement takes NewStatement, whose money fields are optional but
+      // not nullable — the form's nulls become "leave it absent" here.
+      const { min_due, total_due, outstanding, ...rest } = values
+      addStatement.mutate(
+        {
+          debtId: debt.id,
+          input: {
+            ...rest,
+            min_due: min_due ?? undefined,
+            total_due: total_due ?? undefined,
+            outstanding: outstanding ?? undefined,
+          },
+        },
+        { onSuccess: closeRowForm },
+      )
     }
   }
 
@@ -140,12 +167,8 @@ export function DebtDetail() {
 
   const rowNoun = isFixed ? 'scheduled payments' : 'statements'
 
-  // An auto-generated statement can still be unpriced; Pay needs a real number.
-  const payDefaultAmount: number | undefined = payRow
-    ? 'amount' in payRow
-      ? payRow.amount
-      : payRow.min_due
-    : undefined
+  // A schedule row always has its amount; only a statement can be unpriced.
+  const priced = (row: AnyRow) => 'amount' in row || isStatementPriced(row)
 
   return (
     <div className="space-y-6">
@@ -228,34 +251,30 @@ export function DebtDetail() {
                 </td>
               ) : (
                 <>
-                  <td className="px-4 py-3">
-                    {row.min_due !== undefined ? (
-                      <Money value={row.min_due} />
-                    ) : (
-                      <span className="text-sm text-ink-faint">—</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    {row.total_due !== undefined ? (
-                      <Money value={row.total_due} />
-                    ) : (
-                      <span className="text-sm text-ink-faint">—</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    {row.outstanding !== undefined ? (
-                      <Money value={row.outstanding} />
-                    ) : (
-                      <span className="text-sm text-ink-faint">—</span>
-                    )}
-                  </td>
+                  <td className="px-4 py-3">{figureCell(row.min_due)}</td>
+                  <td className="px-4 py-3">{figureCell(row.total_due)}</td>
+                  <td className="px-4 py-3">{figureCell(row.outstanding)}</td>
                 </>
               )}
               <td className="px-4 py-3">{statusCell(row)}</td>
               <td className="px-4 py-3">
                 <div className="flex flex-wrap justify-end gap-1.5">
+                  {!row.paid && !priced(row) && (
+                    <RowButton
+                      tone="primary"
+                      type="button"
+                      onClick={() => setRowForm({ mode: 'edit', row })}
+                    >
+                      Set amount
+                    </RowButton>
+                  )}
                   {!row.paid && (
-                    <RowButton tone="primary" type="button" onClick={() => setPayRow(row)}>
+                    <RowButton
+                      tone={priced(row) ? 'primary' : 'neutral'}
+                      type="button"
+                      disabled={!priced(row)}
+                      onClick={() => setPayRow(row)}
+                    >
                       Pay
                     </RowButton>
                   )}
@@ -272,9 +291,11 @@ export function DebtDetail() {
         </Table>
       )}
 
-      <Button type="button" onClick={openAddRow}>
-        {isFixed ? 'Add payment' : 'Add statement'}
-      </Button>
+      {isFixed && (
+        <Button type="button" onClick={openAddRow}>
+          Add payment
+        </Button>
+      )}
 
       {editingDebt && (
         <EditDebtModal
@@ -303,10 +324,10 @@ export function DebtDetail() {
         onClose={() => setDeletingDebt(false)}
       />
 
-      {payRow && payDefaultAmount !== undefined && (
+      {payRow && priced(payRow) && (
         <PayModal
           open
-          defaultAmount={payDefaultAmount}
+          defaultAmount={'amount' in payRow ? payRow.amount : (payRow.min_due ?? 0)}
           onSubmit={submitPay}
           onClose={() => setPayRow(null)}
         />
@@ -319,6 +340,7 @@ export function DebtDetail() {
           initial={rowForm.mode === 'edit' ? rowForm.row : null}
           pending={rowForm.mode === 'add' && addPending}
           error={rowForm.mode === 'add' && addError}
+          title={rowForm.mode === 'edit' && !priced(rowForm.row) ? 'Set amount' : undefined}
           onSubmit={submitRowForm}
           onClose={closeRowForm}
         />
