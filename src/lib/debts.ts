@@ -65,6 +65,15 @@ export function statementsFor(rows: DebtStatement[], debtId: number): DebtStatem
 }
 
 /**
+ * A statement is priced once all three figures are in. Set amount saves them
+ * together, so there is no half-priced state to reason about — this single
+ * predicate gates paying, and decides which rows the balance can read.
+ */
+export function isStatementPriced(row: DebtStatement): boolean {
+  return row.min_due !== undefined && row.total_due !== undefined && row.outstanding !== undefined
+}
+
+/**
  * Remaining balance. For a fixed debt this is the sum of unpaid installments.
  * For a revolving debt it is the outstanding balance of the latest statement —
  * a card balance is not a sum of its statements.
@@ -79,11 +88,10 @@ export function totalBalance(
       .filter((r) => !r.paid)
       .reduce((sum, r) => sum + r.amount, 0)
   }
-  const rows = statementsFor(statements, debt.id)
-  if (rows.length === 0) return 0
-  // An auto-generated statement's outstanding is unset until priced; treat
-  // that like 0 here, same fallback reasoning as summary.ts's debt payments sum.
-  return rows[rows.length - 1].outstanding ?? 0
+  // The newest statement that has a figure — an auto-generated one has none
+  // yet, and it must not read as a zero balance.
+  const priced = statementsFor(statements, debt.id).filter(isStatementPriced)
+  return priced.length === 0 ? 0 : (priced[priced.length - 1].outstanding ?? 0)
 }
 
 /** Next unpaid due date across whichever table this debt uses. */
