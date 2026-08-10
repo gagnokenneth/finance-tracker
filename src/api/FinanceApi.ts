@@ -2,6 +2,7 @@ import type {
   FinanceData,
   FundEntry,
   Bill,
+  BillPayable,
   ExpendableEntry,
   DebtScheduleRow,
   DebtStatement,
@@ -12,7 +13,23 @@ import type {
 
 // Inputs omit server-assigned fields.
 export type NewFund = Omit<FundEntry, 'id'>
-export type NewBill = Omit<Bill, 'id'>
+/**
+ * A new bill and its first payable, in one call. The client computes
+ * first_due_date because all four recurrence rules live in lib/billSchedule.ts;
+ * the backend derives the payable's amount from the bill's own type.
+ */
+export type NewBill = Omit<Bill, 'id' | 'closed'> & { first_due_date: string }
+
+/** Patches never carry id or closed — closing goes through closeBill. */
+export type BillPatch = Partial<Omit<Bill, 'id' | 'closed'>>
+export type BillPayablePatch = Partial<Omit<BillPayable, 'id' | 'bill_id'>>
+
+/** Paying also mints the next payable, so the next due date comes with it. */
+export interface PayBillInput {
+  paid_date: string
+  paid_amount: number
+  next_due_date: string
+}
 export type NewExpendable = Omit<ExpendableEntry, 'id'>
 export type NewSavings = Omit<SavingsEntry, 'id' | 'total'>
 export type NewSavingsTransfer = Omit<SavingsTransfer, 'id'>
@@ -56,9 +73,6 @@ export interface FinanceApi {
 
   addFund(input: NewFund): Promise<FundEntry>
 
-  addBill(input: NewBill): Promise<Bill>
-  setBillPaid(id: number, paid: boolean): Promise<Bill>
-
   addExpendable(input: NewExpendable): Promise<ExpendableEntry>
   setMonthlyBudget(month: string, amount: number): Promise<void>
 
@@ -85,6 +99,22 @@ export interface FinanceApi {
   addStatement(debtId: number, input: NewStatement): Promise<FinanceData>
   updateStatement(id: number, patch: StatementPatch): Promise<FinanceData>
   deleteStatement(id: number): Promise<FinanceData>
+
+  /* Bill writes return the whole updated dataset, for the same reasons above. */
+
+  /** Creates the bill and its first payable. */
+  addBill(input: NewBill): Promise<FinanceData>
+  updateBill(id: number, patch: BillPatch): Promise<FinanceData>
+  /** One-way. Removes the bill's unpaid payables and freezes the rest. */
+  closeBill(id: number): Promise<FinanceData>
+  /** Deletes the bill and every payable belonging to it. */
+  deleteBill(id: number): Promise<FinanceData>
+
+  /** Serves both Edit and Set amount. */
+  updateBillPayable(id: number, patch: BillPayablePatch): Promise<FinanceData>
+  deleteBillPayable(id: number): Promise<FinanceData>
+  /** Marks the payable paid AND mints the next one, in one write. */
+  payBillPayable(id: number, input: PayBillInput): Promise<FinanceData>
 
   setCurrency(currency: Currency): Promise<FinanceData>
 

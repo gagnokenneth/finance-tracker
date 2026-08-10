@@ -2,6 +2,9 @@ import type {
   FinanceApi,
   NewFund,
   NewBill,
+  BillPatch,
+  BillPayablePatch,
+  PayBillInput,
   NewExpendable,
   NewDebt,
   NewScheduleRow,
@@ -18,6 +21,7 @@ import type {
   FinanceData,
   FundEntry,
   Bill,
+  BillPayable,
   ExpendableEntry,
   Debt,
   DebtScheduleRow,
@@ -53,7 +57,7 @@ function nextId<T extends { id: number }>(rows: T[]): number {
  * An unpaid row must not keep a payment date. Cleared explicitly rather than
  * relying on JSON dropping undefined, so both adapters behave the same way.
  */
-function clearPaidFields(row: DebtScheduleRow | DebtStatement): void {
+function clearPaidFields(row: DebtScheduleRow | DebtStatement | BillPayable): void {
   if (!row.paid) {
     delete row.paid_date
     delete row.paid_amount
@@ -148,21 +152,104 @@ export class MockApi implements FinanceApi {
     return this.delay(fund)
   }
 
-  async addBill(input: NewBill): Promise<Bill> {
+  async addBill(input: NewBill): Promise<FinanceData> {
     const data = this.load()
-    const bill: Bill = { id: nextId(data.bills), ...input }
+    const { first_due_date, ...fields } = input
+    const bill: Bill = { id: nextId(data.bills), ...fields, closed: false }
     data.bills.push(bill)
+    data.bill_payables.push(this.newPayable(data, bill, first_due_date))
     this.save(data)
-    return this.delay(bill)
+    return this.delay(data)
   }
 
-  async setBillPaid(id: number, paid: boolean): Promise<Bill> {
-    const data = this.load()
+  /** The payable a new bill or a payment starts from. */
+  private newPayable(data: FinanceData, bill: Bill, dueDate: string): BillPayable {
+    return {
+      id: nextId(data.bill_payables),
+      bill_id: bill.id,
+      due_date: dueDate,
+      // A variable bill's payable has no figure yet; the user sets it when the
+      // statement arrives.
+      amount: bill.type === 'fixed' ? bill.amount : undefined,
+      paid: false,
+    }
+  }
+
+  /**
+   * The bill, refused when closed. Every bill write goes through here: the
+   * frontend hides the actions on a closed bill, but a stale tab must not be
+   * able to slip one past. Code.gs applies the same rule.
+   */
+  private openBill(data: FinanceData, id: number): Bill {
     const bill = data.bills.find((b) => b.id === id)
     if (!bill) throw new Error(`Bill ${id} not found`)
-    bill.paid = paid
+    if (bill.closed) throw new Error('That bill is closed.')
+    return bill
+  }
+
+  private payableBill(data: FinanceData, payableId: number): { bill: Bill; row: BillPayable } {
+    const row = data.bill_payables.find((r) => r.id === payableId)
+    if (!row) throw new Error(`Bill payable ${payableId} not found`)
+    return { bill: this.openBill(data, row.bill_id), row }
+  }
+
+  async updateBill(id: number, patch: BillPatch): Promise<FinanceData> {
+    const data = this.load()
+    Object.assign(this.openBill(data, id), patch)
     this.save(data)
-    return this.delay(bill)
+    return this.delay(data)
+  }
+
+  async closeBill(id: number): Promise<FinanceData> {
+    const data = this.load()
+    const bill = this.openBill(data, id)
+    // The trailing unpaid payable would otherwise sit at the top of the detail
+    // view forever, reading as a bill being neglected.
+    data.bill_payables = data.bill_payables.filter((r) => r.bill_id !== id || r.paid)
+    bill.closed = true
+    this.save(data)
+    return this.delay(data)
+  }
+
+  async deleteBill(id: number): Promise<FinanceData> {
+    const data = this.load()
+    data.bills = data.bills.filter((b) => b.id !== id)
+    data.bill_payables = data.bill_payables.filter((r) => r.bill_id !== id)
+    this.save(data)
+    return this.delay(data)
+  }
+
+  async updateBillPayable(id: number, patch: BillPayablePatch): Promise<FinanceData> {
+    const data = this.load()
+    const { row } = this.payableBill(data, id)
+    Object.assign(row, patch)
+    clearPaidFields(row)
+    this.save(data)
+    return this.delay(data)
+  }
+
+  async deleteBillPayable(id: number): Promise<FinanceData> {
+    const data = this.load()
+    this.payableBill(data, id)
+    data.bill_payables = data.bill_payables.filter((r) => r.id !== id)
+    this.save(data)
+    return this.delay(data)
+  }
+
+  async payBillPayable(id: number, input: PayBillInput): Promise<FinanceData> {
+    const data = this.load()
+    const { bill, row } = this.payableBill(data, id)
+    row.paid = true
+    row.paid_date = input.paid_date
+    row.paid_amount = input.paid_amount
+    // Mint the next payable only when nothing else is outstanding, so a
+    // double-submitted Pay cannot leave two competing upcoming rows.
+    const stillUnpaid = data.bill_payables.some((r) => r.bill_id === bill.id && !r.paid)
+    if (!stillUnpaid) {
+      data.bill_payables.push(this.newPayable(data, bill, input.next_due_date))
+    }
+    this.save(data)
+    return this.delay(data)
   }
 
   async addExpendable(input: NewExpendable): Promise<ExpendableEntry> {

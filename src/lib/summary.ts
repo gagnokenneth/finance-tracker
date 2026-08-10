@@ -17,8 +17,10 @@ const sum = (ns: number[]): number => ns.reduce((a, b) => a + b, 0)
 
 export function computeSummary(data: FinanceData, month: string): Summary {
   const totalFunds = sum(data.funds.map((f) => f.amount))
-  const totalBills = sum(data.bills.map((b) => b.amount))
-  const billsPaid = sum(data.bills.filter((b) => b.paid).map((b) => b.amount))
+  const totalBills = sum(data.bill_payables.map((p) => p.amount ?? 0))
+  const billsPaid = sum(
+    data.bill_payables.filter((p) => p.paid).map((p) => p.paid_amount ?? p.amount ?? 0),
+  )
   const monthlyExpendable = data.settings.monthlyBudgets[month] ?? 0
   const spentThisMonth = sum(
     data.expendable.filter((e) => e.month === month).map((e) => e.daily_amount),
