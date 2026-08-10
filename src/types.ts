@@ -1,4 +1,6 @@
 export type DebtType = 'fixed' | 'revolving'
+export type BillType = 'fixed' | 'variable'
+export type BillFrequency = 'bimonthly' | 'monthly' | 'quarterly' | 'annually'
 export type SavingsSource = 'funds' | 'remaining_expendable'
 export type Currency = 'PHP' | 'USD'
 
