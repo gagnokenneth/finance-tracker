@@ -1,4 +1,4 @@
-import { isoDate } from './currentMonth.ts'
+import { isoDate, nextMonthOn } from './currentMonth.ts'
 import type { Debt, DebtScheduleRow, DebtStatement } from '../types.ts'
 
 export type DueStatus = 'late' | 'due-soon' | 'upcoming'
@@ -71,6 +71,20 @@ export function statementsFor(rows: DebtStatement[], debtId: number): DebtStatem
  */
 export function isStatementPriced(row: DebtStatement): boolean {
   return row.min_due !== undefined && row.total_due !== undefined && row.outstanding !== undefined
+}
+
+/** A schedule row always carries its amount; only a statement can be unpriced. */
+export function isRowPriced(row: DebtScheduleRow | DebtStatement): boolean {
+  return 'amount' in row || isStatementPriced(row)
+}
+
+/**
+ * When the next statement falls due. A card issues one a month, so it follows
+ * the last statement — and a debt with none starts from today.
+ */
+export function nextStatementDate(rows: DebtStatement[]): string {
+  const last = rows[rows.length - 1]
+  return last ? nextMonthOn(last.due_date) : isoDate()
 }
 
 /**
