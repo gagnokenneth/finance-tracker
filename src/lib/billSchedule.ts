@@ -121,8 +121,13 @@ export function firstDueDate(r: BillRecurrence, today: string = isoDate()): stri
     return candidates.find((d) => d >= today) as string
   }
 
+  // Monthly and quarterly both start at the next occurrence of that day — this
+  // month if it has not passed, otherwise next month. Quarterly steps by three
+  // months only from there: the quarter is anchored to the first payable, so
+  // stepping a whole quarter here would push a bill created on the 10th with a
+  // due day of the 5th out to November instead of September.
   const thisMonth = dateOn(y, m, r.day)
-  return thisMonth >= today ? thisMonth : dateOn(y, m + MONTH_STEP[r.frequency], r.day)
+  return thisMonth >= today ? thisMonth : dateOn(y, m + 1, r.day)
 }
 
 /**
