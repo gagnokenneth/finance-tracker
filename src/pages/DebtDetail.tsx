@@ -122,14 +122,10 @@ export function DebtDetail() {
    * The empty statement the next month starts from. Its figures are unknown
    * until the statement arrives, so the user sets them with Set amount.
    */
-  const startStatement = (dueDate: string) => {
-    addStatement.mutate(
-      { debtId: debt.id, input: { due_date: dueDate, paid: false } },
-      {
-        onError: () =>
-          showError('Paid, but the next statement was not created. Use Start next statement.'),
-      },
-    )
+  // The failure message differs by caller: the pay flow already changed
+  // something (the payment went through), but the recovery button did not.
+  const startStatement = (dueDate: string, onError: () => void) => {
+    addStatement.mutate({ debtId: debt.id, input: { due_date: dueDate, paid: false } }, { onError })
   }
 
   const submitPay = (result: PayResult) => {
@@ -146,7 +142,14 @@ export function DebtDetail() {
     const isLatest = rows[rows.length - 1]?.id === row.id
     updateStatement.mutate(
       { id: row.id, patch: result },
-      { onSuccess: isLatest ? () => startStatement(nextMonthOn(row.due_date)) : undefined },
+      {
+        onSuccess: isLatest
+          ? () =>
+              startStatement(nextMonthOn(row.due_date), () =>
+                showError('Paid, but the next statement was not created. Use Start next statement.'),
+              )
+          : undefined,
+      },
     )
   }
 
@@ -313,7 +316,11 @@ export function DebtDetail() {
       {!isFixed && !rows.some((row) => !row.paid) && !updateStatement.isPending && (
         <Button
           type="button"
-          onClick={() => startStatement(nextStatementDate(statements))}
+          onClick={() =>
+            startStatement(nextStatementDate(statements), () =>
+              showError('Could not start the next statement. Try again.'),
+            )
+          }
           disabled={addStatement.isPending}
         >
           Start next statement

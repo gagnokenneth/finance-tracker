@@ -42,7 +42,13 @@ export function RowFormModal({
   onClose: () => void
 }) {
   const asSchedule = initial && 'amount' in initial ? initial : null
-  const asStatement = initial && 'min_due' in initial ? initial : null
+  // Not 'min_due' in initial: a cleared figure comes back from both backends
+  // with the key absent (JSON.stringify drops undefined), so a
+  // partially-cleared statement would wrongly look like "no initial value"
+  // and blank out its still-set total_due/outstanding too. amount is the
+  // one key that's always present on a schedule row and never on a
+  // statement, so negating it is a safe discriminator either way.
+  const asStatement = initial && !('amount' in initial) ? initial : null
 
   const [dueDate, setDueDate] = useState(initial?.due_date ?? isoDate())
   const [amount, setAmount] = useState(asSchedule ? String(asSchedule.amount) : '')
