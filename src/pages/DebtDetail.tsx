@@ -140,6 +140,13 @@ export function DebtDetail() {
 
   const rowNoun = isFixed ? 'scheduled payments' : 'statements'
 
+  // An auto-generated statement can still be unpriced; Pay needs a real number.
+  const payDefaultAmount: number | undefined = payRow
+    ? 'amount' in payRow
+      ? payRow.amount
+      : payRow.min_due
+    : undefined
+
   return (
     <div className="space-y-6">
       <Link
@@ -296,10 +303,10 @@ export function DebtDetail() {
         onClose={() => setDeletingDebt(false)}
       />
 
-      {payRow && ('amount' in payRow ? payRow.amount : payRow.min_due) !== undefined && (
+      {payRow && payDefaultAmount !== undefined && (
         <PayModal
           open
-          defaultAmount={('amount' in payRow ? payRow.amount : payRow.min_due) as number}
+          defaultAmount={payDefaultAmount}
           onSubmit={submitPay}
           onClose={() => setPayRow(null)}
         />
