@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useFinanceData } from '../hooks/useFinanceData.ts'
 import { useFinanceMutations } from '../hooks/useFinanceMutations.ts'
+import { useToast } from '../hooks/useToast.ts'
 import {
   nextDueDate,
   scheduleFor,
@@ -10,6 +11,7 @@ import {
   dueStatus,
   isStatementPriced,
 } from '../lib/debts.ts'
+import { isoDate, nextMonthOn } from '../lib/currentMonth.ts'
 import { Money } from '../components/Money.tsx'
 import { Table } from '../components/Table.tsx'
 import { DueBadge } from '../components/DueBadge.tsx'
@@ -58,6 +60,8 @@ export function DebtDetail() {
   const [payRow, setPayRow] = useState<AnyRow | null>(null)
   const [rowForm, setRowForm] = useState<RowForm | null>(null)
   const [deletingRow, setDeletingRow] = useState<AnyRow | null>(null)
+
+  const showError = useToast()
 
   if (isPending) return <LoadingScreen />
   if (isError || !data) return <LoadError error={error} />
@@ -127,14 +131,44 @@ export function DebtDetail() {
     }
   }
 
+  /**
+   * The empty statement the next month starts from. Its figures are unknown
+   * until the statement arrives, so the user sets them with Set amount.
+   */
+  const startStatement = (dueDate: string) => {
+    addStatement.mutate(
+      { debtId: debt.id, input: { due_date: dueDate, paid: false } },
+      {
+        onError: () =>
+          showError('Paid, but the next statement was not created. Use Start next statement.'),
+      },
+    )
+  }
+
+  // Every statement is paid, so there is nothing to generate from a payment —
+  // this is how a revolving debt gets going again after the last one settles
+  // or its generated statement is deleted.
+  const nextStatementDate = () => {
+    const last = rows[rows.length - 1]
+    return last ? nextMonthOn(last.due_date) : isoDate()
+  }
+
   const submitPay = (result: PayResult) => {
     if (!payRow) return
     setPayRow(null)
     if ('amount' in payRow) {
       updateScheduleRow.mutate({ id: payRow.id, patch: result })
-    } else {
-      updateStatement.mutate({ id: payRow.id, patch: result })
+      return
     }
+    const row = payRow
+    // Only the latest statement mints a successor: paying a back-filled older
+    // one must not produce a duplicate month. And only on success, so a
+    // rejected payment leaves no statement for a month that was not paid.
+    const isLatest = rows[rows.length - 1]?.id === row.id
+    updateStatement.mutate(
+      { id: row.id, patch: result },
+      { onSuccess: isLatest ? () => startStatement(nextMonthOn(row.due_date)) : undefined },
+    )
   }
 
   const confirmDeleteRow = () => {
@@ -237,7 +271,7 @@ export function DebtDetail() {
           <p className="mt-1 text-sm text-ink-soft">
             {isFixed
               ? 'Add the payments you owe on this loan.'
-              : 'Add a statement when it arrives.'}
+              : 'Start the statement you are waiting on, then set its amounts when it arrives.'}
           </p>
         </div>
       ) : (
@@ -294,6 +328,12 @@ export function DebtDetail() {
       {isFixed && (
         <Button type="button" onClick={openAddRow}>
           Add payment
+        </Button>
+      )}
+
+      {!isFixed && !rows.some((row) => !row.paid) && (
+        <Button type="button" onClick={() => startStatement(nextStatementDate())} disabled={addStatement.isPending}>
+          Start next statement
         </Button>
       )}
 
