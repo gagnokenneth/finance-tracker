@@ -1,7 +1,9 @@
 # Finance Tracker
 
-A personal debt-payoff tracker. Track what you owe across multiple debts, record the
-payment schedule and monthly statements for each, and see what is due, soon, or settled.
+A personal finance tracker, built as one module per thing worth tracking — what you owe,
+what recurs, what you save, what you spend. Each module keeps its own rows and shows what
+is due, soon, or settled. Not every module is switched on; [Routes](#routes) is the list
+of what currently is.
 
 The data lives in a Google Sheet. A Google Apps Script web app sits in front of it as a
 small JSON API, so there is no server to run or pay for — the frontend is a static site
@@ -44,8 +46,15 @@ which is in use.
 
 Everything above reads through one TanStack Query hook, `useFinanceData()`, which
 fetches the whole dataset under a single `['finance','all']` key. Writes go through
-`useFinanceMutations()`; the debt mutations return the updated dataset and write it
-straight into the cache, avoiding a second round-trip.
+`useFinanceMutations()`; the debt and bill mutations return the updated dataset and write
+it straight into the cache, avoiding a second round-trip.
+
+Bills follow the debts pattern, with one difference worth knowing: a bill holds a
+recurrence rule and only ever has one unpaid payable ahead of it. Paying that payable
+mints the next one in the same write, and the next due date is computed on the client —
+all four recurrence rules live in `src/lib/billSchedule.ts`, so the backend writes the
+date it is given rather than reimplementing them in Apps Script. Closing a bill freezes
+it and drops its unpaid payable, and cannot be undone.
 
 Auth is username/password against the Apps Script backend, with sign-up gated by
 single-use invite codes. Mock mode skips the invite code entirely.
@@ -78,8 +87,9 @@ afterwards. If it rejects the write, the snapshot is restored and a toast says s
 — that toast is the only report, since the form is gone by then.
 
 Adds are not optimistic and still wait, because the backend assigns row ids and
-builds a new debt's whole schedule. There is nothing truthful to show until it
-answers.
+builds a new debt's whole schedule. Paying a bill payable waits for the same reason:
+it mints the next payable, whose id only the backend can assign. There is nothing
+truthful to show until it answers.
 
 The rule for anything added to `src/lib/optimistic.ts`: it must produce exactly
 what the backend would return for the same call. If predicting the result needs
@@ -87,10 +97,24 @@ something only the server knows, the write waits instead.
 
 ## Routes
 
-Only `/debts`, `/debts/:id`, and `/settings` are registered. `Dashboard`, `Funds`,
-`Bills`, `Savings`, and `Expendable` still exist under `src/pages/` from an earlier,
-broader version of the app, but are deliberately unrouted. Unknown paths land on
-`/debts`.
+This section is the one place that says which modules are live. Keep it current here
+rather than in the intro, the sidebar, or the sign-in copy — none of those name a module,
+so switching one on is a change to this list and to `src/App.tsx`.
+
+**Registered:**
+
+| Module | Routes | What it tracks |
+|---|---|---|
+| Debts | `/debts`, `/debts/:id` | Loans and credit cards, with a payment schedule or monthly statements |
+| Bills | `/bills`, `/bills/:id` | Recurring payments, generating one payable at a time on a schedule |
+| Settings | `/settings` | Currency, and signing out |
+
+**Not registered:** `Dashboard`, `Funds`, `Savings`, and `Expendable` still exist under
+`src/pages/` from an earlier, broader version of the app, but are deliberately unrouted —
+their sheets have no `user_id` column, so the backend does not serve their actions either.
+Switching one on means giving its sheet a `user_id` and scoping its handlers first.
+
+Unknown paths land on `/debts`.
 
 ## Notes
 

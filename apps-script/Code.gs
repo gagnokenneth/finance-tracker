@@ -9,7 +9,8 @@ var INVITE_COUNT = 50;
 var SHEETS = {
   users: ['id', 'username', 'pw_hash', 'currency', 'created'],
   funds: ['id', 'source', 'amount', 'date', 'notes'],
-  bills: ['id', 'name', 'amount', 'due_date', 'paid', 'notes'],
+  bills: ['id', 'user_id', 'name', 'type', 'frequency', 'amount', 'day', 'second_day', 'month', 'closed'],
+  bill_payables: ['id', 'user_id', 'bill_id', 'due_date', 'amount', 'paid', 'paid_date', 'paid_amount'],
   expendable: ['id', 'month', 'daily_amount', 'date', 'notes'],
   debts: ['id', 'user_id', 'name', 'type'],
   debt_schedule: ['id', 'user_id', 'debt_id', 'due_date', 'amount', 'paid', 'paid_date', 'paid_amount'],
@@ -25,7 +26,7 @@ var SHEETS = {
  * so the new shape is applied on the very next request after a deployment,
  * instead of up to an hour later.
  */
-var SCHEMA_VERSION = 4;
+var SCHEMA_VERSION = 5;
 
 /*
  * Tabs whose stale shape may be DISCARDED and recreated. Deliberately excludes
@@ -33,25 +34,27 @@ var SCHEMA_VERSION = 4;
  * and password hash on the next request, re-seed fresh codes, and lock everyone
  * out with no recovery path.
  */
-var REBUILDABLE_SHEETS = ['debts', 'debt_schedule', 'debt_statements'];
+var REBUILDABLE_SHEETS = ['debts', 'debt_schedule', 'debt_statements', 'bills', 'bill_payables'];
 
-var DATA_SHEETS = ['funds', 'bills', 'expendable', 'debts', 'debt_schedule', 'debt_statements', 'savings', 'savings_transfers'];
+var DATA_SHEETS = ['funds', 'bills', 'bill_payables', 'expendable', 'debts', 'debt_schedule', 'debt_statements', 'savings', 'savings_transfers'];
 
 /**
  * Sheets getAll actually reads. Every sheet read is a separate round trip, so
  * reading the ones no screen displays is pure latency.
  *
- * IMPORTANT: if you re-enable Funds, Bills, Expendable or Savings in the
- * frontend, add their sheet names here. Otherwise those pages render empty even
- * though the rows exist.
+ * IMPORTANT: if you re-enable Funds, Expendable or Savings in the frontend, add
+ * their sheet names here. Otherwise those pages render empty even though the
+ * rows exist.
  */
-var ACTIVE_SHEETS = ['debts', 'debt_schedule', 'debt_statements'];
+var ACTIVE_SHEETS = ['debts', 'debt_schedule', 'debt_statements', 'bills', 'bill_payables'];
 
 /** Actions that return the full dataset instead of the affected row. */
 var RETURNS_DATA = {
   addDebt: true, updateDebt: true, deleteDebt: true,
   addScheduleRow: true, updateScheduleRow: true, deleteScheduleRow: true,
   addStatement: true, updateStatement: true, deleteStatement: true,
+  addBill: true, updateBill: true, closeBill: true, deleteBill: true,
+  updateBillPayable: true, deleteBillPayable: true, payBillPayable: true,
   setCurrency: true
 };
 
@@ -97,7 +100,7 @@ function doPost(e) {
  * them could mislabel columns of real data.
  */
 function ensureSheets() {
-  // Confirming nine tabs on every request adds up, so the result is cached.
+  // Confirming every tab on every request adds up, so the result is cached.
   // The key carries SCHEMA_VERSION, so a deployment that changes columns
   // re-checks immediately rather than waiting for the cache to expire.
   var cache = CacheService.getScriptCache();
@@ -442,7 +445,17 @@ function readRows(name) {
 
 function coerce(name, r) {
   if (name === 'funds') return { id: num(r.id), source: String(r.source), amount: num(r.amount), date: fmtDate(r.date), notes: r.notes ? String(r.notes) : undefined };
-  if (name === 'bills') return { id: num(r.id), name: String(r.name), amount: num(r.amount), due_date: fmtDate(r.due_date), paid: r.paid === true || String(r.paid).toUpperCase() === 'TRUE', notes: r.notes ? String(r.notes) : undefined };
+  if (name === 'bills') return {
+    id: num(r.id), name: String(r.name), type: String(r.type), frequency: String(r.frequency),
+    amount: optNum(r.amount), day: num(r.day), second_day: optNum(r.second_day),
+    month: optNum(r.month), closed: bool(r.closed)
+  };
+  if (name === 'bill_payables') return {
+    // amount uses optNum, not num: an empty cell is a variable bill's "not set
+    // yet", which is not the same as zero.
+    id: num(r.id), bill_id: num(r.bill_id), due_date: fmtDate(r.due_date), amount: optNum(r.amount),
+    paid: bool(r.paid), paid_date: optDate(r.paid_date), paid_amount: optNum(r.paid_amount)
+  };
   if (name === 'expendable') return { id: num(r.id), month: String(r.month), daily_amount: num(r.daily_amount), date: fmtDate(r.date), notes: r.notes ? String(r.notes) : undefined };
   if (name === 'debts') return { id: num(r.id), name: String(r.name), type: String(r.type) };
   if (name === 'debt_schedule') return {
@@ -485,7 +498,7 @@ function patchRowAt(name, rowIndex, patch) {
   var headers = SHEETS[name];
   for (var c = 0; c < headers.length; c++) {
     var h = headers[c];
-    if (h === 'id' || h === 'user_id' || h === 'debt_id') continue;
+    if (h === 'id' || h === 'user_id' || h === 'debt_id' || h === 'bill_id') continue;
     if (!Object.prototype.hasOwnProperty.call(patch, h)) continue;
     var v = patch[h];
     sh.getRange(rowIndex, c + 1).setValue(v === undefined || v === null ? '' : v);
@@ -627,7 +640,7 @@ function getAll(uid) {
 }
 
 /*
- * Only per-user debt actions are served. The funds / bills / expendable /
+ * Only per-user debt and bill actions are served. The funds / expendable /
  * savings sheets have no user_id column, so serving their actions would let any
  * authenticated user read and write another user's rows. Their pages are
  * unreachable in the frontend; re-enabling one means giving its sheet a user_id
@@ -645,6 +658,13 @@ function dispatch(action, p, uid) {
     case 'addStatement': return addChildRow('debt_statements', p, uid);
     case 'updateStatement': return updateChildRow('debt_statements', p, uid);
     case 'deleteStatement': return deleteChildRow('debt_statements', p, uid);
+    case 'addBill': return addBill(p, uid);
+    case 'updateBill': return updateBill(p, uid);
+    case 'closeBill': return closeBill(p, uid);
+    case 'deleteBill': return deleteBill(p, uid);
+    case 'updateBillPayable': return updateBillPayable(p, uid);
+    case 'deleteBillPayable': return deleteBillPayable(p, uid);
+    case 'payBillPayable': return payBillPayable(p, uid);
     case 'setCurrency': return setCurrency(p, uid);
     default: throw new Error('Unknown action: ' + action);
   }
@@ -702,6 +722,149 @@ function updateChildRow(name, p, uid) {
 
 function deleteChildRow(name, p, uid) {
   sheet(name).deleteRow(ownedRowIndex(name, p.id, uid));
+  return null;
+}
+
+/**
+ * The caller's own bill, refused when closed. Every bill write goes through
+ * here: the frontend hides the actions on a closed bill, but a stale tab must
+ * not be able to slip one past.
+ */
+function openBill(id, uid) {
+  // Returns the row's position too, so a caller that goes on to patch it does
+  // not look the same row up a second time — the pattern ownedRowIndex exists for.
+  var rowIndex = ownedRowIndex('bills', id, uid);
+  var bill = getById('bills', id);
+  if (!bill) throw new Error('not found');
+  if (bill.closed) throw new Error('That bill is closed.');
+  return { bill: bill, rowIndex: rowIndex };
+}
+
+/** A payable's sheet row and coerced values, plus its parent bill — all checked. */
+function ownedPayable(id, uid) {
+  var rowIndex = ownedRowIndex('bill_payables', id, uid);
+  var row = getById('bill_payables', id);
+  return { rowIndex: rowIndex, row: row, bill: openBill(row.bill_id, uid).bill };
+}
+
+/** The payable a new bill or a payment starts from. */
+function newPayable(bill, uid, dueDate) {
+  return {
+    id: nextId('bill_payables'),
+    user_id: uid,
+    bill_id: bill.id,
+    due_date: dueDate,
+    // Blank for a variable bill: its figure is unknown until the statement
+    // arrives, and blank coerces back to undefined rather than to zero.
+    amount: bill.type === 'fixed' && bill.amount !== undefined && bill.amount !== null ? bill.amount : '',
+    paid: false
+  };
+}
+
+function addBill(p, uid) {
+  var bill = {
+    id: nextId('bills'),
+    user_id: uid,
+    name: p.name,
+    type: p.type,
+    frequency: p.frequency,
+    amount: blank(p.amount) ? '' : p.amount,
+    day: p.day,
+    second_day: blank(p.second_day) ? '' : p.second_day,
+    month: blank(p.month) ? '' : p.month,
+    closed: false
+  };
+  appendRow('bills', bill);
+  appendRow('bill_payables', newPayable({ id: bill.id, type: p.type, amount: p.amount }, uid, p.first_due_date));
+  return null; // RETURNS_DATA action — doPost reads the dataset back
+}
+
+/**
+ * JSON.stringify drops undefined, so a patch that clears an optional field
+ * arrives without it. Blank those explicitly, or the row would keep a value
+ * from the shape it had before — a monthly bill holding the second_day of the
+ * bi-monthly schedule it used to be.
+ */
+function normalizeBillPatch(patch) {
+  var optional = ['amount', 'second_day', 'month'];
+  for (var i = 0; i < optional.length; i++) {
+    if (!Object.prototype.hasOwnProperty.call(patch, optional[i])) patch[optional[i]] = '';
+  }
+  return patch;
+}
+
+function updateBill(p, uid) {
+  var found = openBill(p.id, uid);
+  return patchRowAt('bills', found.rowIndex, normalizeBillPatch(p.patch || {}));
+}
+
+function closeBill(p, uid) {
+  openBill(p.id, uid);
+  deleteUnpaidPayables(p.id);
+  setCell('bills', p.id, 'closed', true);
+  return null;
+}
+
+/** Deletes bottom-up so earlier row indices stay valid as rows are removed. */
+function deleteUnpaidPayables(billId) {
+  var sh = sheet('bill_payables');
+  var last = sh.getLastRow();
+  if (last < 2) return;
+  var headers = SHEETS.bill_payables;
+  var vals = sh.getRange(2, 1, last - 1, headers.length).getValues();
+  var billCol = headers.indexOf('bill_id');
+  var paidCol = headers.indexOf('paid');
+  for (var i = vals.length - 1; i >= 0; i--) {
+    if (num(vals[i][billCol]) === num(billId) && !bool(vals[i][paidCol])) sh.deleteRow(i + 2);
+  }
+}
+
+function deleteBill(p, uid) {
+  var rowIndex = ownedRowIndex('bills', p.id, uid);
+  deleteRowsWhere('bill_payables', 'bill_id', p.id);
+  sheet('bills').deleteRow(rowIndex);
+  return null;
+}
+
+function updateBillPayable(p, uid) {
+  var found = ownedPayable(p.id, uid);
+  var patch = normalizePaidPatch(p.patch || {});
+  // An omitted amount means "not set yet" — clear the cell rather than keep the
+  // figure that was there.
+  if (!Object.prototype.hasOwnProperty.call(patch, 'amount')) patch.amount = '';
+  return patchRowAt('bill_payables', found.rowIndex, patch);
+}
+
+function deleteBillPayable(p, uid) {
+  var found = ownedPayable(p.id, uid);
+  sheet('bill_payables').deleteRow(found.rowIndex);
+  return null;
+}
+
+/** Whether this bill has an unpaid payable other than `exceptId`. */
+function hasOtherUnpaidPayable(billId, exceptId) {
+  var rows = readRows('bill_payables');
+  for (var i = 0; i < rows.length; i++) {
+    if (num(rows[i].bill_id) !== num(billId)) continue;
+    if (num(rows[i].id) === num(exceptId)) continue;
+    if (!bool(rows[i].paid)) return true;
+  }
+  return false;
+}
+
+function payBillPayable(p, uid) {
+  var found = ownedPayable(p.id, uid);
+  var input = p.input || {};
+  patchRowAt('bill_payables', found.rowIndex, {
+    paid: true,
+    paid_date: input.paid_date,
+    paid_amount: input.paid_amount
+  });
+  // Mint the next payable only when nothing else is outstanding, so a
+  // double-submitted Pay cannot leave two competing upcoming rows.
+  if (!hasOtherUnpaidPayable(found.bill.id, found.row.id)) {
+    appendRow('bill_payables', newPayable(found.bill, uid, input.next_due_date));
+  }
   return null;
 }
 

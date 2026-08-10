@@ -70,8 +70,8 @@ export function SignIn() {
         <h1 className="mt-6 text-2xl font-semibold tracking-tight text-ink">Finance Tracker</h1>
         <p className="mt-2 text-sm text-ink-soft">
           {creating
-            ? 'Create an account to start tracking what you owe.'
-            : 'Keep track of what you owe, and what’s left to pay.'}
+            ? 'Create an account to start tracking your money.'
+            : 'Keep track of where your money stands.'}
         </p>
 
         <form onSubmit={submit} className="mt-8 flex flex-col gap-4">

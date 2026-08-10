@@ -2,6 +2,9 @@ import type {
   FinanceApi,
   NewFund,
   NewBill,
+  BillPatch,
+  BillPayablePatch,
+  PayBillInput,
   NewExpendable,
   NewDebt,
   NewScheduleRow,
@@ -17,7 +20,6 @@ import type {
 import type {
   FinanceData,
   FundEntry,
-  Bill,
   ExpendableEntry,
   SavingsEntry,
   SavingsTransfer,
@@ -117,12 +119,32 @@ export class AppsScriptApi implements FinanceApi {
     return this.call<FundEntry>('addFund', input)
   }
 
-  addBill(input: NewBill): Promise<Bill> {
-    return this.call<Bill>('addBill', input)
+  addBill(input: NewBill): Promise<FinanceData> {
+    return this.call<FinanceData>('addBill', input)
   }
 
-  setBillPaid(id: number, paid: boolean): Promise<Bill> {
-    return this.call<Bill>('setBillPaid', { id, paid })
+  updateBill(id: number, patch: BillPatch): Promise<FinanceData> {
+    return this.call<FinanceData>('updateBill', { id, patch })
+  }
+
+  closeBill(id: number): Promise<FinanceData> {
+    return this.call<FinanceData>('closeBill', { id })
+  }
+
+  deleteBill(id: number): Promise<FinanceData> {
+    return this.call<FinanceData>('deleteBill', { id })
+  }
+
+  updateBillPayable(id: number, patch: BillPayablePatch): Promise<FinanceData> {
+    return this.call<FinanceData>('updateBillPayable', { id, patch })
+  }
+
+  deleteBillPayable(id: number): Promise<FinanceData> {
+    return this.call<FinanceData>('deleteBillPayable', { id })
+  }
+
+  payBillPayable(id: number, input: PayBillInput): Promise<FinanceData> {
+    return this.call<FinanceData>('payBillPayable', { id, input })
   }
 
   addExpendable(input: NewExpendable): Promise<ExpendableEntry> {

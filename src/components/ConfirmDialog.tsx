@@ -1,7 +1,7 @@
 import { Modal } from './Modal.tsx'
 import { SecondaryButton, DangerButton } from './ui.tsx'
 
-/** Confirmation for destructive actions. Every use here deletes something. */
+/** Confirmation for destructive actions — deletes, and closing a bill. */
 export function ConfirmDialog({
   open,
   title,

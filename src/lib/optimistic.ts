@@ -1,5 +1,10 @@
-import type { DebtScheduleRow, DebtStatement, FinanceData } from '../types.ts'
-import type { ScheduleRowPatch, StatementPatch } from '../api/FinanceApi.ts'
+import type { BillPayable, DebtScheduleRow, DebtStatement, FinanceData } from '../types.ts'
+import type {
+  BillPatch,
+  BillPayablePatch,
+  ScheduleRowPatch,
+  StatementPatch,
+} from '../api/FinanceApi.ts'
 
 /**
  * Client-side predictions of what a write does to the dataset, used to show the
@@ -18,7 +23,7 @@ import type { ScheduleRowPatch, StatementPatch } from '../api/FinanceApi.ts'
  * leave the old date and amount on the row until the server replied, which is
  * the sort of near-miss this file exists to avoid.
  */
-function clearPaidWhenUnpaid<T extends DebtScheduleRow | DebtStatement>(row: T): T {
+function clearPaidWhenUnpaid<T extends DebtScheduleRow | DebtStatement | BillPayable>(row: T): T {
   if (row.paid) return row
   const next = { ...row }
   delete next.paid_date
@@ -66,6 +71,59 @@ export function renameDebt(data: FinanceData, vars: { id: number; name: string }
     ),
   }
 }
+
+export function applyBillPatch(
+  data: FinanceData,
+  vars: { id: number; patch: BillPatch },
+): FinanceData {
+  return {
+    ...data,
+    bills: data.bills.map((bill) => (bill.id === vars.id ? { ...bill, ...vars.patch } : bill)),
+  }
+}
+
+/**
+ * Closing drops the unpaid payables and freezes the rest — the same two effects
+ * the backend applies, both computable here.
+ */
+export function closeBillIn(data: FinanceData, id: number): FinanceData {
+  return {
+    ...data,
+    bills: data.bills.map((bill) => (bill.id === id ? { ...bill, closed: true } : bill)),
+    bill_payables: data.bill_payables.filter((row) => row.bill_id !== id || row.paid),
+  }
+}
+
+/** Deleting a bill takes its payables with it, the same cascade the backend applies. */
+export function removeBill(data: FinanceData, id: number): FinanceData {
+  return {
+    ...data,
+    bills: data.bills.filter((bill) => bill.id !== id),
+    bill_payables: data.bill_payables.filter((row) => row.bill_id !== id),
+  }
+}
+
+export function applyBillPayablePatch(
+  data: FinanceData,
+  vars: { id: number; patch: BillPayablePatch },
+): FinanceData {
+  return {
+    ...data,
+    bill_payables: data.bill_payables.map((row) =>
+      row.id === vars.id ? clearPaidWhenUnpaid({ ...row, ...vars.patch }) : row,
+    ),
+  }
+}
+
+export function removeBillPayable(data: FinanceData, id: number): FinanceData {
+  return { ...data, bill_payables: data.bill_payables.filter((row) => row.id !== id) }
+}
+
+/*
+ * There is deliberately no prediction for payBillPayable: it mints a payable
+ * whose id the backend assigns, which is the case the note at the top of this
+ * file excludes.
+ */
 
 /** Deleting a debt takes its rows with it, the same cascade the backend applies. */
 export function removeDebt(data: FinanceData, id: number): FinanceData {
