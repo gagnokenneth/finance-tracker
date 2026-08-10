@@ -34,7 +34,7 @@ function BillRow({ bill, data }: { bill: Bill; data: FinanceData }) {
             than shown empty. Inlined instead of added to StatusBadge, which is
             keyed to a row's due state — and closed is a bill's state. */}
         {bill.closed ? (
-          <span className="inline-flex items-center rounded-full bg-paper px-2 py-0.5 text-xs font-medium text-ink-soft ring-1 ring-ink-faint/30 ring-inset">
+          <span className="inline-flex items-center rounded-full bg-brand/10 px-2 py-0.5 text-xs font-medium text-brand ring-1 ring-brand/20 ring-inset">
             Closed
           </span>
         ) : (
