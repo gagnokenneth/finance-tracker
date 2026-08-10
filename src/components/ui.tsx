@@ -95,7 +95,7 @@ export function RowButton({
   return (
     <button
       {...rest}
-      className={`rounded-md border px-2 py-1 text-xs font-medium transition-colors ${tones[tone]} ${focusRing} ${className ?? ''}`}
+      className={`rounded-md border px-2 py-1 text-xs font-medium transition-colors disabled:opacity-50 ${tones[tone]} ${focusRing} ${className ?? ''}`}
     >
       {children}
     </button>

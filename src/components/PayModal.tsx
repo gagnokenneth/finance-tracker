@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import { isoDate } from '../../lib/currentMonth.ts'
-import { Modal } from '../../components/Modal.tsx'
-import { Field, TextInput, Button, SecondaryButton } from '../../components/ui.tsx'
+import { isoDate } from '../lib/currentMonth.ts'
+import { Modal } from './Modal.tsx'
+import { Field, TextInput, Button, SecondaryButton } from './ui.tsx'
 
 export interface PayResult {
   paid: true
@@ -12,8 +12,8 @@ export interface PayResult {
 
 /**
  * Records a payment against one row. `defaultAmount` is the row's scheduled
- * installment for a fixed debt, or the minimum due for a revolving one — the
- * usual case, but always editable.
+ * installment for a fixed debt, the minimum due for a revolving one, or a bill
+ * payable's amount — the usual case, but always editable.
  */
 export function PayModal({
   open,
