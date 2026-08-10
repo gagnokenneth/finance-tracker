@@ -731,18 +731,20 @@ function deleteChildRow(name, p, uid) {
  * not be able to slip one past.
  */
 function openBill(id, uid) {
-  assertOwned('bills', id, uid);
+  // Returns the row's position too, so a caller that goes on to patch it does
+  // not look the same row up a second time — the pattern ownedRowIndex exists for.
+  var rowIndex = ownedRowIndex('bills', id, uid);
   var bill = getById('bills', id);
   if (!bill) throw new Error('not found');
   if (bill.closed) throw new Error('That bill is closed.');
-  return bill;
+  return { bill: bill, rowIndex: rowIndex };
 }
 
 /** A payable's sheet row and coerced values, plus its parent bill — all checked. */
 function ownedPayable(id, uid) {
   var rowIndex = ownedRowIndex('bill_payables', id, uid);
   var row = getById('bill_payables', id);
-  return { rowIndex: rowIndex, row: row, bill: openBill(row.bill_id, uid) };
+  return { rowIndex: rowIndex, row: row, bill: openBill(row.bill_id, uid).bill };
 }
 
 /** The payable a new bill or a payment starts from. */
@@ -792,9 +794,8 @@ function normalizeBillPatch(patch) {
 }
 
 function updateBill(p, uid) {
-  var rowIndex = ownedRowIndex('bills', p.id, uid);
-  openBill(p.id, uid);
-  return patchRowAt('bills', rowIndex, normalizeBillPatch(p.patch || {}));
+  var found = openBill(p.id, uid);
+  return patchRowAt('bills', found.rowIndex, normalizeBillPatch(p.patch || {}));
 }
 
 function closeBill(p, uid) {

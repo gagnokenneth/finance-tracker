@@ -19,6 +19,9 @@ export interface BillRecurrence {
   month?: number
 }
 
+/** The canonical order the frequencies are offered in. */
+export const FREQUENCIES: BillFrequency[] = ['bimonthly', 'monthly', 'quarterly', 'annually']
+
 export const FREQUENCY_LABEL: Record<BillFrequency, string> = {
   bimonthly: 'Bi-monthly',
   monthly: 'Monthly',

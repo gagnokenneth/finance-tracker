@@ -14,9 +14,12 @@ export function payablesFor(rows: BillPayable[], billId: number): BillPayable[] 
     .sort((a, b) => b.due_date.localeCompare(a.due_date))
 }
 
-/** The one unpaid payable, or null once the bill is closed. */
+/**
+ * The one unpaid payable, or null once the bill is closed. Unsorted input:
+ * nextUnpaid picks by due date, so paying for a sort first would be wasted work.
+ */
 export function upcomingPayable(rows: BillPayable[], billId: number): BillPayable | null {
-  return nextUnpaid(payablesFor(rows, billId))
+  return nextUnpaid(rows.filter((r) => r.bill_id === billId))
 }
 
 /** "Monthly · Fixed" — the caption under a bill's name. */
