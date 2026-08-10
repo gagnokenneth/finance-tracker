@@ -1,4 +1,4 @@
-import { isoDate } from './currentMonth.ts'
+import { dateOn, isoDate } from './currentMonth.ts'
 import type { BillFrequency } from '../types.ts'
 
 /**
@@ -50,21 +50,6 @@ const MONTH_STEP: Record<Exclude<BillFrequency, 'bimonthly'>, number> = {
   monthly: 1,
   quarterly: 3,
   annually: 12,
-}
-
-function daysInMonth(year: number, month: number): number {
-  return new Date(year, month, 0).getDate()
-}
-
-/**
- * An ISO date for the given day of the given month, clamped to that month's
- * length: a bill due the 31st falls on Feb 28, or Feb 29 in a leap year.
- * `month` is 1-12 and may overflow — 13 rolls into the next January.
- */
-function dateOn(year: number, month: number, day: number): string {
-  const y = year + Math.floor((month - 1) / 12)
-  const m = (((month - 1) % 12) + 12) % 12 + 1
-  return isoDate(new Date(y, m - 1, Math.min(day, daysInMonth(y, m))))
 }
 
 function isWholeDay(n: number | undefined): boolean {
