@@ -6,6 +6,7 @@ import { financeKey } from '../hooks/useFinanceData.ts'
 
 const NAV_ITEMS = [
   { to: '/debts', label: 'Debts' },
+  { to: '/bills', label: 'Bills' },
   { to: '/settings', label: 'Settings' },
 ]
 

@@ -26,6 +26,22 @@ export const FREQUENCY_LABEL: Record<BillFrequency, string> = {
   annually: 'Annually',
 }
 
+/** Indexed by month number - 1, so MONTH_LABEL[bill.month - 1] names an annual bill's month. */
+export const MONTH_LABEL = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+]
+
 /** Months between occurrences. Bimonthly is absent: it alternates within a month. */
 const MONTH_STEP: Record<Exclude<BillFrequency, 'bimonthly'>, number> = {
   monthly: 1,
