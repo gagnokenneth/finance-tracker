@@ -76,9 +76,10 @@ export interface DebtStatement {
   id: number
   debt_id: number
   due_date: string
-  min_due: number
-  total_due: number
-  outstanding: number
+  /** Undefined means not set yet — an auto-generated statement starts empty. */
+  min_due?: number
+  total_due?: number
+  outstanding?: number
   paid: boolean
   paid_date?: string
   paid_amount?: number

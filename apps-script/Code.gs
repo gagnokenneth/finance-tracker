@@ -464,7 +464,9 @@ function coerce(name, r) {
   };
   if (name === 'debt_statements') return {
     id: num(r.id), debt_id: num(r.debt_id), due_date: fmtDate(r.due_date),
-    min_due: num(r.min_due), total_due: num(r.total_due), outstanding: num(r.outstanding),
+    // optNum, not num: a blank cell is an auto-generated statement's "not set
+    // yet", which is not the same as zero.
+    min_due: optNum(r.min_due), total_due: optNum(r.total_due), outstanding: optNum(r.outstanding),
     paid: bool(r.paid), paid_date: optDate(r.paid_date), paid_amount: optNum(r.paid_amount)
   };
   if (name === 'savings') return { id: num(r.id), date: fmtDate(r.date), amount: num(r.amount), source: String(r.source), total: num(r.total), notes: r.notes ? String(r.notes) : undefined };

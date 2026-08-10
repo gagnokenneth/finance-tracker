@@ -31,6 +31,15 @@ function clearPaidWhenUnpaid<T extends DebtScheduleRow | DebtStatement | BillPay
   return next
 }
 
+/** The wire's null becomes the model's undefined — see StatementPatch. */
+function clearedAmounts(patch: StatementPatch): Partial<DebtStatement> {
+  const applied: Partial<DebtStatement> = { ...patch } as Partial<DebtStatement>
+  for (const key of ['min_due', 'total_due', 'outstanding'] as const) {
+    if (patch[key] === null) applied[key] = undefined
+  }
+  return applied
+}
+
 export function applyScheduleRowPatch(
   data: FinanceData,
   vars: { id: number; patch: ScheduleRowPatch },
@@ -50,7 +59,7 @@ export function applyStatementPatch(
   return {
     ...data,
     debt_statements: data.debt_statements.map((row) =>
-      row.id === vars.id ? clearPaidWhenUnpaid({ ...row, ...vars.patch }) : row,
+      row.id === vars.id ? clearPaidWhenUnpaid({ ...row, ...clearedAmounts(vars.patch) }) : row,
     ),
   }
 }

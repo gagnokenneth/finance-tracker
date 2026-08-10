@@ -222,13 +222,25 @@ export function DebtDetail() {
               ) : (
                 <>
                   <td className="px-4 py-3">
-                    <Money value={row.min_due} />
+                    {row.min_due !== undefined ? (
+                      <Money value={row.min_due} />
+                    ) : (
+                      <span className="text-sm text-ink-faint">—</span>
+                    )}
                   </td>
                   <td className="px-4 py-3">
-                    <Money value={row.total_due} />
+                    {row.total_due !== undefined ? (
+                      <Money value={row.total_due} />
+                    ) : (
+                      <span className="text-sm text-ink-faint">—</span>
+                    )}
                   </td>
                   <td className="px-4 py-3">
-                    <Money value={row.outstanding} />
+                    {row.outstanding !== undefined ? (
+                      <Money value={row.outstanding} />
+                    ) : (
+                      <span className="text-sm text-ink-faint">—</span>
+                    )}
                   </td>
                 </>
               )}
@@ -284,10 +296,10 @@ export function DebtDetail() {
         onClose={() => setDeletingDebt(false)}
       />
 
-      {payRow && (
+      {payRow && ('amount' in payRow ? payRow.amount : payRow.min_due) !== undefined && (
         <PayModal
           open
-          defaultAmount={'amount' in payRow ? payRow.amount : payRow.min_due}
+          defaultAmount={('amount' in payRow ? payRow.amount : payRow.min_due) as number}
           onSubmit={submitPay}
           onClose={() => setPayRow(null)}
         />

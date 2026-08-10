@@ -31,7 +31,7 @@ export function computeSummary(data: FinanceData, month: string): Summary {
   )
   const debtPayments =
     sum(data.debt_schedule.filter((r) => r.paid).map((r) => r.paid_amount ?? r.amount)) +
-    sum(data.debt_statements.filter((r) => r.paid).map((r) => r.paid_amount ?? r.min_due))
+    sum(data.debt_statements.filter((r) => r.paid).map((r) => r.paid_amount ?? r.min_due ?? 0))
   const savingsTotal =
     sum(data.savings.map((s) => s.amount)) -
     sum(data.savings_transfers.map((t) => t.amount))

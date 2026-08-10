@@ -81,7 +81,9 @@ export function totalBalance(
   }
   const rows = statementsFor(statements, debt.id)
   if (rows.length === 0) return 0
-  return rows[rows.length - 1].outstanding
+  // An auto-generated statement's outstanding is unset until priced; treat
+  // that like 0 here, same fallback reasoning as summary.ts's debt payments sum.
+  return rows[rows.length - 1].outstanding ?? 0
 }
 
 /** Next unpaid due date across whichever table this debt uses. */

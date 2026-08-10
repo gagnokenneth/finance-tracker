@@ -44,7 +44,15 @@ export type NewDebt =
 
 /** Patches never carry id or debt_id — a row cannot be renumbered or moved. */
 export type ScheduleRowPatch = Partial<NewScheduleRow>
-export type StatementPatch = Partial<NewStatement>
+/**
+ * null clears a money field. undefined cannot: JSON.stringify drops it, so a
+ * cleared amount would arrive as "leave this alone" and keep its old figure.
+ */
+export type StatementPatch = Partial<Omit<NewStatement, 'min_due' | 'total_due' | 'outstanding'>> & {
+  min_due?: number | null
+  total_due?: number | null
+  outstanding?: number | null
+}
 
 export interface AuthResult {
   token: string
