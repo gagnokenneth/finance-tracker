@@ -331,7 +331,10 @@ export function DebtDetail() {
         </Button>
       )}
 
-      {!isFixed && !rows.some((row) => !row.paid) && (
+      {/* A payment in flight can optimistically clear the last unpaid row
+          before its own success handler starts the next statement — showing
+          the button in that window would let a click mint a duplicate month. */}
+      {!isFixed && !rows.some((row) => !row.paid) && !updateStatement.isPending && (
         <Button type="button" onClick={() => startStatement(nextStatementDate())} disabled={addStatement.isPending}>
           Start next statement
         </Button>
