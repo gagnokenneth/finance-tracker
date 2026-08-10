@@ -101,6 +101,10 @@ export class MockApi implements FinanceApi {
     const key = this.uid()
     const data = db.data[key]
     if (!data) throw new Error('unauthorized')
+    // Backfilled for the same reason loadDb backfills its own fields: this blob
+    // is persisted JSON that outlives code changes, and a browser holding the
+    // shape from before bill_payables existed must not crash on it.
+    data.bill_payables ??= []
     return data
   }
 
