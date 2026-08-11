@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useFinanceData } from '../hooks/useFinanceData.ts'
 import { useFinanceMutations } from '../hooks/useFinanceMutations.ts'
-import { useToast } from '../hooks/useToast.ts'
 import {
   nextDueDate,
   scheduleFor,
@@ -64,8 +63,6 @@ export function DebtDetail() {
   const [rowForm, setRowForm] = useState<RowForm | null>(null)
   const [deletingRow, setDeletingRow] = useState<AnyRow | null>(null)
 
-  const showError = useToast()
-
   if (isPending) return <LoadingScreen />
   if (isError || !data) return <LoadError error={error} />
 
@@ -116,11 +113,12 @@ export function DebtDetail() {
   /**
    * The empty statement the next month starts from. Its figures are unknown
    * until the statement arrives, so the user sets them with Set amount.
+   *
+   * Failure is reported by the mutation itself, not here — see the note on
+   * addStatement. This page can be gone by the time the write answers.
    */
-  // The failure message differs by caller: the pay flow already changed
-  // something (the payment went through), but the recovery button did not.
-  const startStatement = (dueDate: string, onError: () => void) => {
-    addStatement.mutate({ debtId: debt.id, input: { due_date: dueDate, paid: false } }, { onError })
+  const startStatement = (dueDate: string) => {
+    addStatement.mutate({ debtId: debt.id, input: { due_date: dueDate, paid: false } })
   }
 
   const submitPay = (result: PayResult) => {
@@ -138,12 +136,7 @@ export function DebtDetail() {
     updateStatement.mutate(
       { id: row.id, patch: result },
       {
-        onSuccess: isLatest
-          ? () =>
-              startStatement(nextMonthOn(row.due_date), () =>
-                showError('Paid, but the next statement was not created. Use Start next statement.'),
-              )
-          : undefined,
+        onSuccess: isLatest ? () => startStatement(nextMonthOn(row.due_date)) : undefined,
       },
     )
   }
@@ -314,11 +307,7 @@ export function DebtDetail() {
       {!isFixed && !rows.some((row) => !row.paid) && !updateStatement.isPending && (
         <Button
           type="button"
-          onClick={() =>
-            startStatement(nextStatementDate(statements), () =>
-              showError('Could not start the next statement. Try again.'),
-            )
-          }
+          onClick={() => startStatement(nextStatementDate(statements))}
           /* The prediction hides this button by filling the unpaid row, but
              onMutate awaits cancelQueries first — so for that gap the button is
              still mounted and a second click would mint a duplicate month. */

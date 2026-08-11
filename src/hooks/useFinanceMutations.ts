@@ -98,8 +98,13 @@ export function useFinanceMutations() {
        * snapshot also discards any other write that landed while this one was
        * in flight. Nothing else would correct either: focus refetching is off
        * and data stays fresh for minutes.
+       *
+       * Skipped while another write is in flight, for the same reason onSuccess
+       * is: the refetch it starts could land after that write's own response and
+       * overwrite the cache with server state from before it. That write will
+       * settle the cache itself when it answers.
        */
-      void qc.invalidateQueries({ queryKey: financeKey })
+      if (qc.isMutating() <= 1) void qc.invalidateQueries({ queryKey: financeKey })
     },
     /*
      * Only the last write standing applies the server's copy. An earlier
@@ -143,12 +148,21 @@ export function useFinanceMutations() {
     ...optimistic(removeScheduleRow, 'That installment could not be deleted. It has been restored.'),
   })
 
-  // The caller writes the message: the pay flow and the recovery button each
-  // failed at something different, and say so — see DebtDetail.
+  /*
+   * The message lives here rather than at the call sites. A mutate-level onError
+   * only runs while its observer still has listeners, so a caller-supplied
+   * message is lost if the user leaves the page while the write is in flight —
+   * and against a backend that can take 45s, that is not a rare accident. The
+   * wording covers both callers: whatever prompted it, the next statement is not
+   * there and the button is how to get it.
+   */
   const addStatement = useMutation({
     mutationFn: (v: { debtId: number; input: NewStatement }) =>
       getApi().addStatement(v.debtId, v.input),
-    ...optimistic(addStatementTo, null),
+    ...optimistic(
+      addStatementTo,
+      'The next statement was not created. Use Start next statement to try again.',
+    ),
   })
   const updateStatement = useMutation({
     mutationFn: (v: { id: number; patch: StatementPatch }) =>

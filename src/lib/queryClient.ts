@@ -59,17 +59,52 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  *
  * Stripping on the way in means storage never holds one, so nothing has to
  * recognise a stale temp row on the way out.
+ *
+ * Reports whether it removed anything, because a snapshot it altered is no longer
+ * a faithful copy of what the client had — see markStrippedStale.
  */
-function withoutTempRows(value: unknown): unknown {
+function withoutTempRows(value: unknown, removed: { any: boolean }): unknown {
   if (Array.isArray(value)) {
-    return value
-      .filter((item) => !(isRecord(item) && typeof item.id === 'number' && isTemp(item.id)))
-      .map(withoutTempRows)
+    const kept = value.filter(
+      (item) => !(isRecord(item) && typeof item.id === 'number' && isTemp(item.id)),
+    )
+    if (kept.length !== value.length) removed.any = true
+    return kept.map((item) => withoutTempRows(item, removed))
   }
   if (isRecord(value)) {
-    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, withoutTempRows(v)]))
+    return Object.fromEntries(
+      Object.entries(value).map(([k, v]) => [k, withoutTempRows(v, removed)]),
+    )
   }
   return value
+}
+
+/**
+ * onMutate stamps the cache as freshly updated, so a snapshot taken while a
+ * create was in flight looks current while missing the row being created. If the
+ * write then succeeded and the tab never saw the answer, the next load would show
+ * that snapshot as fresh for STALE_TIME — the new row simply absent, with focus
+ * refetching off to bring it back, and the obvious reaction being to add it
+ * again.
+ *
+ * Zeroing dataUpdatedAt on the queries we altered makes them stale instead: the
+ * data still paints immediately, and a refetch corrects it on mount.
+ */
+function markStrippedStale(client: unknown): unknown {
+  if (!isRecord(client)) return client
+  const state = client.clientState
+  if (!isRecord(state) || !Array.isArray(state.queries)) return client
+  return {
+    ...client,
+    clientState: {
+      ...state,
+      queries: state.queries.map((query) =>
+        isRecord(query) && isRecord(query.state)
+          ? { ...query, state: { ...query.state, dataUpdatedAt: 0 } }
+          : query,
+      ),
+    },
+  }
 }
 
 /**
@@ -81,10 +116,17 @@ export function persistOptionsFor(userId: number) {
     persister: createSyncStoragePersister({
       storage: window.localStorage,
       key: cacheKey(userId),
-      // The walk rebuilds the whole dataset, so it is skipped in the common case:
-      // a session that never created anything has no temp row to strip.
-      serialize: (client) =>
-        JSON.stringify(anyTempIdsMinted() ? withoutTempRows(client) : client),
+      /*
+       * The walk rebuilds the whole client, so it is skipped until this session
+       * has minted its first temp id — after which it runs on every persist,
+       * since nothing tells us the last prediction has been reconciled.
+       */
+      serialize: (client) => {
+        if (!anyTempIdsMinted()) return JSON.stringify(client)
+        const removed = { any: false }
+        const stripped = withoutTempRows(client, removed)
+        return JSON.stringify(removed.any ? markStrippedStale(stripped) : stripped)
+      },
     }),
     maxAge: CACHE_MAX_AGE,
     buster: CACHE_VERSION,
