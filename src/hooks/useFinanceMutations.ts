@@ -96,7 +96,18 @@ export function useFinanceMutations() {
        */
       void qc.invalidateQueries({ queryKey: financeKey })
     },
-    onSuccess: applyData,
+    /*
+     * Only the last write standing applies the server's copy. An earlier
+     * response cannot contain a write that is still in flight, so applying it
+     * would blank that write's predicted row until its own response arrived.
+     * Predictions stay authoritative for the length of a burst; the final
+     * response reconciles all of them at once.
+     *
+     * <= 1 rather than === 0: the mutation running this handler is still counted.
+     */
+    onSuccess: (data: FinanceData) => {
+      if (qc.isMutating() <= 1) applyData(data)
+    },
   })
 
   const addDebt = useMutation({
@@ -185,7 +196,8 @@ export function useFinanceMutations() {
     onSuccess: (data, c) => {
       // Also refresh the cache that gives the right symbol on first paint.
       if (userId !== undefined) writeCachedCurrency(userId, c)
-      applyData(data)
+      // Overriding the helper's onSuccess means repeating its guard — see there.
+      if (qc.isMutating() <= 1) applyData(data)
     },
   })
 
