@@ -34,8 +34,8 @@ export function PayableFormModal({
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    // Unchecking Paid clears the payment fields — this is how a mistaken payment
-    // is undone. It does not un-mint the payable that the payment created.
+    // Unchecking Paid clears the payment fields and un-mints the payable that
+    // the payment created — this is how a mistaken payment is undone.
     const paidFields = paid
       ? { paid: true as const, paid_date: paidDate, paid_amount: Number(paidAmount) }
       : { paid: false as const, paid_date: undefined, paid_amount: undefined }

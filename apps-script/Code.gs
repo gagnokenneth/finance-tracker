@@ -821,6 +821,31 @@ function deleteUnpaidPayables(billId) {
   }
 }
 
+/**
+ * The inverse of the mint in payBillPayable: the payable that payment created is
+ * removed when the payment is undone. Deletes bottom-up so earlier row indices
+ * stay valid, like deleteUnpaidPayables above.
+ *
+ * Which unpaid payable a given payment minted is not recorded anywhere, so every
+ * other unpaid one goes. That is the invariant the mint guard protects — a bill
+ * has at most one unpaid payable open at a time — held in the other direction.
+ */
+function deleteOtherUnpaidPayables(billId, exceptId) {
+  var sh = sheet('bill_payables');
+  var last = sh.getLastRow();
+  if (last < 2) return;
+  var headers = SHEETS.bill_payables;
+  var vals = sh.getRange(2, 1, last - 1, headers.length).getValues();
+  var idCol = headers.indexOf('id');
+  var billCol = headers.indexOf('bill_id');
+  var paidCol = headers.indexOf('paid');
+  for (var i = vals.length - 1; i >= 0; i--) {
+    if (num(vals[i][billCol]) !== num(billId)) continue;
+    if (num(vals[i][idCol]) === num(exceptId)) continue;
+    if (!bool(vals[i][paidCol])) sh.deleteRow(i + 2);
+  }
+}
+
 function deleteBill(p, uid) {
   var rowIndex = ownedRowIndex('bills', p.id, uid);
   deleteRowsWhere('bill_payables', 'bill_id', p.id);
@@ -834,7 +859,17 @@ function updateBillPayable(p, uid) {
   // An omitted amount means "not set yet" — clear the cell rather than keep the
   // figure that was there.
   if (!Object.prototype.hasOwnProperty.call(patch, 'amount')) patch.amount = '';
-  return patchRowAt('bill_payables', found.rowIndex, patch);
+  // Read before the patch: whether this is an undo depends on the stored row.
+  var wasPaid = bool(found.row.paid);
+  // Patch first, so found.rowIndex is still valid when it is used — the deletion
+  // below shifts indices, and nothing may rely on that index afterwards.
+  var result = patchRowAt('bill_payables', found.rowIndex, patch);
+  // Undoing a payment un-mints the payable that payment created. The key must be
+  // present AND false: an omitted paid means "leave it alone", and reading that
+  // as false would delete the open payable on a patch that only set an amount.
+  var unpaying = Object.prototype.hasOwnProperty.call(patch, 'paid') && !bool(patch.paid);
+  if (wasPaid && unpaying) deleteOtherUnpaidPayables(found.bill.id, found.row.id);
+  return result;
 }
 
 function deleteBillPayable(p, uid) {

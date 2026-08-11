@@ -237,11 +237,25 @@ export function applyBillPayablePatch(
   data: FinanceData,
   vars: { id: number; patch: BillPayablePatch },
 ): FinanceData {
+  const before = data.bill_payables.find((row) => row.id === vars.id)
+  const rows = data.bill_payables.map((row) =>
+    row.id === vars.id ? clearPaidWhenUnpaid({ ...row, ...vars.patch }) : row,
+  )
+  /*
+   * Undoing a payment un-mints the payable that payment created — the inverse of
+   * payBillPayableIn, applied by both backends. Which payable a given payment
+   * minted is not recorded, so every other unpaid payable of this bill goes,
+   * keeping "one unpaid payable per bill" true in both directions.
+   *
+   * Guarded on the stored row having been paid: editing an already-unpaid
+   * payable's amount must not delete anything.
+   */
+  const undone = before?.paid === true && vars.patch.paid === false
   return {
     ...data,
-    bill_payables: data.bill_payables.map((row) =>
-      row.id === vars.id ? clearPaidWhenUnpaid({ ...row, ...vars.patch }) : row,
-    ),
+    bill_payables: undone
+      ? rows.filter((row) => row.id === vars.id || row.bill_id !== before.bill_id || row.paid)
+      : rows,
   }
 }
 
