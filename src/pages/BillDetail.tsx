@@ -5,10 +5,12 @@ import { useFinanceMutations } from '../hooks/useFinanceMutations.ts'
 import { billCaption, payablesFor, recurrenceOf, upcomingPayable } from '../lib/bills.ts'
 import { nextDueDate } from '../lib/billSchedule.ts'
 import { dueStatus } from '../lib/debts.ts'
+import { isTemp } from '../lib/tempId.ts'
 import { Money } from '../components/Money.tsx'
 import { Table } from '../components/Table.tsx'
 import { DueBadge } from '../components/DueBadge.tsx'
 import { StatusBadge } from '../components/StatusBadge.tsx'
+import { PendingBadge } from '../components/PendingBadge.tsx'
 import { ConfirmDialog } from '../components/ConfirmDialog.tsx'
 import { LoadError } from '../components/LoadError.tsx'
 import { LoadingScreen } from '../components/LoadingScreen.tsx'
@@ -98,6 +100,10 @@ export function BillDetail() {
   const rowActions = (row: BillPayable) => {
     // A closed bill is history: readable, and frozen.
     if (bill.closed) return null
+    // A pending row has no backend id yet, so every action here would be sent
+    // against an id the backend has never seen. Same treatment, for the second
+    // it lasts.
+    if (isTemp(row.id)) return <PendingBadge />
     const priced = row.amount !== undefined
     return (
       <div className="flex flex-wrap justify-end gap-1.5">

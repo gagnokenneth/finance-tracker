@@ -13,10 +13,12 @@ import {
   nextStatementDate,
 } from '../lib/debts.ts'
 import { nextMonthOn } from '../lib/currentMonth.ts'
+import { isTemp } from '../lib/tempId.ts'
 import { Money } from '../components/Money.tsx'
 import { Table } from '../components/Table.tsx'
 import { DueBadge } from '../components/DueBadge.tsx'
 import { StatusBadge } from '../components/StatusBadge.tsx'
+import { PendingBadge } from '../components/PendingBadge.tsx'
 import { InstallmentStrip } from '../components/InstallmentStrip.tsx'
 import { ConfirmDialog } from '../components/ConfirmDialog.tsx'
 import { LoadError } from '../components/LoadError.tsx'
@@ -181,6 +183,37 @@ export function DebtDetail() {
       <StatusBadge status={dueStatus(row.due_date)} />
     )
 
+  const rowActions = (row: AnyRow) => {
+    // A pending row has no backend id yet, so every action here would be sent
+    // against an id the backend has never seen.
+    if (isTemp(row.id)) return <PendingBadge />
+    return (
+      <div className="flex flex-wrap justify-end gap-1.5">
+        {!row.paid && !isRowPriced(row) && (
+          <RowButton tone="primary" type="button" onClick={() => setRowForm({ mode: 'edit', row })}>
+            Set amount
+          </RowButton>
+        )}
+        {!row.paid && (
+          <RowButton
+            tone={isRowPriced(row) ? 'primary' : 'neutral'}
+            type="button"
+            disabled={!isRowPriced(row)}
+            onClick={() => setPayRow(row)}
+          >
+            Pay
+          </RowButton>
+        )}
+        <RowButton type="button" onClick={() => setRowForm({ mode: 'edit', row })}>
+          Edit
+        </RowButton>
+        <RowButton tone="danger" type="button" onClick={() => setDeletingRow(row)}>
+          Delete
+        </RowButton>
+      </div>
+    )
+  }
+
   const rowNoun = isFixed ? 'scheduled payments' : 'statements'
 
   return (
@@ -270,35 +303,7 @@ export function DebtDetail() {
                 </>
               )}
               <td className="px-4 py-3">{statusCell(row)}</td>
-              <td className="px-4 py-3">
-                <div className="flex flex-wrap justify-end gap-1.5">
-                  {!row.paid && !isRowPriced(row) && (
-                    <RowButton
-                      tone="primary"
-                      type="button"
-                      onClick={() => setRowForm({ mode: 'edit', row })}
-                    >
-                      Set amount
-                    </RowButton>
-                  )}
-                  {!row.paid && (
-                    <RowButton
-                      tone={isRowPriced(row) ? 'primary' : 'neutral'}
-                      type="button"
-                      disabled={!isRowPriced(row)}
-                      onClick={() => setPayRow(row)}
-                    >
-                      Pay
-                    </RowButton>
-                  )}
-                  <RowButton type="button" onClick={() => setRowForm({ mode: 'edit', row })}>
-                    Edit
-                  </RowButton>
-                  <RowButton tone="danger" type="button" onClick={() => setDeletingRow(row)}>
-                    Delete
-                  </RowButton>
-                </div>
-              </td>
+              <td className="px-4 py-3">{rowActions(row)}</td>
             </tr>
           ))}
         </Table>
