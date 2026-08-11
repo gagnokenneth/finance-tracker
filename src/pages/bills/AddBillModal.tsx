@@ -17,7 +17,10 @@ export function AddBillModal({ open, onClose }: { open: boolean; onClose: () => 
   const submit = (e: FormEvent) => {
     e.preventDefault()
     if (!form.values || firstDue === null) return
-    addBill.mutate({ ...form.values, first_due_date: firstDue }, { onSuccess: onClose })
+    // Closing now is the point: the bill is already in the cache, and a failure
+    // removes it again and raises a toast.
+    onClose()
+    addBill.mutate({ ...form.values, first_due_date: firstDue })
   }
 
   return (
@@ -27,17 +30,12 @@ export function AddBillModal({ open, onClose }: { open: boolean; onClose: () => 
 
         {firstDue && <p className="text-xs text-ink-soft">→ First payable due {firstDue}</p>}
         {form.error && <p className="text-xs text-overdue">{form.error}</p>}
-        {addBill.isError && (
-          <p className="text-sm text-overdue">
-            That bill didn’t save. Check your connection and try again.
-          </p>
-        )}
 
         <div className="mt-1 flex justify-end gap-2">
           <SecondaryButton type="button" onClick={onClose}>
             Cancel
           </SecondaryButton>
-          <Button type="submit" disabled={addBill.isPending || form.error !== null}>
+          <Button type="submit" disabled={form.error !== null}>
             Add bill
           </Button>
         </div>

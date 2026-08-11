@@ -52,31 +52,30 @@ export function AddDebtModal({ open, onClose }: { open: boolean; onClose: () => 
     e.preventDefault()
     if (!name) return
 
+    // Closing before the write is the point: the debt is already in the cache,
+    // and a failure removes it again and raises a toast.
     if (type === 'fixed') {
       if (previewError || !total || !months) return
-      addDebt.mutate(
-        { name, type: 'fixed', rows: buildSchedule(firstDue, Number(total), Number(months)) },
-        { onSuccess: onClose },
-      )
+      const rows = buildSchedule(firstDue, Number(total), Number(months))
+      onClose()
+      addDebt.mutate({ name, type: 'fixed', rows })
       return
     }
 
-    addDebt.mutate(
-      {
-        name,
-        type: 'revolving',
-        rows: [
-          {
-            due_date: dueDate,
-            min_due: Number(minDue),
-            total_due: Number(totalDue),
-            outstanding: Number(outstanding),
-            paid: false,
-          },
-        ],
-      },
-      { onSuccess: onClose },
-    )
+    onClose()
+    addDebt.mutate({
+      name,
+      type: 'revolving',
+      rows: [
+        {
+          due_date: dueDate,
+          min_due: Number(minDue),
+          total_due: Number(totalDue),
+          outstanding: Number(outstanding),
+          paid: false,
+        },
+      ],
+    })
   }
 
   return (
@@ -169,15 +168,13 @@ export function AddDebtModal({ open, onClose }: { open: boolean; onClose: () => 
           </>
         )}
 
-        {addDebt.isError && (
-          <p className="text-sm text-overdue">That debt didn’t save. Check your connection and try again.</p>
-        )}
-
         <div className="mt-1 flex justify-end gap-2">
           <SecondaryButton type="button" onClick={onClose}>
             Cancel
           </SecondaryButton>
-          <Button type="submit" disabled={addDebt.isPending || previewError !== null}>
+          {/* previewError stays: that is validation, which fires before any
+              write and so has nothing to do with waiting. */}
+          <Button type="submit" disabled={previewError !== null}>
             Add debt
           </Button>
         </div>

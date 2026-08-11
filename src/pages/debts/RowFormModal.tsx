@@ -26,8 +26,6 @@ export function RowFormModal({
   open,
   kind,
   initial,
-  pending,
-  error,
   title,
   onSubmit,
   onClose,
@@ -35,8 +33,6 @@ export function RowFormModal({
   open: boolean
   kind: RowKind
   initial: DebtScheduleRow | DebtStatement | null
-  pending?: boolean
-  error?: boolean
   title?: string
   onSubmit: (values: NewScheduleRow | StatementFormValues) => void
   onClose: () => void
@@ -172,15 +168,11 @@ export function RowFormModal({
           </>
         )}
 
-        {error && <p className="text-sm text-overdue">That didn’t save. Check your connection and try again.</p>}
-
         <div className="mt-1 flex justify-end gap-2">
           <SecondaryButton type="button" onClick={onClose}>
             Cancel
           </SecondaryButton>
-          <Button type="submit" disabled={pending}>
-            Save
-          </Button>
+          <Button type="submit">Save</Button>
         </div>
       </form>
     </Modal>
