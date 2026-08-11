@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
 import { useFinanceData } from '../hooks/useFinanceData.ts'
 import { billCaption, unpaidTotal, upcomingPayable } from '../lib/bills.ts'
 import { isTemp } from '../lib/tempId.ts'
 import { Money } from '../components/Money.tsx'
+import { CardRow } from '../components/CardRow.tsx'
 import { DueBadge } from '../components/DueBadge.tsx'
 import { PendingBadge } from '../components/PendingBadge.tsx'
 import { Button } from '../components/ui.tsx'
@@ -12,14 +12,12 @@ import { LoadingScreen } from '../components/LoadingScreen.tsx'
 import { AddBillModal } from './bills/AddBillModal.tsx'
 import type { Bill, FinanceData } from '../types.ts'
 
-const ROW_SHELL = 'block rounded-xl border border-edge bg-white p-5'
-
 function BillRow({ bill, data }: { bill: Bill; data: FinanceData }) {
   const upcoming = upcomingPayable(data.bill_payables, bill.id)
   const pending = isTemp(bill.id)
 
-  const body = (
-    <>
+  return (
+    <CardRow to={`/bills/${bill.id}`} pending={pending}>
       <div className="flex items-start justify-between gap-4">
         <span className="font-semibold tracking-tight text-ink">{bill.name}</span>
         {upcoming?.amount !== undefined && (
@@ -50,20 +48,7 @@ function BillRow({ bill, data }: { bill: Bill; data: FinanceData }) {
           </>
         )}
       </div>
-    </>
-  )
-
-  // A pending bill's id exists only in the cache, so its detail route would find
-  // nothing. Not a link until the write returns the real one.
-  if (pending) return <div className={ROW_SHELL}>{body}</div>
-
-  return (
-    <Link
-      to={`/bills/${bill.id}`}
-      className={`${ROW_SHELL} transition-shadow hover:shadow-md hover:shadow-ink/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand`}
-    >
-      {body}
-    </Link>
+    </CardRow>
   )
 }
 

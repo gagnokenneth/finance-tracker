@@ -807,30 +807,14 @@ function closeBill(p, uid) {
   return null;
 }
 
-/** Deletes bottom-up so earlier row indices stay valid as rows are removed. */
-function deleteUnpaidPayables(billId) {
-  var sh = sheet('bill_payables');
-  var last = sh.getLastRow();
-  if (last < 2) return;
-  var headers = SHEETS.bill_payables;
-  var vals = sh.getRange(2, 1, last - 1, headers.length).getValues();
-  var billCol = headers.indexOf('bill_id');
-  var paidCol = headers.indexOf('paid');
-  for (var i = vals.length - 1; i >= 0; i--) {
-    if (num(vals[i][billCol]) === num(billId) && !bool(vals[i][paidCol])) sh.deleteRow(i + 2);
-  }
-}
-
 /**
- * The inverse of the mint in payBillPayable: the payable that payment created is
- * removed when the payment is undone. Deletes bottom-up so earlier row indices
- * stay valid, like deleteUnpaidPayables above.
+ * Deletes this bill's unpaid payables, optionally sparing one. Deletes bottom-up
+ * so earlier row indices stay valid as rows are removed.
  *
- * Which unpaid payable a given payment minted is not recorded anywhere, so every
- * other unpaid one goes. That is the invariant the mint guard protects — a bill
- * has at most one unpaid payable open at a time — held in the other direction.
+ * Pass exceptId when undoing a payment: the row being unpaid must survive while
+ * the payable that payment minted goes. Closing a bill spares nothing.
  */
-function deleteOtherUnpaidPayables(billId, exceptId) {
+function deleteUnpaidPayables(billId, exceptId) {
   var sh = sheet('bill_payables');
   var last = sh.getLastRow();
   if (last < 2) return;
@@ -841,7 +825,7 @@ function deleteOtherUnpaidPayables(billId, exceptId) {
   var paidCol = headers.indexOf('paid');
   for (var i = vals.length - 1; i >= 0; i--) {
     if (num(vals[i][billCol]) !== num(billId)) continue;
-    if (num(vals[i][idCol]) === num(exceptId)) continue;
+    if (exceptId !== undefined && num(vals[i][idCol]) === num(exceptId)) continue;
     if (!bool(vals[i][paidCol])) sh.deleteRow(i + 2);
   }
 }
@@ -864,11 +848,18 @@ function updateBillPayable(p, uid) {
   // Patch first, so found.rowIndex is still valid when it is used — the deletion
   // below shifts indices, and nothing may rely on that index afterwards.
   var result = patchRowAt('bill_payables', found.rowIndex, patch);
-  // Undoing a payment un-mints the payable that payment created. The key must be
-  // present AND false: an omitted paid means "leave it alone", and reading that
-  // as false would delete the open payable on a patch that only set an amount.
+  /*
+   * Undoing a payment un-mints the payable that payment created — the inverse of
+   * the mint in payBillPayable, which keeps "one unpaid payable per bill" true in
+   * both directions. Which payable a given payment minted is not recorded, so
+   * every other unpaid one goes; this row is spared.
+   *
+   * The key must be present AND false: an omitted paid means "leave it alone",
+   * and reading that as false would delete the open payable on a patch that only
+   * set an amount.
+   */
   var unpaying = Object.prototype.hasOwnProperty.call(patch, 'paid') && !bool(patch.paid);
-  if (wasPaid && unpaying) deleteOtherUnpaidPayables(found.bill.id, found.row.id);
+  if (wasPaid && unpaying) deleteUnpaidPayables(found.bill.id, found.row.id);
   return result;
 }
 

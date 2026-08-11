@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
 import { useFinanceData } from '../hooks/useFinanceData.ts'
 import { nextDueDate, scheduleFor, statementsFor, totalBalance } from '../lib/debts.ts'
 import { isTemp } from '../lib/tempId.ts'
 import { Money } from '../components/Money.tsx'
+import { CardRow } from '../components/CardRow.tsx'
 import { DueBadge } from '../components/DueBadge.tsx'
 import { PendingBadge } from '../components/PendingBadge.tsx'
 import { InstallmentStrip } from '../components/InstallmentStrip.tsx'
@@ -13,8 +13,6 @@ import { LoadingScreen } from '../components/LoadingScreen.tsx'
 import { AddDebtModal } from './debts/AddDebtModal.tsx'
 import type { Debt, FinanceData } from '../types.ts'
 
-const ROW_SHELL = 'block rounded-xl border border-edge bg-white p-5'
-
 function DebtRow({ debt, data }: { debt: Debt; data: FinanceData }) {
   const rows =
     debt.type === 'fixed'
@@ -23,8 +21,8 @@ function DebtRow({ debt, data }: { debt: Debt; data: FinanceData }) {
   const paid = rows.filter((r) => r.paid).length
   const pending = isTemp(debt.id)
 
-  const body = (
-    <>
+  return (
+    <CardRow to={`/debts/${debt.id}`} pending={pending}>
       <div className="flex items-start justify-between gap-4">
         <span className="font-semibold tracking-tight text-ink">{debt.name}</span>
         <Money
@@ -51,20 +49,7 @@ function DebtRow({ debt, data }: { debt: Debt; data: FinanceData }) {
           </>
         )}
       </div>
-    </>
-  )
-
-  // A pending debt's id exists only in the cache, so its detail route would find
-  // nothing. Not a link until the write returns the real one.
-  if (pending) return <div className={ROW_SHELL}>{body}</div>
-
-  return (
-    <Link
-      to={`/debts/${debt.id}`}
-      className={`${ROW_SHELL} transition-shadow hover:shadow-md hover:shadow-ink/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand`}
-    >
-      {body}
-    </Link>
+    </CardRow>
   )
 }
 

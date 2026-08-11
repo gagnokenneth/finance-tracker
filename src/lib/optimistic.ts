@@ -89,24 +89,24 @@ export function addBillTo(data: FinanceData, vars: NewBill): FinanceData {
  */
 export function addDebtTo(data: FinanceData, vars: NewDebt): FinanceData {
   const debt: Debt = { id: tempId(), name: vars.name, type: vars.type }
-  if (vars.type === 'fixed') {
-    return {
-      ...data,
-      debts: [...data.debts, debt],
-      debt_schedule: [
-        ...data.debt_schedule,
-        ...vars.rows.map((row) => ({ id: tempId(), debt_id: debt.id, ...row })),
-      ],
-    }
-  }
-  return {
-    ...data,
-    debts: [...data.debts, debt],
-    debt_statements: [
-      ...data.debt_statements,
-      ...vars.rows.map((row) => ({ id: tempId(), debt_id: debt.id, ...row })),
-    ],
-  }
+  const withDebt = { ...data, debts: [...data.debts, debt] }
+  // Mapped inside each branch so the row type stays narrowed to the table it
+  // lands in — a statement must not be appendable to the schedule.
+  return vars.type === 'fixed'
+    ? {
+        ...withDebt,
+        debt_schedule: [
+          ...data.debt_schedule,
+          ...vars.rows.map((row) => ({ id: tempId(), debt_id: debt.id, ...row })),
+        ],
+      }
+    : {
+        ...withDebt,
+        debt_statements: [
+          ...data.debt_statements,
+          ...vars.rows.map((row) => ({ id: tempId(), debt_id: debt.id, ...row })),
+        ],
+      }
 }
 
 export function addScheduleRowTo(

@@ -1,6 +1,6 @@
 import { QueryClient } from '@tanstack/react-query'
 import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister'
-import { isTemp } from './tempId.ts'
+import { anyTempIdsMinted, isTemp } from './tempId.ts'
 
 /**
  * How long fetched data is treated as fresh. The backend is a Google Sheet that
@@ -81,7 +81,10 @@ export function persistOptionsFor(userId: number) {
     persister: createSyncStoragePersister({
       storage: window.localStorage,
       key: cacheKey(userId),
-      serialize: (client) => JSON.stringify(withoutTempRows(client)),
+      // The walk rebuilds the whole dataset, so it is skipped in the common case:
+      // a session that never created anything has no temp row to strip.
+      serialize: (client) =>
+        JSON.stringify(anyTempIdsMinted() ? withoutTempRows(client) : client),
     }),
     maxAge: CACHE_MAX_AGE,
     buster: CACHE_VERSION,

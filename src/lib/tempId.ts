@@ -19,3 +19,12 @@ export function tempId(): number {
 export function isTemp(id: number): boolean {
   return id < 0
 }
+
+/**
+ * Whether this session has ever minted one. Lets a caller skip work that only
+ * matters when temp rows can exist — which is most sessions, since a session that
+ * never creates anything never mints an id.
+ */
+export function anyTempIdsMinted(): boolean {
+  return last < 0
+}
