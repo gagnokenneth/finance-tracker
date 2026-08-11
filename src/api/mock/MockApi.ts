@@ -226,13 +226,23 @@ export class MockApi implements FinanceApi {
   async updateBillPayable(id: number, patch: BillPayablePatch): Promise<FinanceData> {
     const data = this.load()
     const { bill, row } = this.payableBill(data, id)
-    // Read before the patch: whether this is an undo depends on the stored row.
-    const wasPaid = row.paid
+    /*
+     * Undoing a payment un-mints the payable that payment created — the inverse
+     * of the mint in payBillPayable. Code.gs applies the same rule.
+     *
+     * Decided before the patch, which is what makes "was this row paid"
+     * answerable, and limited to the latest paid payable: only that payment has
+     * an open payable to un-mint. See isLatestPaidPayable in Code.gs.
+     */
+    const unmint =
+      row.paid &&
+      patch.paid === false &&
+      !data.bill_payables.some(
+        (r) => r.bill_id === bill.id && r.id !== id && r.paid && r.due_date > row.due_date,
+      )
     Object.assign(row, patch)
     clearPaidFields(row)
-    // Undoing a payment un-mints the payable that payment created — the inverse
-    // of the mint in payBillPayable. Code.gs applies the same rule.
-    if (wasPaid && !row.paid) {
+    if (unmint) {
       data.bill_payables = data.bill_payables.filter(
         (r) => r.id === id || r.bill_id !== bill.id || r.paid,
       )

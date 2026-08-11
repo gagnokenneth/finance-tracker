@@ -243,17 +243,30 @@ export function applyBillPayablePatch(
   )
   /*
    * Undoing a payment un-mints the payable that payment created — the inverse of
-   * payBillPayableIn, applied by both backends. Which payable a given payment
-   * minted is not recorded, so every other unpaid payable of this bill goes,
-   * keeping "one unpaid payable per bill" true in both directions.
+   * payBillPayableIn, applied by both backends.
    *
-   * Guarded on the stored row having been paid: editing an already-unpaid
-   * payable's amount must not delete anything.
+   * Only the latest paid payable has one to un-mint: an older payment's successor
+   * has since been paid itself, so undoing it must leave the open payable alone.
+   * Deleting it would discard a figure the user entered, and would let the
+   * re-payment mint a duplicate of a month already paid.
+   *
+   * Also guarded on the stored row having been paid, so editing an already-unpaid
+   * payable's amount deletes nothing.
    */
-  const undone = before?.paid === true && vars.patch.paid === false
+  const unmint =
+    before !== undefined &&
+    before.paid &&
+    vars.patch.paid === false &&
+    !data.bill_payables.some(
+      (row) =>
+        row.bill_id === before.bill_id &&
+        row.id !== vars.id &&
+        row.paid &&
+        row.due_date > before.due_date,
+    )
   return {
     ...data,
-    bill_payables: undone
+    bill_payables: unmint
       ? rows.filter((row) => row.id === vars.id || row.bill_id !== before.bill_id || row.paid)
       : rows,
   }

@@ -843,23 +843,21 @@ function updateBillPayable(p, uid) {
   // An omitted amount means "not set yet" — clear the cell rather than keep the
   // figure that was there.
   if (!Object.prototype.hasOwnProperty.call(patch, 'amount')) patch.amount = '';
-  // Read before the patch: whether this is an undo depends on the stored row.
-  var wasPaid = bool(found.row.paid);
-  // Patch first, so found.rowIndex is still valid when it is used — the deletion
-  // below shifts indices, and nothing may rely on that index afterwards.
-  var result = patchRowAt('bill_payables', found.rowIndex, patch);
   /*
    * Undoing a payment un-mints the payable that payment created — the inverse of
-   * the mint in payBillPayable, which keeps "one unpaid payable per bill" true in
-   * both directions. Which payable a given payment minted is not recorded, so
-   * every other unpaid one goes; this row is spared.
+   * the mint in payBillPayable.
    *
-   * The key must be present AND false: an omitted paid means "leave it alone",
-   * and reading that as false would delete the open payable on a patch that only
-   * set an amount.
+   * Decided before the patch, which is what makes "was this row paid" answerable.
+   * The paid key must be present AND false: an omitted paid means "leave it
+   * alone", and reading that as false would un-mint on a patch that only set an
+   * amount.
    */
   var unpaying = Object.prototype.hasOwnProperty.call(patch, 'paid') && !bool(patch.paid);
-  if (wasPaid && unpaying) deleteUnpaidPayables(found.bill.id, found.row.id);
+  var unmint = bool(found.row.paid) && unpaying && isLatestPaidPayable(found.bill.id, found.row);
+  // Patch first, so found.rowIndex is still valid when it is used — the deletion
+  // shifts indices, and nothing may rely on that index afterwards.
+  var result = patchRowAt('bill_payables', found.rowIndex, patch);
+  if (unmint) deleteUnpaidPayables(found.bill.id, found.row.id);
   return result;
 }
 
@@ -867,6 +865,29 @@ function deleteBillPayable(p, uid) {
   var found = ownedPayable(p.id, uid);
   sheet('bill_payables').deleteRow(found.rowIndex);
   return null;
+}
+
+/**
+ * Whether this paid payable is the most recent paid one for its bill, and so the
+ * one whose payment minted the payable now open.
+ *
+ * Only that payment has something to un-mint. An older one minted the payable
+ * that has since been paid itself, so undoing it must leave the open payable
+ * alone — deleting it would discard a figure the user entered, and would let the
+ * re-payment mint a duplicate of a month already paid.
+ *
+ * Compared by due date, which is ISO and so orders lexicographically.
+ */
+function isLatestPaidPayable(billId, payable) {
+  var rows = readRows('bill_payables');
+  var due = fmtDate(payable.due_date);
+  for (var i = 0; i < rows.length; i++) {
+    if (num(rows[i].bill_id) !== num(billId)) continue;
+    if (num(rows[i].id) === num(payable.id)) continue;
+    if (!bool(rows[i].paid)) continue;
+    if (fmtDate(rows[i].due_date) > due) return false;
+  }
+  return true;
 }
 
 /** Whether this bill has an unpaid payable other than `exceptId`. */
