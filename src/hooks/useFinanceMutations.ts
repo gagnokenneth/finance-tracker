@@ -5,11 +5,16 @@ import { useAuth } from '../auth/useAuth.ts'
 import { useToast } from './useToast.ts'
 import { writeCachedCurrency } from '../lib/currency.ts'
 import {
+  addBillTo,
+  addDebtTo,
+  addScheduleRowTo,
+  addStatementTo,
   applyBillPatch,
   applyBillPayablePatch,
   applyScheduleRowPatch,
   applyStatementPatch,
   closeBillIn,
+  payBillPayableIn,
   removeBill,
   removeBillPayable,
   removeDebt,
@@ -112,7 +117,7 @@ export function useFinanceMutations() {
 
   const addDebt = useMutation({
     mutationFn: (i: NewDebt) => getApi().addDebt(i),
-    onSuccess: applyData,
+    ...optimistic(addDebtTo, 'That debt did not save. It has been removed.'),
   })
   const updateDebt = useMutation({
     mutationFn: (v: { id: number; name: string }) => getApi().updateDebt(v.id, { name: v.name }),
@@ -126,7 +131,7 @@ export function useFinanceMutations() {
   const addScheduleRow = useMutation({
     mutationFn: (v: { debtId: number; input: NewScheduleRow }) =>
       getApi().addScheduleRow(v.debtId, v.input),
-    onSuccess: applyData,
+    ...optimistic(addScheduleRowTo, 'That payment did not save. It has been removed.'),
   })
   const updateScheduleRow = useMutation({
     mutationFn: (v: { id: number; patch: ScheduleRowPatch }) =>
@@ -138,10 +143,12 @@ export function useFinanceMutations() {
     ...optimistic(removeScheduleRow, 'That installment could not be deleted. It has been restored.'),
   })
 
+  // The caller writes the message: the pay flow and the recovery button each
+  // failed at something different, and say so — see DebtDetail.
   const addStatement = useMutation({
     mutationFn: (v: { debtId: number; input: NewStatement }) =>
       getApi().addStatement(v.debtId, v.input),
-    onSuccess: applyData,
+    ...optimistic(addStatementTo, null),
   })
   const updateStatement = useMutation({
     mutationFn: (v: { id: number; patch: StatementPatch }) =>
@@ -155,7 +162,7 @@ export function useFinanceMutations() {
 
   const addBill = useMutation({
     mutationFn: (i: NewBill) => getApi().addBill(i),
-    onSuccess: applyData,
+    ...optimistic(addBillTo, 'That bill did not save. It has been removed.'),
   })
   const updateBill = useMutation({
     mutationFn: (v: { id: number; patch: BillPatch }) => getApi().updateBill(v.id, v.patch),
@@ -179,11 +186,9 @@ export function useFinanceMutations() {
     mutationFn: (id: number) => getApi().deleteBillPayable(id),
     ...optimistic(removeBillPayable, 'That payable could not be deleted. It has been restored.'),
   })
-  // Minting the next payable needs a server-assigned id, so this one waits for
-  // the real answer instead of predicting it.
   const payBillPayable = useMutation({
     mutationFn: (v: { id: number; input: PayBillInput }) => getApi().payBillPayable(v.id, v.input),
-    onSuccess: applyData,
+    ...optimistic(payBillPayableIn, 'That payment did not save. The payable is unpaid again.'),
   })
 
   const setCurrency = useMutation({
