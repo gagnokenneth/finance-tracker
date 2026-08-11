@@ -1,5 +1,6 @@
 import { QueryClient } from '@tanstack/react-query'
 import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister'
+import { isTemp } from './tempId.ts'
 
 /**
  * How long fetched data is treated as fresh. The backend is a Google Sheet that
@@ -46,6 +47,31 @@ export function makeQueryClient(): QueryClient {
   })
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+/**
+ * Optimistic rows must not outlive the write that created them. A tab closed
+ * mid-write would otherwise rehydrate a row with a temp id that no backend row
+ * corresponds to — permanent, and inert against every action, since the UI
+ * disables a pending row's actions by design.
+ *
+ * Stripping on the way in means storage never holds one, so nothing has to
+ * recognise a stale temp row on the way out.
+ */
+function withoutTempRows(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value
+      .filter((item) => !(isRecord(item) && typeof item.id === 'number' && isTemp(item.id)))
+      .map(withoutTempRows)
+  }
+  if (isRecord(value)) {
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, withoutTempRows(v)]))
+  }
+  return value
+}
+
 /**
  * Storage is keyed by user: one signed-in account must never rehydrate another
  * account's data on a shared browser.
@@ -55,6 +81,7 @@ export function persistOptionsFor(userId: number) {
     persister: createSyncStoragePersister({
       storage: window.localStorage,
       key: cacheKey(userId),
+      serialize: (client) => JSON.stringify(withoutTempRows(client)),
     }),
     maxAge: CACHE_MAX_AGE,
     buster: CACHE_VERSION,
