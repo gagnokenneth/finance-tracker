@@ -1,12 +1,19 @@
 import { Modal } from './Modal.tsx'
-import { SecondaryButton, DangerButton } from './ui.tsx'
+import { Button, SecondaryButton, DangerButton } from './ui.tsx'
 
-/** Confirmation for destructive actions — deletes, and closing a bill. */
+/**
+ * Confirmation for an action worth a second look — deletes, closing a bill, and
+ * switching currency.
+ *
+ * Tone picks the confirm button: 'danger' for anything that destroys or freezes
+ * data, 'primary' for a reversible change, where red would overstate the stakes.
+ */
 export function ConfirmDialog({
   open,
   title,
   message,
   confirmLabel,
+  tone = 'danger',
   onConfirm,
   onClose,
 }: {
@@ -14,9 +21,11 @@ export function ConfirmDialog({
   title: string
   message: string
   confirmLabel: string
+  tone?: 'danger' | 'primary'
   onConfirm: () => void
   onClose: () => void
 }) {
+  const Confirm = tone === 'danger' ? DangerButton : Button
   return (
     <Modal open={open} title={title} onClose={onClose}>
       <p className="text-sm text-ink">{message}</p>
@@ -24,9 +33,9 @@ export function ConfirmDialog({
         <SecondaryButton type="button" onClick={onClose}>
           Cancel
         </SecondaryButton>
-        <DangerButton type="button" onClick={onConfirm}>
+        <Confirm type="button" onClick={onConfirm}>
           {confirmLabel}
-        </DangerButton>
+        </Confirm>
       </div>
     </Modal>
   )
