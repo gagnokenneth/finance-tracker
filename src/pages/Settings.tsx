@@ -3,6 +3,7 @@ import { useFinanceData } from '../hooks/useFinanceData.ts'
 import { useFinanceMutations } from '../hooks/useFinanceMutations.ts'
 import { useCurrency } from '../hooks/useCurrency.ts'
 import { CURRENCY_LABELS } from '../lib/currency.ts'
+import { errorDetail } from '../lib/errorText.ts'
 import { ConfirmDialog } from '../components/ConfirmDialog.tsx'
 import { LoadError } from '../components/LoadError.tsx'
 import { LoadingScreen } from '../components/LoadingScreen.tsx'
@@ -21,6 +22,18 @@ export function Settings() {
    * currency, so cancelling needs no reset — nothing moved.
    */
   const [pending, setPending] = useState<Currency | null>(null)
+  /*
+   * What the last confirmed switch tried to set. A rejected write is not proof
+   * the backend is unchanged: the request can fail after the sheet was written —
+   * a lost response, or the client's own timeout — and the rollback restores a
+   * snapshot that is only a guess. The refetch that rollback starts is what
+   * settles it, so once the currency on screen matches what was attempted, the
+   * write did land and the failure is stale news. Saying otherwise would
+   * contradict the radios directly above the message.
+   */
+  const [attempt, setAttempt] = useState<Currency | null>(null)
+  const unconfirmed = setCurrency.isError && attempt !== null && attempt !== currency
+  const detail = errorDetail(setCurrency.error)
 
   if (isPending) return <LoadingScreen />
   if (isError) return <LoadError error={error} />
@@ -68,12 +81,15 @@ export function Settings() {
           })}
         </div>
 
-        {/* The rollback has already run by now, so this names the currency truly in effect. */}
-        {setCurrency.isError && (
-          <p className="mt-3 text-sm text-overdue">
-            That didn&rsquo;t save &mdash; amounts are still in {CURRENCY_LABELS[currency]}. Check
-            your connection and try again.
-          </p>
+        {unconfirmed && (
+          <div className="mt-3 space-y-1">
+            <p className="text-sm text-overdue">
+              That switch didn&rsquo;t confirm. Amounts are showing in{' '}
+              {CURRENCY_LABELS[currency]}, which is the last value read back &mdash; the change may
+              still have reached the backend. Reload to see what actually saved.
+            </p>
+            {detail !== '' && <p className="text-xs text-ink-soft">{detail}</p>}
+          </div>
         )}
       </section>
 
@@ -85,6 +101,7 @@ export function Settings() {
           message={`Amounts will show in ${CURRENCY_LABELS[pending]}. Nothing is converted — existing records keep their figures.`}
           confirmLabel={`Switch to ${pending}`}
           onConfirm={() => {
+            setAttempt(pending)
             setCurrency.mutate(pending)
             setPending(null)
           }}
