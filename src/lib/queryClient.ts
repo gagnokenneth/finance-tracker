@@ -1,6 +1,8 @@
 import { QueryClient } from '@tanstack/react-query'
+import type { PersistedClient } from '@tanstack/react-query-persist-client'
 import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister'
 import { anyTempIdsMinted, isTemp } from './tempId.ts'
+import { isFinanceData } from './financeShape.ts'
 
 /**
  * How long fetched data is treated as fresh. The backend is a Google Sheet that
@@ -27,7 +29,7 @@ const PERSIST_THROTTLE = 1000
  * buster is thrown away instead of rehydrated, which is what stops an old shape
  * from reaching code that expects the new one.
  */
-const CACHE_VERSION = 'v3'
+const CACHE_VERSION = 'v4'
 
 function cacheKey(userId: number): string {
   return `${CACHE_PREFIX}${userId}`
@@ -108,6 +110,38 @@ function markStrippedStale(client: unknown): unknown {
 }
 
 /**
+ * Drops a stored query whose data is not a usable dataset, rather than handing it
+ * to the app.
+ *
+ * The buster only catches shapes this build knows are old. It cannot catch a
+ * dataset that was stored incomplete — and an incomplete one is unrecoverable
+ * without this: every page indexes straight into its arrays, so the render throws
+ * on rehydration, before any code that could refetch or repair runs. The app is
+ * then white on every load, and clearing localStorage by hand is the only way
+ * out. Dropping the query instead leaves the app with no data, which is a state
+ * it already handles — it fetches.
+ *
+ * Only the dataset query is ever persisted, so every query here is expected to
+ * hold one. A query with no data yet is kept as it is.
+ */
+function withoutMalformedQueries(client: unknown): unknown {
+  if (!isRecord(client)) return client
+  const state = client.clientState
+  if (!isRecord(state) || !Array.isArray(state.queries)) return client
+  return {
+    ...client,
+    clientState: {
+      ...state,
+      queries: state.queries.filter((query) => {
+        if (!isRecord(query) || !isRecord(query.state)) return false
+        const data = query.state.data
+        return data === undefined || isFinanceData(data)
+      }),
+    },
+  }
+}
+
+/**
  * Storage is keyed by user: one signed-in account must never rehydrate another
  * account's data on a shared browser.
  */
@@ -127,6 +161,7 @@ export function persistOptionsFor(userId: number) {
         const stripped = withoutTempRows(client, removed)
         return JSON.stringify(removed.any ? markStrippedStale(stripped) : stripped)
       },
+      deserialize: (cached) => withoutMalformedQueries(JSON.parse(cached)) as PersistedClient,
     }),
     maxAge: CACHE_MAX_AGE,
     buster: CACHE_VERSION,

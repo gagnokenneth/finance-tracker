@@ -1,6 +1,19 @@
 import { useQuery } from '@tanstack/react-query'
 import { getApi } from '../api/index.ts'
+import { isFinanceData } from '../lib/financeShape.ts'
 import type { FinanceData } from '../types.ts'
+
+/**
+ * A response missing an array crashes inside a render, which no error branch
+ * here can catch and which persists into storage. Rejecting it as a failed load
+ * puts it in front of LoadError instead, where the message is visible and a
+ * reload is one click away.
+ */
+async function loadFinanceData(): Promise<FinanceData> {
+  const data = await getApi().getAll()
+  if (!isFinanceData(data)) throw new Error('The backend returned an incomplete dataset.')
+  return data
+}
 
 export const financeKey = ['finance', 'all'] as const
 
@@ -15,7 +28,7 @@ export const financeKey = ['finance', 'all'] as const
 export function useFinanceData() {
   return useQuery<FinanceData>({
     queryKey: financeKey,
-    queryFn: () => getApi().getAll(),
+    queryFn: loadFinanceData,
     // One retry, not the default three: each attempt can take up to the
     // client's 45s timeout, and isLoading stays true across retries — so
     // three of them would hide a real error behind a spinner for minutes.
