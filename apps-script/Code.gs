@@ -54,7 +54,8 @@ var RETURNS_DATA = {
   addScheduleRow: true, updateScheduleRow: true, deleteScheduleRow: true,
   addStatement: true, updateStatement: true, deleteStatement: true,
   addBill: true, updateBill: true, closeBill: true, deleteBill: true,
-  updateBillPayable: true, deleteBillPayable: true, payBillPayable: true
+  updateBillPayable: true, deleteBillPayable: true, payBillPayable: true,
+  setCurrency: true
 };
 
 function doGet() {
@@ -916,12 +917,6 @@ function payBillPayable(p, uid) {
   return null;
 }
 
-/*
- * Deliberately NOT in RETURNS_DATA. One cell changes, and the client predicts the
- * result exactly, so reading the whole dataset back would add seconds to a
- * response that carries no news — enough, on a cold start, to outlast the client's
- * timeout while this write had already landed.
- */
 function setCurrency(p, uid) {
   setCell('users', uid, 'currency', p.currency);
   return null;

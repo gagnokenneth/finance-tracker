@@ -377,11 +377,11 @@ export class MockApi implements FinanceApi {
     return this.delay(data)
   }
 
-  async setCurrency(currency: Currency): Promise<void> {
+  async setCurrency(currency: Currency): Promise<FinanceData> {
     const data = this.load()
     data.settings.currency = currency
     this.save(data)
-    await this.delay(null)
+    return this.delay(data)
   }
 
   async addSavings(input: NewSavings): Promise<SavingsEntry> {
