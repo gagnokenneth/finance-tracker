@@ -191,8 +191,8 @@ export class AppsScriptApi implements FinanceApi {
     return this.call<FinanceData>('deleteStatement', { id })
   }
 
-  setCurrency(currency: Currency): Promise<FinanceData> {
-    return this.call<FinanceData>('setCurrency', { currency })
+  async setCurrency(currency: Currency): Promise<void> {
+    await this.call<null>('setCurrency', { currency })
   }
 
   addSavings(input: NewSavings): Promise<SavingsEntry> {

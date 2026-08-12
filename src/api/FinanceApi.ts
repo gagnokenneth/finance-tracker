@@ -124,7 +124,13 @@ export interface FinanceApi {
   /** Marks the payable paid AND mints the next one, in one write. */
   payBillPayable(id: number, input: PayBillInput): Promise<FinanceData>
 
-  setCurrency(currency: Currency): Promise<FinanceData>
+  /**
+   * Returns nothing, unlike the writes above. It changes one cell, and the
+   * client can predict the result exactly — so making the backend read the whole
+   * dataset back just to answer would put a multi-second read in front of a
+   * response that carries no news.
+   */
+  setCurrency(currency: Currency): Promise<void>
 
   /** Adds a savings entry; returns it with its computed running total. */
   addSavings(input: NewSavings): Promise<SavingsEntry>

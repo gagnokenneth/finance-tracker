@@ -212,11 +212,20 @@ export function useFinanceMutations() {
       (data, c: Currency) => ({ ...data, settings: { ...data.settings, currency: c } }),
       null,
     ),
-    onSuccess: (data, c) => {
+    /*
+     * Overrides the helper's onSuccess, which applies the server's copy. There is
+     * no copy to apply: this write answers with nothing on purpose. Reading the
+     * whole dataset back to confirm one string is what pushed the request past the
+     * client's timeout, while the write itself had already landed — so the sheet
+     * changed and the app reported failure.
+     *
+     * Nothing is lost by trusting the prediction here. It sets a single field to
+     * the value the backend was just told to store, so unlike a row insert there
+     * is no server-assigned id or derived figure that could differ.
+     */
+    onSuccess: (_data, c) => {
       // Also refresh the cache that gives the right symbol on first paint.
       if (userId !== undefined) writeCachedCurrency(userId, c)
-      // Overriding the helper's onSuccess means repeating its guard — see there.
-      if (qc.isMutating() <= 1) applyData(data)
     },
   })
 
