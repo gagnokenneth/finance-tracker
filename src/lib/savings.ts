@@ -41,7 +41,8 @@ export function byId(a: number, b: number): number {
  * sequence instead of jumping around on same-date rows.
  */
 export function byDateDesc(a: SavingsLedgerEntry, b: SavingsLedgerEntry): number {
-  return b.date.localeCompare(a.date) || byId(b.id, a.id)
+  // Negated rather than argument-swapped, so it reads as "the reverse of byId".
+  return b.date.localeCompare(a.date) || -byId(a.id, b.id)
 }
 
 /**

@@ -13,9 +13,11 @@ import { PendingBadge } from '../components/PendingBadge.tsx'
 import { LoadError } from '../components/LoadError.tsx'
 import { LoadingScreen } from '../components/LoadingScreen.tsx'
 import { SavingsFormModal } from './savings/SavingsFormModal.tsx'
-import type { SavingsLedgerEntry } from '../types.ts'
+import type { SavingsLedgerEntry, SavingsLedgerKind } from '../types.ts'
 
-const KIND_LABEL: Record<string, string> = {
+/* Keyed to the union, not string: a fifth kind becomes a compile error here
+   rather than a raw enum value leaking into the table. */
+const KIND_LABEL: Record<SavingsLedgerKind, string> = {
   deposit: 'Deposit',
   withdrawal: 'Withdrawal',
   bill_payment: 'Bill payment',
@@ -41,7 +43,8 @@ export function Savings() {
   // Balance column would read non-monotone on same-date rows; re-sort to the
   // exact reverse of the accumulation order instead.
   const rows = [...inMonth(data.savings_ledger, month)].sort(byDateDesc)
-  const net = rows.reduce((sum, r) => sum + r.amount, 0)
+  // Same sum as the balance, over the month's rows rather than all of them.
+  const net = savingsBalance(rows)
 
   return (
     <div className="space-y-6">
@@ -86,7 +89,7 @@ export function Savings() {
               <tr key={row.id}>
                 <td className="px-4 py-3">{row.date}</td>
                 <td className="px-4 py-3">
-                  {KIND_LABEL[row.kind] ?? row.kind}
+                  {KIND_LABEL[row.kind]}
                   {pending && <PendingBadge />}
                 </td>
                 <td className="px-4 py-3">
@@ -140,7 +143,7 @@ export function Savings() {
         title="Delete movement?"
         message={
           deleting
-            ? `${KIND_LABEL[deleting.kind] ?? deleting.kind} on ${deleting.date}. This cannot be undone.`
+            ? `${KIND_LABEL[deleting.kind]} on ${deleting.date}. This cannot be undone.`
             : ''
         }
         confirmLabel="Delete"

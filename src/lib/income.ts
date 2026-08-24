@@ -1,11 +1,5 @@
-import { inMonth } from './currentMonth.ts'
 import { isTemp } from './tempId.ts'
 import type { IncomeEntry, IncomeSource } from '../types.ts'
-
-/** Entries dated within a yyyy-mm, newest first. */
-export function entriesInMonth(rows: IncomeEntry[], month: string): IncomeEntry[] {
-  return inMonth(rows, month)
-}
 
 export function monthTotal(rows: IncomeEntry[]): number {
   return rows.reduce((sum, r) => sum + r.amount, 0)

@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useFinanceData } from '../hooks/useFinanceData.ts'
 import { useFinanceMutations } from '../hooks/useFinanceMutations.ts'
-import { entriesInMonth, monthTotal, sourceName } from '../lib/income.ts'
-import { monthKey, addMonths } from '../lib/currentMonth.ts'
+import { monthTotal, sourceName } from '../lib/income.ts'
+import { monthKey, addMonths, inMonth } from '../lib/currentMonth.ts'
 import { isTemp } from '../lib/tempId.ts'
 import { Money } from '../components/Money.tsx'
 import { Table } from '../components/Table.tsx'
@@ -28,7 +28,7 @@ export function Income() {
   if (isPending) return <LoadingScreen />
   if (isError || !data) return <LoadError error={error} />
 
-  const rows = entriesInMonth(data.income, month)
+  const rows = inMonth(data.income, month)
   const total = monthTotal(rows)
 
   return (

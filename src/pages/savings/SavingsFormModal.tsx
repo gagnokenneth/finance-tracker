@@ -44,24 +44,30 @@ export function SavingsFormModal({
     if (entry) {
       updateSavingsEntry.mutate({
         id: entry.id,
+        // null, not undefined: this is how a blanked notes field clears the cell.
         patch: { kind, amount: Number(amount), date, notes: notes.trim() || null },
       })
-      // Compared as yyyy-mm strings, NOT via new Date(iso): an ISO string parses
-      // as UTC midnight, so west of UTC this guard would silently fail to fire
-      // while the table, which compares strings, has already dropped the row.
-      if (date.slice(0, 7) !== entry.date.slice(0, 7)) onMonthChange?.(date.slice(0, 7))
     } else {
+      // An add has nothing to clear, so undefined rather than null.
       addSavingsEntry.mutate({
         kind,
         amount: Number(amount),
         date,
         notes: notes.trim() || undefined,
       })
-      // Same courtesy as the edit path, and the same string comparison for the
-      // same reason: a new Date(iso) comparison would parse as UTC midnight and
-      // silently pick the wrong month west of UTC.
-      if (month !== undefined && date.slice(0, 7) !== month) onMonthChange?.(date.slice(0, 7))
     }
+
+    /*
+     * Follow the row if it landed outside the month on screen — vanishing with
+     * no explanation reads as data loss. An edit is measured against the row's
+     * old month, an add against the month being displayed.
+     *
+     * Compared as yyyy-mm strings, NOT via new Date(iso): an ISO date parses as
+     * UTC midnight, so west of UTC this guard would silently fail to fire while
+     * the table, which compares strings, has already dropped the row.
+     */
+    const anchor = entry ? entry.date.slice(0, 7) : month
+    if (anchor !== undefined && date.slice(0, 7) !== anchor) onMonthChange?.(date.slice(0, 7))
     onClose()
   }
 

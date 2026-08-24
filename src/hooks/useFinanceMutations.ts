@@ -93,9 +93,8 @@ export function useFinanceMutations() {
       // as the fixed strings below: prefer the backend's own reason (e.g. the
       // savings guard naming the balance) when it carries one, and fall back to
       // the fixed copy only when errorDetail has nothing useful to add.
-      const detail = errorDetail(error)
-      if (detail) showError(detail)
-      else if (failure) showError(failure)
+      const message = errorDetail(error) || failure
+      if (message) showError(message)
       /*
        * The snapshot is a guess, not the truth. The write may have reached the
        * sheet before the client gave up on it, and restoring a whole-dataset
