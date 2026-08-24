@@ -34,7 +34,8 @@ import { createSeed } from './seed.ts'
 import { backfillArrays } from '../../lib/financeShape.ts'
 import { readToken, decodeSession } from '../../auth/session.ts'
 import { normalizeUsername, isValidUsername, USERNAME_RULE } from '../../auth/password.ts'
-import { signedAmount, savingsBalance, isPaymentKind } from '../../lib/savings.ts'
+import { signedAmount, isPaymentKind } from '../../lib/savings.ts'
+import { isoDate } from '../../lib/currentMonth.ts'
 
 const KEY = 'finance-mock-db'
 
@@ -82,9 +83,33 @@ function assertSavingsAmount(amount: number | undefined): void {
  * the user can see is valid. Both the guard and the formatted balance must match
  * Code.gs exactly — optimistic.ts requires predictions to hold for both backends.
  */
+/*
+ * The as-of-today balance after optionally replacing one row, mirroring
+ * savingsBalanceAfter in Code.gs. A movement dated for a future payday is stored
+ * but not counted, so it cannot fund a withdrawal now.
+ */
+function hasOwn(o: object, k: string): boolean {
+  return Object.prototype.hasOwnProperty.call(o, k)
+}
+
+function savingsBalanceAfter(
+  rows: SavingsLedgerEntry[],
+  excludeId: number | null,
+  replacement: { date: string; amount: number } | null,
+): number {
+  const today = isoDate()
+  let total = 0
+  for (const row of rows) {
+    if (excludeId !== null && row.id === excludeId) continue
+    if (row.date <= today) total += row.amount
+  }
+  if (replacement && replacement.date <= today) total += replacement.amount
+  return total
+}
+
 function assertNotBelowZero(balance: number): void {
   if (Math.round(balance * 100) < 0) {
-    throw new Error(`That would put savings below zero. The balance is ${balance.toFixed(2)}.`)
+    throw new Error(`That would put savings below zero. The balance as of today is ${balance.toFixed(2)}.`)
   }
 }
 
@@ -509,7 +534,9 @@ export class MockApi implements FinanceApi {
     assertSavingsDate(input.date)
     assertSavingsAmount(input.amount)
     const signed = signedAmount(input.kind, input.amount)
-    assertNotBelowZero(savingsBalance(data.savings_ledger) + signed)
+    assertNotBelowZero(
+      savingsBalanceAfter(data.savings_ledger, null, { date: input.date, amount: signed }),
+    )
     data.savings_ledger.push({
       id: nextId(data.savings_ledger),
       date: input.date,
@@ -530,15 +557,29 @@ export class MockApi implements FinanceApi {
 
     const hasKind = Object.prototype.hasOwnProperty.call(patch, 'kind')
     const hasAmount = Object.prototype.hasOwnProperty.call(patch, 'amount')
+    const kind = hasKind ? (patch.kind as SavingsMovementKind) : (row.kind as SavingsMovementKind)
+    const magnitude = hasAmount ? (patch.amount as number) : Math.abs(row.amount)
     if (hasKind || hasAmount) {
-      const kind = hasKind ? (patch.kind as SavingsMovementKind) : (row.kind as SavingsMovementKind)
       assertMovementKind(kind)
-      const magnitude = hasAmount ? (patch.amount as number) : Math.abs(row.amount)
       assertSavingsAmount(magnitude)
-      const signed = signedAmount(kind, magnitude)
-      assertNotBelowZero(savingsBalance(data.savings_ledger) - row.amount + signed)
+    }
+
+    /*
+     * Checked on EVERY edit, not only when kind or amount changed: now that the
+     * balance counts only rows whose date has arrived, moving a withdrawal from
+     * next week to today lowers it without touching its amount.
+     */
+    const effectiveDate = hasOwn(patch, 'date') ? (patch.date as string) : row.date
+    assertNotBelowZero(
+      savingsBalanceAfter(data.savings_ledger, id, {
+        date: effectiveDate,
+        amount: signedAmount(kind, magnitude),
+      }),
+    )
+
+    if (hasKind || hasAmount) {
       row.kind = kind
-      row.amount = signed
+      row.amount = signedAmount(kind, magnitude)
     }
     if (Object.prototype.hasOwnProperty.call(patch, 'date')) row.date = patch.date as string
     if (Object.prototype.hasOwnProperty.call(patch, 'notes')) {
@@ -553,7 +594,7 @@ export class MockApi implements FinanceApi {
     const row = data.savings_ledger.find((r) => r.id === id)
     if (!row) throw new Error(`Savings movement ${id} not found`)
     assertNotPaymentRow(row)
-    assertNotBelowZero(savingsBalance(data.savings_ledger) - row.amount)
+    assertNotBelowZero(savingsBalanceAfter(data.savings_ledger, id, null))
     data.savings_ledger = data.savings_ledger.filter((r) => r.id !== id)
     this.save(data)
     return this.delay(data)

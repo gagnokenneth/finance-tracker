@@ -1,4 +1,5 @@
 import { isTemp } from './tempId.ts'
+import { isoDate } from './currentMonth.ts'
 import type { SavingsLedgerEntry, SavingsLedgerKind, SavingsMovementKind } from '../types.ts'
 
 /** Rows the user cannot edit here: FT-4 writes them against a real payment. */
@@ -23,6 +24,31 @@ export function signedAmount(kind: SavingsMovementKind, magnitude: number): numb
  */
 export function savingsBalance(rows: SavingsLedgerEntry[]): number {
   return rows.reduce((sum, r) => sum + r.amount, 0)
+}
+
+/**
+ * Money you actually have: rows whose date has arrived.
+ *
+ * A movement recorded for a future payday is stored but not counted, so it
+ * neither inflates the headline balance nor funds a withdrawal today. Still one
+ * sum rather than a walk through the sequence, so the "final balance, not every
+ * intermediate point" rule is untouched.
+ *
+ * Known limitation, shared with the backend guard: a future-dated withdrawal is
+ * not checked against the balance on its own date, so a deliberately recorded
+ * future overdraft turns the balance negative when that date arrives. Visible on
+ * the card as soon as it does, unlike the hole this replaces.
+ */
+export function balanceAsOf(rows: SavingsLedgerEntry[], today: string = isoDate()): number {
+  return rows.reduce((sum, r) => (r.date <= today ? sum + r.amount : sum), 0)
+}
+
+/** Rows dated later than today — recorded, not yet counted. Disclosed, never hidden. */
+export function futureRows(
+  rows: SavingsLedgerEntry[],
+  today: string = isoDate(),
+): SavingsLedgerEntry[] {
+  return rows.filter((r) => r.date > today)
 }
 
 /*

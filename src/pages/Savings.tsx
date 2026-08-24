@@ -1,7 +1,14 @@
 import { useState } from 'react'
 import { useFinanceData } from '../hooks/useFinanceData.ts'
 import { useFinanceMutations } from '../hooks/useFinanceMutations.ts'
-import { savingsBalance, runningBalances, isPaymentKind, byDateDesc } from '../lib/savings.ts'
+import {
+  savingsBalance,
+  balanceAsOf,
+  futureRows,
+  runningBalances,
+  isPaymentKind,
+  byDateDesc,
+} from '../lib/savings.ts'
 import { monthKey, addMonths, inMonth } from '../lib/currentMonth.ts'
 import { isTemp } from '../lib/tempId.ts'
 import { Money } from '../components/Money.tsx'
@@ -35,9 +42,18 @@ export function Savings() {
   if (isPending) return <LoadingScreen />
   if (isError || !data) return <LoadError error={error} />
 
-  // The balance is all-time and unaffected by which month is displayed; the
-  // running balances are computed over every row for the same reason.
-  const balance = savingsBalance(data.savings_ledger)
+  /*
+   * The headline balance is money you actually HAVE: rows whose date has
+   * arrived. A deposit recorded for a future payday is disclosed separately
+   * rather than counted, because counting it would both overstate the card and
+   * let it fund a withdrawal today — the backend guard uses the same rule.
+   *
+   * Unaffected by which month is displayed; the running balances are computed
+   * over every row for the same reason.
+   */
+  const balance = balanceAsOf(data.savings_ledger)
+  const later = futureRows(data.savings_ledger)
+  const laterTotal = savingsBalance(later)
   const balances = runningBalances(data.savings_ledger)
   // inMonth's order doesn't match runningBalances' accumulation order, so the
   // Balance column would read non-monotone on same-date rows; re-sort to the
@@ -71,6 +87,11 @@ export function Savings() {
 
       <Card title="Balance">
         <Money value={balance} className="text-3xl font-bold" />
+        {later.length > 0 && (
+          <p className="mt-2 text-xs text-ink-faint">
+            <Money value={laterTotal} /> dated later, not counted yet
+          </p>
+        )}
       </Card>
 
       {rows.length === 0 ? (

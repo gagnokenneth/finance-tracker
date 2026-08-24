@@ -1126,8 +1126,42 @@ function ownedSavingsRows(uid) {
   return readOwnedRows('savings_ledger', uid);
 }
 
-function savingsBalanceOf(rows) {
-  return sumField(rows, 'amount');
+/** Today in the SPREADSHEET's timezone, so it compares against stored dates. */
+function isoToday() {
+  return Utilities.formatDate(new Date(), ss().getSpreadsheetTimeZone(), 'yyyy-MM-dd');
+}
+
+/*
+ * The as-of-today balance after optionally replacing one row: money you actually
+ * have. A movement dated for a future payday is stored but not counted, so it
+ * cannot fund a withdrawal now — the hole a plain all-rows sum left open.
+ *
+ * Still ONE sum, not a walk through the sequence. A backdated row changes this
+ * total and nothing else, so the "final balance, not every intermediate point"
+ * rule is untouched.
+ *
+ * `replacement` is {date, amount} for an add or an edit, or null for a delete.
+ * Old and new versions each count only once their own date has arrived, which is
+ * why moving a row into or out of the future shifts the balance by one side of
+ * the pair rather than both.
+ *
+ * KNOWN LIMITATION: this guards the CURRENT balance, so a movement dated in the
+ * future is not checked against the balance on its own date. Recording a
+ * withdrawal of 1000 next month against 100 today is accepted, and the balance
+ * goes negative when that date arrives. Guarding it would need the per-date walk
+ * this design rejected — and it is visible on the card the moment it lands,
+ * unlike the hole it replaces, where a future deposit funded a real withdrawal
+ * today.
+ */
+function savingsBalanceAfter(rows, excludeId, replacement) {
+  var today = isoToday();
+  var total = 0;
+  for (var i = 0; i < rows.length; i++) {
+    if (excludeId !== null && num(rows[i].id) === num(excludeId)) continue;
+    if (fmtDate(rows[i].date) <= today) total += num(rows[i].amount);
+  }
+  if (replacement && String(replacement.date) <= today) total += Number(replacement.amount);
+  return total;
 }
 
 function findSavingsRow(rows, id) {
@@ -1155,7 +1189,7 @@ function findSavingsRow(rows, id) {
 function assertNotBelowZero(balance) {
   if (Math.round(balance * 100) < 0) {
     throw new Error(
-      'That would put savings below zero. The balance is ' + Number(balance).toFixed(2) + '.'
+      'That would put savings below zero. The balance as of today is ' + Number(balance).toFixed(2) + '.'
     );
   }
 }
@@ -1176,7 +1210,7 @@ function addSavingsEntry(p, uid) {
   assertSavingsDate(input.date);
   assertSavingsAmount(input.amount);
   var signed = signedSavingsAmount(input.kind, input.amount);
-  assertNotBelowZero(savingsBalanceOf(ownedSavingsRows(uid)) + signed);
+  assertNotBelowZero(savingsBalanceAfter(ownedSavingsRows(uid), null, { date: input.date, amount: signed }));
   appendRow('savings_ledger', {
     id: nextId('savings_ledger'),
     user_id: uid,
@@ -1214,20 +1248,33 @@ function updateSavingsEntry(p, uid) {
     patch.notes = given.notes;
   }
 
-  // Kind and amount move together: either one changes the signed value, and
-  // editing a deposit into a withdrawal moves the balance by twice the amount.
+  /*
+   * Kind and amount move together: either one changes the signed value, and
+   * editing a deposit into a withdrawal moves the balance by twice the amount.
+   */
   var hasKind = Object.prototype.hasOwnProperty.call(given, 'kind');
   var hasAmount = Object.prototype.hasOwnProperty.call(given, 'amount');
+  var kind = hasKind ? given.kind : row.kind;
+  var magnitude = hasAmount ? given.amount : Math.abs(Number(row.amount));
   if (hasKind || hasAmount) {
-    var kind = hasKind ? given.kind : row.kind;
     assertMovementKind(kind);
-    var magnitude = hasAmount ? given.amount : Math.abs(Number(row.amount));
     assertSavingsAmount(magnitude);
-    var signed = signedSavingsAmount(kind, magnitude);
-    assertNotBelowZero(savingsBalanceOf(rows) - Number(row.amount) + signed);
     patch.kind = kind;
-    patch.amount = signed;
+    patch.amount = signedSavingsAmount(kind, magnitude);
   }
+
+  /*
+   * Checked on EVERY edit, not only when kind or amount changed. Now that the
+   * balance counts only rows whose date has arrived, moving a withdrawal from
+   * next week to today lowers the balance without touching its amount.
+   */
+  var effectiveDate = patch.date !== undefined ? patch.date : fmtDate(row.date);
+  assertNotBelowZero(
+    savingsBalanceAfter(rows, p.id, {
+      date: effectiveDate,
+      amount: signedSavingsAmount(kind, magnitude)
+    })
+  );
   return patchRowAt('savings_ledger', rowIndex, patch);
 }
 
@@ -1238,7 +1285,7 @@ function deleteSavingsEntry(p, uid) {
   var rows = ownedSavingsRows(uid);
   var row = findSavingsRow(rows, p.id);
   assertNotPaymentRow(row);
-  assertNotBelowZero(savingsBalanceOf(rows) - Number(row.amount));
+  assertNotBelowZero(savingsBalanceAfter(rows, p.id, null));
   sheet('savings_ledger').deleteRow(rowIndex);
   return null;
 }
