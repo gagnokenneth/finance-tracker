@@ -7,6 +7,7 @@ import type {
   Currency,
   IncomeEntry,
   IncomeSource,
+  SavingsMovementKind,
 } from '../types.ts'
 
 /**
@@ -54,6 +55,22 @@ export type NewIncome = Omit<IncomeEntry, 'id' | 'allocation_period_id'>
 export type IncomePatch = Partial<Omit<NewIncome, 'notes'>> & { notes?: string | null }
 export type NewIncomeSource = Pick<IncomeSource, 'name'>
 export type IncomeSourcePatch = Partial<Omit<IncomeSource, 'id'>>
+
+/** amount is a POSITIVE magnitude; the backend derives the stored sign from kind. */
+export interface NewSavingsEntry {
+  date: string
+  kind: SavingsMovementKind
+  amount: number
+  notes?: string
+}
+/**
+ * null clears notes. undefined cannot: JSON.stringify drops it, so a cleared
+ * note would arrive as "leave this alone" — the same reason IncomePatch and
+ * StatementPatch type their clearable fields this way.
+ */
+export type SavingsEntryPatch = Partial<Omit<NewSavingsEntry, 'notes'>> & {
+  notes?: string | null
+}
 
 export interface AuthResult {
   token: string
@@ -133,4 +150,11 @@ export interface FinanceApi {
   updateIncomeSource(id: number, patch: IncomeSourcePatch): Promise<FinanceData>
   /** Refused when any entry uses it — archive instead. */
   deleteIncomeSource(id: number): Promise<FinanceData>
+
+  /* Savings writes return the whole updated dataset, for the same reasons above. */
+
+  addSavingsEntry(input: NewSavingsEntry): Promise<FinanceData>
+  updateSavingsEntry(id: number, patch: SavingsEntryPatch): Promise<FinanceData>
+  /** Refused when it would take the balance below zero, or on a payment row. */
+  deleteSavingsEntry(id: number): Promise<FinanceData>
 }

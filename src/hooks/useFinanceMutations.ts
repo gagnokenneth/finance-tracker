@@ -27,6 +27,9 @@ import {
   addIncomeSourceTo,
   applyIncomeSourcePatch,
   removeIncomeSource,
+  addSavingsEntryTo,
+  applySavingsEntryPatch,
+  removeSavingsEntry,
 } from '../lib/optimistic.ts'
 import type { Currency, FinanceData } from '../types.ts'
 import type {
@@ -43,6 +46,8 @@ import type {
   IncomePatch,
   NewIncomeSource,
   IncomeSourcePatch,
+  NewSavingsEntry,
+  SavingsEntryPatch,
 } from '../api/FinanceApi.ts'
 
 export function useFinanceMutations() {
@@ -239,6 +244,20 @@ export function useFinanceMutations() {
     ...optimistic(removeIncomeSource, 'That source could not be deleted. It has been restored.'),
   })
 
+  const addSavingsEntry = useMutation({
+    mutationFn: (i: NewSavingsEntry) => getApi().addSavingsEntry(i),
+    ...optimistic(addSavingsEntryTo, 'That movement did not save. It has been removed.'),
+  })
+  const updateSavingsEntry = useMutation({
+    mutationFn: (v: { id: number; patch: SavingsEntryPatch }) =>
+      getApi().updateSavingsEntry(v.id, v.patch),
+    ...optimistic(applySavingsEntryPatch, 'That change did not save. The movement is back as it was.'),
+  })
+  const deleteSavingsEntry = useMutation({
+    mutationFn: (id: number) => getApi().deleteSavingsEntry(id),
+    ...optimistic(removeSavingsEntry, 'That movement could not be deleted. It has been restored.'),
+  })
+
   return {
     addDebt,
     updateDebt,
@@ -263,5 +282,8 @@ export function useFinanceMutations() {
     addIncomeSource,
     updateIncomeSource,
     deleteIncomeSource,
+    addSavingsEntry,
+    updateSavingsEntry,
+    deleteSavingsEntry,
   }
 }

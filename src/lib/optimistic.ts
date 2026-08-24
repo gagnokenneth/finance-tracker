@@ -7,6 +7,8 @@ import type {
   FinanceData,
   IncomeEntry,
   IncomeSource,
+  SavingsLedgerEntry,
+  SavingsMovementKind,
 } from '../types.ts'
 import type {
   BillPatch,
@@ -22,8 +24,11 @@ import type {
   IncomePatch,
   NewIncomeSource,
   IncomeSourcePatch,
+  NewSavingsEntry,
+  SavingsEntryPatch,
 } from '../api/FinanceApi.ts'
 import { tempId } from './tempId.ts'
+import { signedAmount } from './savings.ts'
 
 /**
  * Client-side predictions of what a write does to the dataset, used to show the
@@ -345,4 +350,47 @@ export function applyIncomeSourcePatch(
  */
 export function removeIncomeSource(data: FinanceData, id: number): FinanceData {
   return { ...data, income_sources: data.income_sources.filter((s) => s.id !== id) }
+}
+
+export function addSavingsEntryTo(data: FinanceData, vars: NewSavingsEntry): FinanceData {
+  // signedAmount, not the raw magnitude: a prediction storing the magnitude
+  // unsigned would show a withdrawal INCREASING the balance until the response
+  // arrived. Both backends convert the same way.
+  const entry: SavingsLedgerEntry = {
+    id: tempId(),
+    date: vars.date,
+    amount: signedAmount(vars.kind, vars.amount),
+    kind: vars.kind,
+    notes: vars.notes,
+  }
+  return { ...data, savings_ledger: [...data.savings_ledger, entry] }
+}
+
+export function applySavingsEntryPatch(
+  data: FinanceData,
+  vars: { id: number; patch: SavingsEntryPatch },
+): FinanceData {
+  return {
+    ...data,
+    savings_ledger: data.savings_ledger.map((row) => {
+      if (row.id !== vars.id) return row
+      const patch = vars.patch
+      const next: SavingsLedgerEntry = { ...row }
+      if (patch.date !== undefined) next.date = patch.date
+      if (patch.notes !== undefined) next.notes = patch.notes === null ? undefined : patch.notes
+      // Kind and amount are predicted together, matching the backend: either one
+      // changes the signed value the balance is summed from.
+      if (patch.kind !== undefined || patch.amount !== undefined) {
+        const kind = (patch.kind ?? row.kind) as SavingsMovementKind
+        const magnitude = patch.amount ?? Math.abs(row.amount)
+        next.kind = kind
+        next.amount = signedAmount(kind, magnitude)
+      }
+      return next
+    }),
+  }
+}
+
+export function removeSavingsEntry(data: FinanceData, id: number): FinanceData {
+  return { ...data, savings_ledger: data.savings_ledger.filter((row) => row.id !== id) }
 }

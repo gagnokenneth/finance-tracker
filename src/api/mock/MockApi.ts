@@ -16,6 +16,8 @@ import type {
   IncomePatch,
   NewIncomeSource,
   IncomeSourcePatch,
+  NewSavingsEntry,
+  SavingsEntryPatch,
 } from '../FinanceApi.ts'
 import type {
   FinanceData,
@@ -25,11 +27,14 @@ import type {
   DebtScheduleRow,
   DebtStatement,
   Currency,
+  SavingsLedgerEntry,
+  SavingsMovementKind,
 } from '../../types.ts'
 import { createSeed } from './seed.ts'
 import { backfillArrays } from '../../lib/financeShape.ts'
 import { readToken, decodeSession } from '../../auth/session.ts'
 import { normalizeUsername, isValidUsername, USERNAME_RULE } from '../../auth/password.ts'
+import { signedAmount, savingsBalance, isPaymentKind } from '../../lib/savings.ts'
 
 const KEY = 'finance-mock-db'
 
@@ -50,6 +55,37 @@ function assertIncomeAmount(amount: number | undefined): void {
     throw new Error('An income entry needs an amount')
   }
   if (Number(amount) < 0) throw new Error('An income amount cannot be negative')
+}
+
+function assertMovementKind(kind: string): void {
+  if (kind !== 'deposit' && kind !== 'withdrawal') {
+    throw new Error('A savings movement must be a deposit or a withdrawal')
+  }
+}
+
+function assertSavingsDate(date: string | undefined): void {
+  if (!date) throw new Error('A savings movement needs a date')
+}
+
+function assertSavingsAmount(amount: number | undefined): void {
+  if (amount === undefined || Number.isNaN(Number(amount))) {
+    throw new Error('A savings movement needs an amount')
+  }
+  if (Number(amount) <= 0) {
+    throw new Error('Enter a positive amount and pick deposit or withdrawal')
+  }
+}
+
+function assertNotBelowZero(balance: number): void {
+  if (balance < 0) {
+    throw new Error(`That would put savings below zero. The balance is ${balance}.`)
+  }
+}
+
+function assertNotPaymentRow(row: SavingsLedgerEntry): void {
+  if (isPaymentKind(row.kind)) {
+    throw new Error('That movement settled a bill or debt. Change it there instead.')
+  }
 }
 
 interface MockUser {
@@ -457,6 +493,62 @@ export class MockApi implements FinanceApi {
       )
     }
     data.income_sources = data.income_sources.filter((s) => s.id !== id)
+    this.save(data)
+    return this.delay(data)
+  }
+
+  async addSavingsEntry(input: NewSavingsEntry): Promise<FinanceData> {
+    const data = this.load()
+    assertMovementKind(input.kind)
+    assertSavingsDate(input.date)
+    assertSavingsAmount(input.amount)
+    const signed = signedAmount(input.kind, input.amount)
+    assertNotBelowZero(savingsBalance(data.savings_ledger) + signed)
+    data.savings_ledger.push({
+      id: nextId(data.savings_ledger),
+      date: input.date,
+      amount: signed,
+      kind: input.kind,
+      notes: input.notes,
+    })
+    this.save(data)
+    return this.delay(data)
+  }
+
+  async updateSavingsEntry(id: number, patch: SavingsEntryPatch): Promise<FinanceData> {
+    const data = this.load()
+    const row = data.savings_ledger.find((r) => r.id === id)
+    if (!row) throw new Error(`Savings movement ${id} not found`)
+    assertNotPaymentRow(row)
+    if (Object.prototype.hasOwnProperty.call(patch, 'date')) assertSavingsDate(patch.date)
+
+    const hasKind = Object.prototype.hasOwnProperty.call(patch, 'kind')
+    const hasAmount = Object.prototype.hasOwnProperty.call(patch, 'amount')
+    if (hasKind || hasAmount) {
+      const kind = hasKind ? (patch.kind as SavingsMovementKind) : (row.kind as SavingsMovementKind)
+      assertMovementKind(kind)
+      const magnitude = hasAmount ? (patch.amount as number) : Math.abs(row.amount)
+      assertSavingsAmount(magnitude)
+      const signed = signedAmount(kind, magnitude)
+      assertNotBelowZero(savingsBalance(data.savings_ledger) - row.amount + signed)
+      row.kind = kind
+      row.amount = signed
+    }
+    if (Object.prototype.hasOwnProperty.call(patch, 'date')) row.date = patch.date as string
+    if (Object.prototype.hasOwnProperty.call(patch, 'notes')) {
+      row.notes = patch.notes === null ? undefined : patch.notes
+    }
+    this.save(data)
+    return this.delay(data)
+  }
+
+  async deleteSavingsEntry(id: number): Promise<FinanceData> {
+    const data = this.load()
+    const row = data.savings_ledger.find((r) => r.id === id)
+    if (!row) throw new Error(`Savings movement ${id} not found`)
+    assertNotPaymentRow(row)
+    assertNotBelowZero(savingsBalance(data.savings_ledger) - row.amount)
+    data.savings_ledger = data.savings_ledger.filter((r) => r.id !== id)
     this.save(data)
     return this.delay(data)
   }
