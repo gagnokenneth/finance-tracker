@@ -13,7 +13,8 @@ var SHEETS = {
   debts: ['id', 'user_id', 'name', 'type'],
   debt_schedule: ['id', 'user_id', 'debt_id', 'due_date', 'amount', 'paid', 'paid_date', 'paid_amount'],
   debt_statements: ['id', 'user_id', 'debt_id', 'due_date', 'min_due', 'total_due', 'outstanding', 'paid', 'paid_date', 'paid_amount'],
-  income: ['id', 'user_id', 'source', 'amount', 'date', 'notes', 'allocation_period_id'],
+  income: ['id', 'user_id', 'source_id', 'amount', 'date', 'notes', 'allocation_period_id'],
+  income_sources: ['id', 'user_id', 'name', 'archived'],
   savings_ledger: ['id', 'user_id', 'date', 'amount', 'kind', 'ref_type', 'ref_id', 'notes'],
   allocations: ['id', 'user_id', 'name', 'frequency', 'day', 'second_day', 'month', 'closed'],
   allocation_periods: ['id', 'user_id', 'allocation_id', 'period_date'],
@@ -26,7 +27,7 @@ var SHEETS = {
  * so the new shape is applied on the very next request after a deployment,
  * instead of up to an hour later.
  */
-var SCHEMA_VERSION = 7;
+var SCHEMA_VERSION = 8;
 
 /*
  * Tabs whose stale shape may be DISCARDED and recreated. Deliberately excludes
@@ -34,9 +35,9 @@ var SCHEMA_VERSION = 7;
  * and password hash on the next request, re-seed fresh codes, and lock everyone
  * out with no recovery path.
  */
-var REBUILDABLE_SHEETS = ['debts', 'debt_schedule', 'debt_statements', 'bills', 'bill_payables', 'income', 'savings_ledger', 'allocations', 'allocation_periods', 'allocation_lines'];
+var REBUILDABLE_SHEETS = ['debts', 'debt_schedule', 'debt_statements', 'bills', 'bill_payables', 'income', 'income_sources', 'savings_ledger', 'allocations', 'allocation_periods', 'allocation_lines'];
 
-var DATA_SHEETS = ['bills', 'bill_payables', 'debts', 'debt_schedule', 'debt_statements', 'income', 'savings_ledger', 'allocations', 'allocation_periods', 'allocation_lines'];
+var DATA_SHEETS = ['bills', 'bill_payables', 'debts', 'debt_schedule', 'debt_statements', 'income', 'income_sources', 'savings_ledger', 'allocations', 'allocation_periods', 'allocation_lines'];
 
 /**
  * Sheets getAll actually reads. Every sheet read is a separate round trip, so
@@ -471,8 +472,12 @@ function coerce(name, r) {
     paid: bool(r.paid), paid_date: optDate(r.paid_date), paid_amount: optNum(r.paid_amount)
   };
   if (name === 'income') return {
-    id: num(r.id), source: String(r.source), amount: num(r.amount), date: fmtDate(r.date),
-    notes: optStr(r.notes), allocation_period_id: optNum(r.allocation_period_id)
+    id: num(r.id), source_id: num(r.source_id), amount: num(r.amount),
+    date: fmtDate(r.date), notes: optStr(r.notes),
+    allocation_period_id: optNum(r.allocation_period_id)
+  };
+  if (name === 'income_sources') return {
+    id: num(r.id), name: String(r.name), archived: bool(r.archived)
   };
   if (name === 'savings_ledger') return {
     // amount is signed: positive is a deposit, negative a withdrawal or a
