@@ -89,12 +89,18 @@ export function useFinanceMutations() {
     },
     onError: (error: unknown, _vars: TVars, context: { previous?: FinanceData } | undefined) => {
       if (context?.previous) qc.setQueryData(financeKey, context.previous)
-      // A refusal the user cannot act on is a weaker version of the same intent
-      // as the fixed strings below: prefer the backend's own reason (e.g. the
-      // savings guard naming the balance) when it carries one, and fall back to
-      // the fixed copy only when errorDetail has nothing useful to add.
-      const message = errorDetail(error) || failure
-      if (message) showError(message)
+      /*
+       * A refusal the user cannot act on is a weaker version of the same intent
+       * as the fixed strings below, so prefer the backend's own reason (e.g. the
+       * savings guard naming the balance) and fall back to the fixed copy.
+       *
+       * Gated on `failure` being non-null, NOT on errorDetail having something
+       * to say: null is a caller opting out of toasts entirely because it
+       * renders its own line (setCurrency does), and a backend message must not
+       * override that opt-out — it would duplicate what Settings shows inline
+       * and fire in the case Settings deliberately stays silent about.
+       */
+      if (failure) showError(errorDetail(error) || failure)
       /*
        * The snapshot is a guess, not the truth. The write may have reached the
        * sheet before the client gave up on it, and restoring a whole-dataset

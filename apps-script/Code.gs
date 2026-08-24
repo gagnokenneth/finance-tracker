@@ -631,6 +631,13 @@ function readOwnedRows(name, uid) {
  * sheets, and returns the location so callers do not look the row up a second
  * time.
  */
+/*
+ * Deliberately says nothing about whether the row exists — see above. Now that
+ * a backend message can reach a toast, it also has to read as a sentence rather
+ * than as the bare 'not found' it used to be.
+ */
+var NOT_FOUND = 'That row was not found. It may have been changed in another tab.';
+
 function ownedRowIndex(name, id, uid) {
   var sh = sheet(name);
   var last = sh.getLastRow();
@@ -638,12 +645,12 @@ function ownedRowIndex(name, id, uid) {
     var vals = sh.getRange(2, 1, last - 1, 2).getValues();
     for (var i = 0; i < vals.length; i++) {
       if (num(vals[i][0]) === num(id)) {
-        if (num(vals[i][1]) !== num(uid)) throw new Error('not found');
+        if (num(vals[i][1]) !== num(uid)) throw new Error(NOT_FOUND);
         return i + 2;
       }
     }
   }
-  throw new Error('not found');
+  throw new Error(NOT_FOUND);
 }
 
 /** Ownership check where the row's position is not needed. */
@@ -665,9 +672,8 @@ function getAll(uid) {
 
 /*
  * Every sheet served here is per-user: its second column is user_id and its
- * handlers go through readOwnedRows / assertOwned. The savings_ledger and
- * allocation sheets exist but have no actions yet; each module ticket adds its
- * own. Anything added here without an ownership check would let any
+ * handlers go through readOwnedRows / assertOwned. The allocation sheets exist
+ * but have no actions yet; each module ticket adds its own. Anything added here without an ownership check would let any
  * authenticated user read and write another user's rows.
  *
  * A foreign key needs its own check: the income handlers call assertOwnedSource
@@ -1137,9 +1143,20 @@ function findSavingsRow(rows, id) {
  * valid; that is permitted, because movements are often entered out of order
  * and a user cannot locate which historical row a refusal refers to.
  */
+/*
+ * Compared in CENTS. 0.70 + 0.10 sums to 0.7999999999999999 in floating point,
+ * so withdrawing the full 0.80 lands at -1.1e-16 and a raw `< 0` refuses a
+ * write the user can plainly see is valid — with an unreadable number in the
+ * message. Math.round(x * 100) is the same guard debtSchedule.ts already uses.
+ *
+ * The balance is formatted too: it reaches the user through a toast now, and
+ * `13.5` reads as broken next to every other figure in the app.
+ */
 function assertNotBelowZero(balance) {
-  if (balance < 0) {
-    throw new Error('That would put savings below zero. The balance is ' + balance + '.');
+  if (Math.round(balance * 100) < 0) {
+    throw new Error(
+      'That would put savings below zero. The balance is ' + Number(balance).toFixed(2) + '.'
+    );
   }
 }
 

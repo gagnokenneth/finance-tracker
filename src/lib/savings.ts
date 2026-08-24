@@ -70,6 +70,12 @@ export function runningBalances(rows: SavingsLedgerEntry[]): Map<number, number>
  * savings-funded payment in the Bills and Debts views from it, and FT-7 needs
  * it to avoid counting one outflow twice — and every savings derivation
  * belongs in one module.
+ *
+ * INVARIANT this relies on: at most ONE ledger row per settled row. It holds
+ * because a bill_payable and a debt row each carry a single paid_amount, so
+ * there is one payment to fund. If FT-4 ever allows a payable to be settled by
+ * several savings movements, this map silently keeps only the last one and must
+ * become Map<string, SavingsLedgerEntry[]>.
  */
 export function paymentsByRef(rows: SavingsLedgerEntry[]): Map<string, SavingsLedgerEntry> {
   const index = new Map<string, SavingsLedgerEntry>()

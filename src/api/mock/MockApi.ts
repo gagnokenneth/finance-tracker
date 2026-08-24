@@ -76,9 +76,15 @@ function assertSavingsAmount(amount: number | undefined): void {
   }
 }
 
+/*
+ * Compared in CENTS, mirroring Code.gs. 0.70 + 0.10 sums to 0.7999999999999999,
+ * so withdrawing the full 0.80 lands at -1.1e-16 and a raw `< 0` refuses a write
+ * the user can see is valid. Both the guard and the formatted balance must match
+ * Code.gs exactly — optimistic.ts requires predictions to hold for both backends.
+ */
 function assertNotBelowZero(balance: number): void {
-  if (balance < 0) {
-    throw new Error(`That would put savings below zero. The balance is ${balance}.`)
+  if (Math.round(balance * 100) < 0) {
+    throw new Error(`That would put savings below zero. The balance is ${balance.toFixed(2)}.`)
   }
 }
 
