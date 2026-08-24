@@ -47,7 +47,7 @@ var DATA_SHEETS = ['bills', 'bill_payables', 'debts', 'debt_schedule', 'debt_sta
  * the same change. A sheet in DATA_SHEETS but not here is reported as an empty
  * array, so its page renders blank even though the rows exist.
  */
-var ACTIVE_SHEETS = ['debts', 'debt_schedule', 'debt_statements', 'bills', 'bill_payables'];
+var ACTIVE_SHEETS = ['debts', 'debt_schedule', 'debt_statements', 'bills', 'bill_payables', 'income', 'income_sources'];
 
 /** Actions that return the full dataset instead of the affected row. */
 var RETURNS_DATA = {
@@ -56,6 +56,8 @@ var RETURNS_DATA = {
   addStatement: true, updateStatement: true, deleteStatement: true,
   addBill: true, updateBill: true, closeBill: true, deleteBill: true,
   updateBillPayable: true, deleteBillPayable: true, payBillPayable: true,
+  addIncome: true, updateIncome: true, deleteIncome: true,
+  addIncomeSource: true, updateIncomeSource: true, deleteIncomeSource: true,
   setCurrency: true
 };
 
@@ -683,6 +685,12 @@ function dispatch(action, p, uid) {
     case 'updateBillPayable': return updateBillPayable(p, uid);
     case 'deleteBillPayable': return deleteBillPayable(p, uid);
     case 'payBillPayable': return payBillPayable(p, uid);
+    case 'addIncome': return addIncome(p, uid);
+    case 'updateIncome': return updateIncome(p, uid);
+    case 'deleteIncome': return deleteIncome(p, uid);
+    case 'addIncomeSource': return addIncomeSource(p, uid);
+    case 'updateIncomeSource': return updateIncomeSource(p, uid);
+    case 'deleteIncomeSource': return deleteIncomeSource(p, uid);
     case 'setCurrency': return setCurrency(p, uid);
     default: throw new Error('Unknown action: ' + action);
   }
@@ -930,6 +938,95 @@ function payBillPayable(p, uid) {
   if (!hasOtherUnpaidPayable(found.bill.id, found.row.id)) {
     appendRow('bill_payables', newPayable(found.bill, uid, input.next_due_date));
   }
+  return null;
+}
+
+/**
+ * The caller's own source. Every income write goes through here: a crafted
+ * request naming someone else's source_id would otherwise read that source's
+ * name back through getAll.
+ */
+function assertOwnedSource(sourceId, uid) {
+  if (blank(sourceId)) throw new Error('An income entry needs a source');
+  assertOwned('income_sources', sourceId, uid);
+}
+
+function addIncome(p, uid) {
+  var input = p.input || {};
+  assertOwnedSource(input.source_id, uid);
+  appendRow('income', {
+    id: nextId('income'),
+    user_id: uid,
+    source_id: input.source_id,
+    amount: input.amount,
+    date: input.date,
+    notes: input.notes,
+    allocation_period_id: ''
+  });
+  return null;
+}
+
+function updateIncome(p, uid) {
+  var rowIndex = ownedRowIndex('income', p.id, uid);
+  var patch = p.patch || {};
+  // Only when the caller is actually moving the entry to another source.
+  if (Object.prototype.hasOwnProperty.call(patch, 'source_id')) {
+    assertOwnedSource(patch.source_id, uid);
+  }
+  return patchRowAt('income', rowIndex, patch);
+}
+
+function deleteIncome(p, uid) {
+  var rowIndex = ownedRowIndex('income', p.id, uid);
+  var row = getById('income', p.id);
+  // Unreachable until FT-5 sets this column. Implemented now because
+  // retrofitting a guard after the dependent feature exists costs more.
+  if (row && !blank(row.allocation_period_id)) {
+    throw new Error('That income funds allocation period ' + row.allocation_period_id + '. Unlink it first.');
+  }
+  sheet('income').deleteRow(rowIndex);
+  return null;
+}
+
+function addIncomeSource(p, uid) {
+  var input = p.input || {};
+  var name = String(input.name || '').trim();
+  if (!name) throw new Error('A source needs a name');
+  appendRow('income_sources', {
+    id: nextId('income_sources'),
+    user_id: uid,
+    name: name,
+    archived: false
+  });
+  return null;
+}
+
+function updateIncomeSource(p, uid) {
+  var rowIndex = ownedRowIndex('income_sources', p.id, uid);
+  var patch = {};
+  if (Object.prototype.hasOwnProperty.call(p.patch || {}, 'name')) {
+    var name = String(p.patch.name || '').trim();
+    if (!name) throw new Error('A source needs a name');
+    patch.name = name;
+  }
+  if (Object.prototype.hasOwnProperty.call(p.patch || {}, 'archived')) {
+    patch.archived = p.patch.archived === true;
+  }
+  return patchRowAt('income_sources', rowIndex, patch);
+}
+
+/** Deleted only when unused. A used source is archived instead, never cascaded. */
+function deleteIncomeSource(p, uid) {
+  var rowIndex = ownedRowIndex('income_sources', p.id, uid);
+  var rows = readOwnedRows('income', uid);
+  var used = 0;
+  for (var i = 0; i < rows.length; i++) {
+    if (num(rows[i].source_id) === num(p.id)) used++;
+  }
+  if (used > 0) {
+    throw new Error(used + (used === 1 ? ' entry uses' : ' entries use') + ' that source. Archive it instead.');
+  }
+  sheet('income_sources').deleteRow(rowIndex);
   return null;
 }
 
