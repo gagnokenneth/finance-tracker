@@ -38,3 +38,19 @@ export function nextMonthOn(date: string): string {
   const [year, month, day] = date.split('-').map(Number)
   return dateOn(year, month + 1, day)
 }
+
+/**
+ * Inclusive ISO bounds of a yyyy-mm. The one definition of "this month" —
+ * FT-5's allocation periods and FT-7's dashboard both filter through this
+ * rather than comparing date prefixes their own way.
+ */
+export function monthWindow(month: string): { start: string; end: string } {
+  const [y, m] = month.split('-').map(Number)
+  return { start: dateOn(y, m, 1), end: dateOn(y, m, 31) }
+}
+
+/** The yyyy-mm n months away; n may be negative. */
+export function addMonths(month: string, n: number): string {
+  const [y, m] = month.split('-').map(Number)
+  return monthKey(new Date(y, m - 1 + n, 1))
+}
