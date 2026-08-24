@@ -8,22 +8,17 @@ var INVITE_COUNT = 50;
 
 var SHEETS = {
   users: ['id', 'username', 'pw_hash', 'currency', 'created'],
-  funds: ['id', 'source', 'amount', 'date', 'notes'],
   bills: ['id', 'user_id', 'name', 'type', 'frequency', 'amount', 'day', 'second_day', 'month', 'closed'],
   bill_payables: ['id', 'user_id', 'bill_id', 'due_date', 'amount', 'paid', 'paid_date', 'paid_amount'],
-  expendable: ['id', 'month', 'daily_amount', 'date', 'notes'],
   debts: ['id', 'user_id', 'name', 'type'],
   debt_schedule: ['id', 'user_id', 'debt_id', 'due_date', 'amount', 'paid', 'paid_date', 'paid_amount'],
   debt_statements: ['id', 'user_id', 'debt_id', 'due_date', 'min_due', 'total_due', 'outstanding', 'paid', 'paid_date', 'paid_amount'],
-  savings: ['id', 'date', 'amount', 'source', 'total', 'notes'],
-  savings_transfers: ['id', 'date', 'amount', 'notes'],
   income: ['id', 'user_id', 'source', 'amount', 'date', 'notes', 'allocation_period_id'],
   savings_ledger: ['id', 'user_id', 'date', 'amount', 'kind', 'ref_type', 'ref_id', 'notes'],
   allocations: ['id', 'user_id', 'name', 'frequency', 'day', 'second_day', 'month', 'closed'],
   allocation_periods: ['id', 'user_id', 'allocation_id', 'period_date'],
   allocation_lines: ['id', 'user_id', 'period_id', 'target_type', 'target_id', 'label', 'planned_amount', 'committed', 'committed_date', 'committed_amount', 'source'],
-  invites: ['code', 'used_by', 'used_at'],
-  settings: ['key', 'value']
+  invites: ['code', 'used_by', 'used_at']
 };
 
 /**
@@ -31,7 +26,7 @@ var SHEETS = {
  * so the new shape is applied on the very next request after a deployment,
  * instead of up to an hour later.
  */
-var SCHEMA_VERSION = 6;
+var SCHEMA_VERSION = 7;
 
 /*
  * Tabs whose stale shape may be DISCARDED and recreated. Deliberately excludes
@@ -41,15 +36,15 @@ var SCHEMA_VERSION = 6;
  */
 var REBUILDABLE_SHEETS = ['debts', 'debt_schedule', 'debt_statements', 'bills', 'bill_payables', 'income', 'savings_ledger', 'allocations', 'allocation_periods', 'allocation_lines'];
 
-var DATA_SHEETS = ['funds', 'bills', 'bill_payables', 'expendable', 'debts', 'debt_schedule', 'debt_statements', 'savings', 'savings_transfers', 'income', 'savings_ledger', 'allocations', 'allocation_periods', 'allocation_lines'];
+var DATA_SHEETS = ['bills', 'bill_payables', 'debts', 'debt_schedule', 'debt_statements', 'income', 'savings_ledger', 'allocations', 'allocation_periods', 'allocation_lines'];
 
 /**
  * Sheets getAll actually reads. Every sheet read is a separate round trip, so
  * reading the ones no screen displays is pure latency.
  *
- * IMPORTANT: if you re-enable Funds, Expendable or Savings in the frontend, add
- * their sheet names here. Otherwise those pages render empty even though the
- * rows exist.
+ * IMPORTANT: a module ticket that starts reading a sheet must add it here in
+ * the same change. A sheet in DATA_SHEETS but not here is reported as an empty
+ * array, so its page renders blank even though the rows exist.
  */
 var ACTIVE_SHEETS = ['debts', 'debt_schedule', 'debt_statements', 'bills', 'bill_payables'];
 
@@ -443,7 +438,7 @@ function readRows(name) {
   var headers = values[0];
   var rows = [];
   for (var i = 1; i < values.length; i++) {
-    if (values[i][0] === '' && name !== 'settings') continue; // skip blank id rows
+    if (values[i][0] === '') continue; // skip blank id rows
     var row = {};
     for (var c = 0; c < headers.length; c++) row[headers[c]] = values[i][c];
     rows.push(row);
@@ -452,7 +447,6 @@ function readRows(name) {
 }
 
 function coerce(name, r) {
-  if (name === 'funds') return { id: num(r.id), source: String(r.source), amount: num(r.amount), date: fmtDate(r.date), notes: r.notes ? String(r.notes) : undefined };
   if (name === 'bills') return {
     id: num(r.id), name: String(r.name), type: String(r.type), frequency: String(r.frequency),
     amount: optNum(r.amount), day: num(r.day), second_day: optNum(r.second_day),
@@ -464,7 +458,6 @@ function coerce(name, r) {
     id: num(r.id), bill_id: num(r.bill_id), due_date: fmtDate(r.due_date), amount: optNum(r.amount),
     paid: bool(r.paid), paid_date: optDate(r.paid_date), paid_amount: optNum(r.paid_amount)
   };
-  if (name === 'expendable') return { id: num(r.id), month: String(r.month), daily_amount: num(r.daily_amount), date: fmtDate(r.date), notes: r.notes ? String(r.notes) : undefined };
   if (name === 'debts') return { id: num(r.id), name: String(r.name), type: String(r.type) };
   if (name === 'debt_schedule') return {
     id: num(r.id), debt_id: num(r.debt_id), due_date: fmtDate(r.due_date), amount: num(r.amount),
@@ -477,8 +470,6 @@ function coerce(name, r) {
     min_due: optNum(r.min_due), total_due: optNum(r.total_due), outstanding: optNum(r.outstanding),
     paid: bool(r.paid), paid_date: optDate(r.paid_date), paid_amount: optNum(r.paid_amount)
   };
-  if (name === 'savings') return { id: num(r.id), date: fmtDate(r.date), amount: num(r.amount), source: String(r.source), total: num(r.total), notes: r.notes ? String(r.notes) : undefined };
-  if (name === 'savings_transfers') return { id: num(r.id), date: fmtDate(r.date), amount: num(r.amount), notes: r.notes ? String(r.notes) : undefined };
   if (name === 'income') return {
     id: num(r.id), source: String(r.source), amount: num(r.amount), date: fmtDate(r.date),
     notes: optStr(r.notes), allocation_period_id: optNum(r.allocation_period_id)
@@ -610,17 +601,6 @@ function sumField(rows, field) {
   return t;
 }
 
-/** Global settings only. Currency is per-user and attached by getAll. */
-function readSettings() {
-  var rows = readRows('settings');
-  var monthlyBudgets = {};
-  for (var i = 0; i < rows.length; i++) {
-    var k = String(rows[i].key);
-    if (k.indexOf('budget_') === 0) monthlyBudgets[k.substring(7)] = num(rows[i].value);
-  }
-  return { monthlyBudgets: monthlyBudgets };
-}
-
 /** Rows of `name` belonging to this user. */
 function readOwnedRows(name, uid) {
   var rows = readRows(name);
@@ -668,17 +648,16 @@ function getAll(uid) {
     data[name] = readOwnedRows(name, uid).map(function (r) { return coerce(name, r); });
   });
   var user = userById(uid);
-  data.settings = readSettings();
-  data.settings.currency = user ? user.currency : 'PHP';
+  data.settings = { currency: user ? user.currency : 'PHP' };
   return data;
 }
 
 /*
- * Only per-user debt and bill actions are served. The funds / expendable /
- * savings sheets have no user_id column, so serving their actions would let any
- * authenticated user read and write another user's rows. Their pages are
- * unreachable in the frontend; re-enabling one means giving its sheet a user_id
- * and scoping its handlers first.
+ * Every sheet served here is per-user: its second column is user_id and its
+ * handlers go through readOwnedRows / assertOwned. The income, savings_ledger
+ * and allocation sheets exist but have no actions yet; each module ticket adds
+ * its own. Anything added here without an ownership check would let any
+ * authenticated user read and write another user's rows.
  */
 function dispatch(action, p, uid) {
   switch (action) {
@@ -954,10 +933,3 @@ function setCurrency(p, uid) {
   return null;
 }
 
-function transferSavingsToFunds(p) {
-  var transfer = { id: nextId('savings_transfers'), date: p.date, amount: p.amount, notes: p.notes || '' };
-  appendRow('savings_transfers', transfer);
-  var fund = { id: nextId('funds'), source: 'Savings', amount: p.amount, date: p.date, notes: p.notes || '' };
-  appendRow('funds', fund);
-  return { transfer: coerce('savings_transfers', transfer), fund: coerce('funds', fund) };
-}
