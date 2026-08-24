@@ -27,6 +27,7 @@ import type {
   Currency,
 } from '../../types.ts'
 import { createSeed } from './seed.ts'
+import { backfillArrays } from '../../lib/financeShape.ts'
 import { readToken, decodeSession } from '../../auth/session.ts'
 import { normalizeUsername, isValidUsername, USERNAME_RULE } from '../../auth/password.ts'
 
@@ -98,9 +99,11 @@ export class MockApi implements FinanceApi {
     const data = db.data[key]
     if (!data) throw new Error('unauthorized')
     // Backfilled for the same reason loadDb backfills its own fields: this blob
-    // is persisted JSON that outlives code changes, and a browser holding the
-    // shape from before bill_payables existed must not crash on it.
-    data.bill_payables ??= []
+    // is persisted JSON that outlives code changes, and a browser holding a
+    // shape from before a field existed must not take every page down with it.
+    // Driven by financeShape's own list rather than naming fields here, so a
+    // schema change cannot be applied to the check and forgotten here.
+    backfillArrays(data)
     return data
   }
 

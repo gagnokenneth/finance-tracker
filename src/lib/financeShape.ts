@@ -1,4 +1,5 @@
 import type { FinanceData } from '../types.ts'
+import { DEFAULT_CURRENCY } from './currency.ts'
 
 /**
  * The array fields every page indexes into without checking. A dataset missing
@@ -24,6 +25,27 @@ const REQUIRED_ARRAYS: readonly (keyof FinanceData)[] = [
   'allocation_periods',
   'allocation_lines',
 ]
+
+/**
+ * Fills in array fields a stored dataset is missing, in place.
+ *
+ * For persisted JSON that outlives code changes — MockApi's own localStorage
+ * database, which is written by one build and read by the next. A blob missing
+ * an array added later fails isFinanceData and takes every page down with
+ * "Could not load your data", and no cache buster helps: that store is not the
+ * query cache.
+ *
+ * Driven by the same list as the check itself, so a new field cannot be added
+ * to one and forgotten in the other. Extra keys from retired modules are left
+ * alone — isFinanceData ignores them.
+ */
+export function backfillArrays(value: FinanceData): void {
+  const record = value as unknown as Record<string, unknown>
+  for (const key of REQUIRED_ARRAYS) {
+    if (!Array.isArray(record[key])) record[key] = []
+  }
+  if (!isRecord(record.settings)) record.settings = { currency: DEFAULT_CURRENCY }
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
