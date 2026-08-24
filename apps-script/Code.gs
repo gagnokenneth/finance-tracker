@@ -50,7 +50,7 @@ var DATA_SHEETS = ['bills', 'bill_payables', 'debts', 'debt_schedule', 'debt_sta
  * the same change. A sheet in DATA_SHEETS but not here is reported as an empty
  * array, so its page renders blank even though the rows exist.
  */
-var ACTIVE_SHEETS = ['debts', 'debt_schedule', 'debt_statements', 'bills', 'bill_payables', 'income', 'income_sources'];
+var ACTIVE_SHEETS = ['debts', 'debt_schedule', 'debt_statements', 'bills', 'bill_payables', 'income', 'income_sources', 'savings_ledger'];
 
 /** Actions that return the full dataset instead of the affected row. */
 var RETURNS_DATA = {
@@ -61,7 +61,8 @@ var RETURNS_DATA = {
   updateBillPayable: true, deleteBillPayable: true, payBillPayable: true,
   addIncome: true, updateIncome: true, deleteIncome: true,
   addIncomeSource: true, updateIncomeSource: true, deleteIncomeSource: true,
-  setCurrency: true
+  setCurrency: true,
+  addSavingsEntry: true, updateSavingsEntry: true, deleteSavingsEntry: true
 };
 
 function doGet() {
@@ -699,6 +700,9 @@ function dispatch(action, p, uid) {
     case 'updateIncomeSource': return updateIncomeSource(p, uid);
     case 'deleteIncomeSource': return deleteIncomeSource(p, uid);
     case 'setCurrency': return setCurrency(p, uid);
+    case 'addSavingsEntry': return addSavingsEntry(p, uid);
+    case 'updateSavingsEntry': return updateSavingsEntry(p, uid);
+    case 'deleteSavingsEntry': return deleteSavingsEntry(p, uid);
     default: throw new Error('Unknown action: ' + action);
   }
 }
@@ -1077,6 +1081,148 @@ function deleteIncomeSource(p, uid) {
 
 function setCurrency(p, uid) {
   setCell('users', uid, 'currency', p.currency);
+  return null;
+}
+
+/**
+ * The stored amount is signed; the input is a positive magnitude, so the kind
+ * and the sign cannot disagree. MockApi and lib/savings.ts convert identically.
+ */
+function signedSavingsAmount(kind, magnitude) {
+  var size = Math.abs(Number(magnitude));
+  return kind === 'withdrawal' ? -size : size;
+}
+
+/** Only the two kinds a user creates. FT-4 writes the payment kinds itself. */
+function assertMovementKind(kind) {
+  if (kind !== 'deposit' && kind !== 'withdrawal') {
+    throw new Error('A savings movement must be a deposit or a withdrawal');
+  }
+}
+
+function assertSavingsDate(date) {
+  if (blank(date)) throw new Error('A savings movement needs a date');
+}
+
+function assertSavingsAmount(amount) {
+  var n = Number(amount);
+  if (blank(amount) || isNaN(n)) throw new Error('A savings movement needs an amount');
+  if (n <= 0) throw new Error('Enter a positive amount and pick deposit or withdrawal');
+}
+
+/**
+ * The caller's rows, read ONCE. Both the below-zero guard and the row being
+ * edited come out of the same read: ownedRowIndex already gave us the sheet
+ * position from a narrow two-column read, so calling getById as well would be
+ * a third trip for a row this array already contains.
+ */
+function ownedSavingsRows(uid) {
+  return readOwnedRows('savings_ledger', uid);
+}
+
+function savingsBalanceOf(rows) {
+  return sumField(rows, 'amount');
+}
+
+function findSavingsRow(rows, id) {
+  for (var i = 0; i < rows.length; i++) {
+    if (num(rows[i].id) === num(id)) return coerce('savings_ledger', rows[i]);
+  }
+  throw new Error('not found');
+}
+
+/**
+ * Refused on the FINAL balance, not on any intermediate point. A backdated
+ * withdrawal may make older rows' running balance dip while the sum stays
+ * valid; that is permitted, because movements are often entered out of order
+ * and a user cannot locate which historical row a refusal refers to.
+ */
+function assertNotBelowZero(balance) {
+  if (balance < 0) {
+    throw new Error('That would put savings below zero. The balance is ' + balance + '.');
+  }
+}
+
+/**
+ * A payment row belongs to the bill or debt it settled: editing it here would
+ * desync the two. Unreachable until FT-4 writes the payment kinds.
+ */
+function assertNotPaymentRow(row) {
+  if (row && (row.kind === 'bill_payment' || row.kind === 'debt_payment')) {
+    throw new Error('That movement settled a bill or debt. Change it there instead.');
+  }
+}
+
+function addSavingsEntry(p, uid) {
+  var input = p.input || {};
+  assertMovementKind(input.kind);
+  assertSavingsDate(input.date);
+  assertSavingsAmount(input.amount);
+  var signed = signedSavingsAmount(input.kind, input.amount);
+  assertNotBelowZero(savingsBalanceOf(ownedSavingsRows(uid)) + signed);
+  appendRow('savings_ledger', {
+    id: nextId('savings_ledger'),
+    user_id: uid,
+    date: input.date,
+    amount: signed,
+    kind: input.kind,
+    ref_type: '',
+    ref_id: '',
+    notes: input.notes
+  });
+  return null;
+}
+
+/*
+ * Whitelisted, not forwarded. patchRowAt skips only the id columns, so an
+ * unfiltered patch would let a client write ref_type and ref_id — which is how
+ * FT-4 ties a ledger row to the payment it settled. The same hole FT-2 had to
+ * close after review.
+ */
+function updateSavingsEntry(p, uid) {
+  var rowIndex = ownedRowIndex('savings_ledger', p.id, uid);
+  var rows = ownedSavingsRows(uid);
+  var row = findSavingsRow(rows, p.id);
+  assertNotPaymentRow(row);
+
+  var given = p.patch || {};
+  var patch = {};
+  if (Object.prototype.hasOwnProperty.call(given, 'date')) {
+    assertSavingsDate(given.date);
+    patch.date = given.date;
+  }
+  if (Object.prototype.hasOwnProperty.call(given, 'notes')) {
+    // null and undefined both reach patchRowAt as a blank cell, which coerce
+    // reads back as undefined.
+    patch.notes = given.notes;
+  }
+
+  // Kind and amount move together: either one changes the signed value, and
+  // editing a deposit into a withdrawal moves the balance by twice the amount.
+  var hasKind = Object.prototype.hasOwnProperty.call(given, 'kind');
+  var hasAmount = Object.prototype.hasOwnProperty.call(given, 'amount');
+  if (hasKind || hasAmount) {
+    var kind = hasKind ? given.kind : row.kind;
+    assertMovementKind(kind);
+    var magnitude = hasAmount ? given.amount : Math.abs(Number(row.amount));
+    assertSavingsAmount(magnitude);
+    var signed = signedSavingsAmount(kind, magnitude);
+    assertNotBelowZero(savingsBalanceOf(rows) - Number(row.amount) + signed);
+    patch.kind = kind;
+    patch.amount = signed;
+  }
+  return patchRowAt('savings_ledger', rowIndex, patch);
+}
+
+/* Deleting a deposit LOWERS the balance, so delete is subject to the same
+ * check as a write rather than exempt from it. */
+function deleteSavingsEntry(p, uid) {
+  var rowIndex = ownedRowIndex('savings_ledger', p.id, uid);
+  var rows = ownedSavingsRows(uid);
+  var row = findSavingsRow(rows, p.id);
+  assertNotPaymentRow(row);
+  assertNotBelowZero(savingsBalanceOf(rows) - Number(row.amount));
+  sheet('savings_ledger').deleteRow(rowIndex);
   return null;
 }
 
