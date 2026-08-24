@@ -5,6 +5,8 @@ import type {
   DebtScheduleRow,
   DebtStatement,
   Currency,
+  IncomeEntry,
+  IncomeSource,
 } from '../types.ts'
 
 /**
@@ -43,6 +45,11 @@ export type StatementPatch = Partial<Omit<NewStatement, 'min_due' | 'total_due' 
   total_due?: number | null
   outstanding?: number | null
 }
+
+export type NewIncome = Omit<IncomeEntry, 'id' | 'allocation_period_id'>
+export type IncomePatch = Partial<NewIncome>
+export type NewIncomeSource = Pick<IncomeSource, 'name'>
+export type IncomeSourcePatch = Partial<Omit<IncomeSource, 'id'>>
 
 export interface AuthResult {
   token: string
@@ -110,4 +117,16 @@ export interface FinanceApi {
   payBillPayable(id: number, input: PayBillInput): Promise<FinanceData>
 
   setCurrency(currency: Currency): Promise<FinanceData>
+
+  /* Income writes return the whole updated dataset, for the same reasons above. */
+
+  addIncome(input: NewIncome): Promise<FinanceData>
+  updateIncome(id: number, patch: IncomePatch): Promise<FinanceData>
+  /** Refused when the entry funds an allocation period. */
+  deleteIncome(id: number): Promise<FinanceData>
+
+  addIncomeSource(input: NewIncomeSource): Promise<FinanceData>
+  updateIncomeSource(id: number, patch: IncomeSourcePatch): Promise<FinanceData>
+  /** Refused when any entry uses it — archive instead. */
+  deleteIncomeSource(id: number): Promise<FinanceData>
 }

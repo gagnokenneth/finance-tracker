@@ -5,6 +5,8 @@ import type {
   DebtScheduleRow,
   DebtStatement,
   FinanceData,
+  IncomeEntry,
+  IncomeSource,
 } from '../types.ts'
 import type {
   BillPatch,
@@ -16,6 +18,10 @@ import type {
   PayBillInput,
   ScheduleRowPatch,
   StatementPatch,
+  NewIncome,
+  IncomePatch,
+  NewIncomeSource,
+  IncomeSourcePatch,
 } from '../api/FinanceApi.ts'
 import { tempId } from './tempId.ts'
 
@@ -284,4 +290,50 @@ export function removeDebt(data: FinanceData, id: number): FinanceData {
     debt_schedule: data.debt_schedule.filter((row) => row.debt_id !== id),
     debt_statements: data.debt_statements.filter((row) => row.debt_id !== id),
   }
+}
+
+export function addIncomeTo(data: FinanceData, vars: NewIncome): FinanceData {
+  const entry: IncomeEntry = { id: tempId(), ...vars }
+  return { ...data, income: [...data.income, entry] }
+}
+
+export function applyIncomePatch(
+  data: FinanceData,
+  vars: { id: number; patch: IncomePatch },
+): FinanceData {
+  return {
+    ...data,
+    income: data.income.map((row) => (row.id === vars.id ? { ...row, ...vars.patch } : row)),
+  }
+}
+
+export function removeIncome(data: FinanceData, id: number): FinanceData {
+  return { ...data, income: data.income.filter((row) => row.id !== id) }
+}
+
+export function addIncomeSourceTo(data: FinanceData, vars: NewIncomeSource): FinanceData {
+  // archived: false mirrors what both backends assign — a prediction that left
+  // it undefined would flicker when the response arrived.
+  const source: IncomeSource = { id: tempId(), name: vars.name, archived: false }
+  return { ...data, income_sources: [...data.income_sources, source] }
+}
+
+export function applyIncomeSourcePatch(
+  data: FinanceData,
+  vars: { id: number; patch: IncomeSourcePatch },
+): FinanceData {
+  return {
+    ...data,
+    income_sources: data.income_sources.map((s) =>
+      s.id === vars.id ? { ...s, ...vars.patch } : s,
+    ),
+  }
+}
+
+/**
+ * Only ever called for a source with no entries — both backends refuse
+ * otherwise — so no entry needs re-pointing here.
+ */
+export function removeIncomeSource(data: FinanceData, id: number): FinanceData {
+  return { ...data, income_sources: data.income_sources.filter((s) => s.id !== id) }
 }

@@ -21,6 +21,12 @@ import {
   removeScheduleRow,
   removeStatement,
   renameDebt,
+  addIncomeTo,
+  applyIncomePatch,
+  removeIncome,
+  addIncomeSourceTo,
+  applyIncomeSourcePatch,
+  removeIncomeSource,
 } from '../lib/optimistic.ts'
 import type { Currency, FinanceData } from '../types.ts'
 import type {
@@ -33,6 +39,10 @@ import type {
   NewStatement,
   ScheduleRowPatch,
   StatementPatch,
+  NewIncome,
+  IncomePatch,
+  NewIncomeSource,
+  IncomeSourcePatch,
 } from '../api/FinanceApi.ts'
 
 export function useFinanceMutations() {
@@ -202,6 +212,33 @@ export function useFinanceMutations() {
     },
   })
 
+  const addIncome = useMutation({
+    mutationFn: (i: NewIncome) => getApi().addIncome(i),
+    ...optimistic(addIncomeTo, 'That income did not save. It has been removed.'),
+  })
+  const updateIncome = useMutation({
+    mutationFn: (v: { id: number; patch: IncomePatch }) => getApi().updateIncome(v.id, v.patch),
+    ...optimistic(applyIncomePatch, 'That change did not save. The entry is back as it was.'),
+  })
+  const deleteIncome = useMutation({
+    mutationFn: (id: number) => getApi().deleteIncome(id),
+    ...optimistic(removeIncome, 'That income could not be deleted. It has been restored.'),
+  })
+
+  const addIncomeSource = useMutation({
+    mutationFn: (i: NewIncomeSource) => getApi().addIncomeSource(i),
+    ...optimistic(addIncomeSourceTo, 'That source did not save. It has been removed.'),
+  })
+  const updateIncomeSource = useMutation({
+    mutationFn: (v: { id: number; patch: IncomeSourcePatch }) =>
+      getApi().updateIncomeSource(v.id, v.patch),
+    ...optimistic(applyIncomeSourcePatch, 'That source did not save. It is back as it was.'),
+  })
+  const deleteIncomeSource = useMutation({
+    mutationFn: (id: number) => getApi().deleteIncomeSource(id),
+    ...optimistic(removeIncomeSource, 'That source could not be deleted. It has been restored.'),
+  })
+
   return {
     addDebt,
     updateDebt,
@@ -220,5 +257,11 @@ export function useFinanceMutations() {
     deleteBillPayable,
     payBillPayable,
     setCurrency,
+    addIncome,
+    updateIncome,
+    deleteIncome,
+    addIncomeSource,
+    updateIncomeSource,
+    deleteIncomeSource,
   }
 }

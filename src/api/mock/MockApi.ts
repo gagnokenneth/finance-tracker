@@ -12,6 +12,10 @@ import type {
   AuthResult,
   SignupInput,
   LoginInput,
+  NewIncome,
+  IncomePatch,
+  NewIncomeSource,
+  IncomeSourcePatch,
 } from '../FinanceApi.ts'
 import type {
   FinanceData,
@@ -349,6 +353,67 @@ export class MockApi implements FinanceApi {
   async setCurrency(currency: Currency): Promise<FinanceData> {
     const data = this.load()
     data.settings.currency = currency
+    this.save(data)
+    return this.delay(data)
+  }
+
+  async addIncome(input: NewIncome): Promise<FinanceData> {
+    const data = this.load()
+    data.income.push({ id: nextId(data.income), ...input })
+    this.save(data)
+    return this.delay(data)
+  }
+
+  async updateIncome(id: number, patch: IncomePatch): Promise<FinanceData> {
+    const data = this.load()
+    const row = data.income.find((r) => r.id === id)
+    if (!row) throw new Error(`Income ${id} not found`)
+    Object.assign(row, patch)
+    this.save(data)
+    return this.delay(data)
+  }
+
+  async deleteIncome(id: number): Promise<FinanceData> {
+    const data = this.load()
+    const row = data.income.find((r) => r.id === id)
+    // Throws like ownedRowIndex does, so a missing row fails the same way on
+    // both backends instead of silently succeeding here.
+    if (!row) throw new Error(`Income ${id} not found`)
+    if (row.allocation_period_id !== undefined) {
+      throw new Error(
+        `That income funds allocation period ${row.allocation_period_id}. Unlink it first.`,
+      )
+    }
+    data.income = data.income.filter((r) => r.id !== id)
+    this.save(data)
+    return this.delay(data)
+  }
+
+  async addIncomeSource(input: NewIncomeSource): Promise<FinanceData> {
+    const data = this.load()
+    data.income_sources.push({ id: nextId(data.income_sources), ...input, archived: false })
+    this.save(data)
+    return this.delay(data)
+  }
+
+  async updateIncomeSource(id: number, patch: IncomeSourcePatch): Promise<FinanceData> {
+    const data = this.load()
+    const row = data.income_sources.find((s) => s.id === id)
+    if (!row) throw new Error(`Income source ${id} not found`)
+    Object.assign(row, patch)
+    this.save(data)
+    return this.delay(data)
+  }
+
+  async deleteIncomeSource(id: number): Promise<FinanceData> {
+    const data = this.load()
+    const used = data.income.filter((r) => r.source_id === id).length
+    if (used > 0) {
+      throw new Error(
+        `${used} ${used === 1 ? 'entry uses' : 'entries use'} that source. Archive it instead.`,
+      )
+    }
+    data.income_sources = data.income_sources.filter((s) => s.id !== id)
     this.save(data)
     return this.delay(data)
   }

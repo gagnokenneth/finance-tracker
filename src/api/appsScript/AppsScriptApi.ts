@@ -12,6 +12,10 @@ import type {
   AuthResult,
   SignupInput,
   LoginInput,
+  NewIncome,
+  IncomePatch,
+  NewIncomeSource,
+  IncomeSourcePatch,
 } from '../FinanceApi.ts'
 import type { FinanceData, Currency } from '../../types.ts'
 import { readToken, clearToken } from '../../auth/session.ts'
@@ -170,5 +174,29 @@ export class AppsScriptApi implements FinanceApi {
 
   setCurrency(currency: Currency): Promise<FinanceData> {
     return this.call<FinanceData>('setCurrency', { currency })
+  }
+
+  addIncome(input: NewIncome): Promise<FinanceData> {
+    return this.call<FinanceData>('addIncome', { input })
+  }
+
+  updateIncome(id: number, patch: IncomePatch): Promise<FinanceData> {
+    return this.call<FinanceData>('updateIncome', { id, patch })
+  }
+
+  deleteIncome(id: number): Promise<FinanceData> {
+    return this.call<FinanceData>('deleteIncome', { id })
+  }
+
+  addIncomeSource(input: NewIncomeSource): Promise<FinanceData> {
+    return this.call<FinanceData>('addIncomeSource', { input })
+  }
+
+  updateIncomeSource(id: number, patch: IncomeSourcePatch): Promise<FinanceData> {
+    return this.call<FinanceData>('updateIncomeSource', { id, patch })
+  }
+
+  deleteIncomeSource(id: number): Promise<FinanceData> {
+    return this.call<FinanceData>('deleteIncomeSource', { id })
   }
 }
