@@ -28,6 +28,11 @@ export function createSeed(): FinanceData {
     savings_transfers: [
       { id: 1, date: '2026-06-20', amount: 200 },
     ],
+    income: [],
+    savings_ledger: [],
+    allocations: [],
+    allocation_periods: [],
+    allocation_lines: [],
     settings: {
       monthlyBudgets: { '2026-06': 900 },
       currency: 'PHP',

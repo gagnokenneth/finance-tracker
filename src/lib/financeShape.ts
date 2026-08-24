@@ -21,6 +21,11 @@ const REQUIRED_ARRAYS: readonly (keyof FinanceData)[] = [
   'debt_statements',
   'savings',
   'savings_transfers',
+  'income',
+  'savings_ledger',
+  'allocations',
+  'allocation_periods',
+  'allocation_lines',
 ]
 
 function isRecord(value: unknown): value is Record<string, unknown> {

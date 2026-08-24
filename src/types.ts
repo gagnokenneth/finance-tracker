@@ -101,6 +101,78 @@ export interface SavingsTransfer {
   notes?: string
 }
 
+export type SavingsLedgerKind = 'deposit' | 'withdrawal' | 'bill_payment' | 'debt_payment'
+export type SavingsRefType = 'bill_payable' | 'debt_schedule' | 'debt_statement'
+export type AllocationTargetType = SavingsRefType | 'savings' | 'other'
+export type AllocationSource = 'income' | 'savings'
+
+/** Money in. Flat entries; no recurrence by design. */
+export interface IncomeEntry {
+  id: number
+  source: string
+  amount: number
+  date: string // ISO yyyy-mm-dd
+  notes?: string
+  /** Set when this entry funds an allocation period. Blocks deletion. */
+  allocation_period_id?: number
+}
+
+/**
+ * One movement of the savings balance. Signed: positive is a deposit,
+ * negative a withdrawal or a bill/debt payment. The balance is the sum of
+ * these and is never stored — the retired SavingsEntry.total was a running
+ * total computed at write time, which every later row silently contradicted
+ * once an earlier one was edited or deleted.
+ */
+export interface SavingsLedgerEntry {
+  id: number
+  date: string
+  amount: number
+  kind: SavingsLedgerKind
+  /** Set for the payment kinds: what this payment settled. */
+  ref_type?: SavingsRefType
+  ref_id?: number
+  notes?: string
+}
+
+/** A recurring allocation plan. Instances live in allocation_periods. */
+export interface Allocation {
+  id: number
+  name: string
+  frequency: BillFrequency
+  day: number
+  second_day?: number
+  month?: number
+  closed: boolean
+}
+
+/** One occurrence of an allocation. */
+export interface AllocationPeriod {
+  id: number
+  allocation_id: number
+  period_date: string
+}
+
+/**
+ * One earmark within a period. planned_amount is the intent; the committed
+ * fields record what actually happened. planned_amount is independent of the
+ * target's own amount, because a variable bill's payable has no figure until
+ * its statement arrives.
+ */
+export interface AllocationLine {
+  id: number
+  period_id: number
+  target_type: AllocationTargetType
+  /** Unset for target_type 'other', which uses label instead. */
+  target_id?: number
+  label?: string
+  planned_amount: number
+  committed: boolean
+  committed_date?: string
+  committed_amount?: number
+  source?: AllocationSource
+}
+
 export interface Settings {
   // monthly expendable budget keyed by yyyy-mm
   monthlyBudgets: Record<string, number>
@@ -119,5 +191,10 @@ export interface FinanceData {
   debt_statements: DebtStatement[]
   savings: SavingsEntry[]
   savings_transfers: SavingsTransfer[]
+  income: IncomeEntry[]
+  savings_ledger: SavingsLedgerEntry[]
+  allocations: Allocation[]
+  allocation_periods: AllocationPeriod[]
+  allocation_lines: AllocationLine[]
   settings: Settings
 }
