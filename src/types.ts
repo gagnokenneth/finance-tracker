@@ -69,6 +69,8 @@ export interface DebtStatement {
 }
 
 export type SavingsLedgerKind = 'deposit' | 'withdrawal' | 'bill_payment' | 'debt_payment'
+/** The two kinds a user creates directly. The payment kinds are written by FT-4. */
+export type SavingsMovementKind = Extract<SavingsLedgerKind, 'deposit' | 'withdrawal'>
 export type SavingsRefType = 'bill_payable' | 'debt_schedule' | 'debt_statement'
 export type AllocationTargetType = SavingsRefType | 'savings' | 'other'
 export type AllocationSource = 'income' | 'savings'

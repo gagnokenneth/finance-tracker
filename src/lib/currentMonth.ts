@@ -49,6 +49,17 @@ export function monthWindow(month: string): { start: string; end: string } {
   return { start: dateOn(y, m, 1), end: dateOn(y, m, 31) }
 }
 
+/**
+ * Rows dated within a yyyy-mm, newest first. Generic because Income and
+ * Savings both need exactly this and two copies would drift apart.
+ */
+export function inMonth<T extends { date: string }>(rows: T[], month: string): T[] {
+  const { start, end } = monthWindow(month)
+  return rows
+    .filter((r) => r.date >= start && r.date <= end)
+    .sort((a, b) => b.date.localeCompare(a.date))
+}
+
 /** The yyyy-mm n months away; n may be negative. */
 export function addMonths(month: string, n: number): string {
   const [y, m] = month.split('-').map(Number)

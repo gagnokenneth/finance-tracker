@@ -1,13 +1,10 @@
-import { monthWindow } from './currentMonth.ts'
+import { inMonth } from './currentMonth.ts'
 import { isTemp } from './tempId.ts'
 import type { IncomeEntry, IncomeSource } from '../types.ts'
 
 /** Entries dated within a yyyy-mm, newest first. */
 export function entriesInMonth(rows: IncomeEntry[], month: string): IncomeEntry[] {
-  const { start, end } = monthWindow(month)
-  return rows
-    .filter((r) => r.date >= start && r.date <= end)
-    .sort((a, b) => b.date.localeCompare(a.date))
+  return inMonth(rows, month)
 }
 
 export function monthTotal(rows: IncomeEntry[]): number {
