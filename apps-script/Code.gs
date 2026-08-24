@@ -966,13 +966,25 @@ function addIncome(p, uid) {
   return null;
 }
 
+/*
+ * Whitelisted, not forwarded. patchRowAt skips only id, user_id, debt_id and
+ * bill_id, so an unfiltered patch would let a client write
+ * allocation_period_id — a column FT-5 owns. Worse, a client could clear its
+ * own link and then delete income that funds an allocation, defeating the
+ * guard in deleteIncome. NewIncome omitting the field constrains only the
+ * honest frontend; this is what constrains the rest.
+ */
 function updateIncome(p, uid) {
   var rowIndex = ownedRowIndex('income', p.id, uid);
-  var patch = p.patch || {};
-  // Only when the caller is actually moving the entry to another source.
-  if (Object.prototype.hasOwnProperty.call(patch, 'source_id')) {
-    assertOwnedSource(patch.source_id, uid);
+  var given = p.patch || {};
+  var patch = {};
+  if (Object.prototype.hasOwnProperty.call(given, 'source_id')) {
+    assertOwnedSource(given.source_id, uid);
+    patch.source_id = given.source_id;
   }
+  if (Object.prototype.hasOwnProperty.call(given, 'amount')) patch.amount = given.amount;
+  if (Object.prototype.hasOwnProperty.call(given, 'date')) patch.date = given.date;
+  if (Object.prototype.hasOwnProperty.call(given, 'notes')) patch.notes = given.notes;
   return patchRowAt('income', rowIndex, patch);
 }
 
