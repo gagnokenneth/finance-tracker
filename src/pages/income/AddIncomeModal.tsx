@@ -44,14 +44,21 @@ export function AddIncomeModal({
         <SourcePicker sources={sources} value={sourceId} onChange={setSourceId} />
         <Field label="Amount">
           <TextInput
+            required
             type="number"
             step="0.01"
+            min="0"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
           />
         </Field>
         <Field label="Date">
-          <TextInput type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          <TextInput
+            required
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+          />
         </Field>
         <Field label="Notes">
           <TextInput value={notes} onChange={(e) => setNotes(e.target.value)} />

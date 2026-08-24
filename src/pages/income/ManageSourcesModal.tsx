@@ -51,7 +51,7 @@ export function ManageSourcesModal({
       <form onSubmit={submit} className="flex items-end gap-2">
         <div className="flex-1">
           <Field label="New source">
-            <TextInput value={name} onChange={(e) => setName(e.target.value)} placeholder="Salary" />
+            <TextInput value={name} onChange={(e) => setName(e.target.value)} />
           </Field>
         </div>
         <Button type="submit">Add</Button>

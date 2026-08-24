@@ -33,6 +33,25 @@ import { normalizeUsername, isValidUsername, USERNAME_RULE } from '../../auth/pa
 
 const KEY = 'finance-mock-db'
 
+/*
+ * Mirrors assertIncomeDate / assertIncomeAmount in Code.gs. The two backends
+ * must agree on what fails and with what message, or predictions in
+ * lib/optimistic.ts cannot match both — the rule stated at the top of that file.
+ *
+ * A blank date is the one worth guarding: it writes a row no month window
+ * matches, invisible on every screen and so unreachable for edit or delete.
+ */
+function assertIncomeDate(date: string | undefined): void {
+  if (!date) throw new Error('An income entry needs a date')
+}
+
+function assertIncomeAmount(amount: number | undefined): void {
+  if (amount === undefined || Number.isNaN(Number(amount))) {
+    throw new Error('An income entry needs an amount')
+  }
+  if (Number(amount) < 0) throw new Error('An income amount cannot be negative')
+}
+
 interface MockUser {
   id: number
   username: string
@@ -365,6 +384,8 @@ export class MockApi implements FinanceApi {
     if (!data.income_sources.some((s) => s.id === input.source_id)) {
       throw new Error(`Income source ${input.source_id} not found`)
     }
+    assertIncomeDate(input.date)
+    assertIncomeAmount(input.amount)
     data.income.push({ id: nextId(data.income), ...input })
     this.save(data)
     return this.delay(data)
@@ -382,6 +403,8 @@ export class MockApi implements FinanceApi {
     ) {
       throw new Error(`Income source ${patch.source_id} not found`)
     }
+    if (Object.prototype.hasOwnProperty.call(patch, 'date')) assertIncomeDate(patch.date)
+    if (Object.prototype.hasOwnProperty.call(patch, 'amount')) assertIncomeAmount(patch.amount)
     Object.assign(row, patch)
     // null is the wire's "clear this"; the stored model uses undefined.
     if (patch.notes === null) row.notes = undefined

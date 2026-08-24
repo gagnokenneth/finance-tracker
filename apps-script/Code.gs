@@ -664,10 +664,14 @@ function getAll(uid) {
 
 /*
  * Every sheet served here is per-user: its second column is user_id and its
- * handlers go through readOwnedRows / assertOwned. The income, savings_ledger
- * and allocation sheets exist but have no actions yet; each module ticket adds
- * its own. Anything added here without an ownership check would let any
+ * handlers go through readOwnedRows / assertOwned. The savings_ledger and
+ * allocation sheets exist but have no actions yet; each module ticket adds its
+ * own. Anything added here without an ownership check would let any
  * authenticated user read and write another user's rows.
+ *
+ * A foreign key needs its own check: the income handlers call assertOwnedSource
+ * on source_id, because a request naming someone else's source would otherwise
+ * read that source's name back through getAll.
  */
 function dispatch(action, p, uid) {
   switch (action) {
@@ -954,9 +958,26 @@ function assertOwnedSource(sourceId, uid) {
   assertOwned('income_sources', sourceId, uid);
 }
 
+/**
+ * A date and a usable amount. The frontend marks both fields required, but a
+ * blank date writes a row no month window matches — invisible on every screen,
+ * so unreachable for edit or delete while still sitting in the sheet.
+ */
+function assertIncomeDate(date) {
+  if (blank(date)) throw new Error('An income entry needs a date');
+}
+
+function assertIncomeAmount(amount) {
+  var n = Number(amount);
+  if (blank(amount) || isNaN(n)) throw new Error('An income entry needs an amount');
+  if (n < 0) throw new Error('An income amount cannot be negative');
+}
+
 function addIncome(p, uid) {
   var input = p.input || {};
   assertOwnedSource(input.source_id, uid);
+  assertIncomeDate(input.date);
+  assertIncomeAmount(input.amount);
   appendRow('income', {
     id: nextId('income'),
     user_id: uid,
@@ -985,8 +1006,14 @@ function updateIncome(p, uid) {
     assertOwnedSource(given.source_id, uid);
     patch.source_id = given.source_id;
   }
-  if (Object.prototype.hasOwnProperty.call(given, 'amount')) patch.amount = given.amount;
-  if (Object.prototype.hasOwnProperty.call(given, 'date')) patch.date = given.date;
+  if (Object.prototype.hasOwnProperty.call(given, 'amount')) {
+    assertIncomeAmount(given.amount);
+    patch.amount = given.amount;
+  }
+  if (Object.prototype.hasOwnProperty.call(given, 'date')) {
+    assertIncomeDate(given.date);
+    patch.date = given.date;
+  }
   // null is how the client clears notes, and patchRowAt writes both null and
   // undefined as a blank cell — which coerce reads back as undefined, the
   // model's "no notes". So no conversion is needed here.

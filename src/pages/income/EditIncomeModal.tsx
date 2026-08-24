@@ -29,7 +29,10 @@ export function EditIncomeModal({
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    const valid = activeSources(sources).some((s) => s.id === sourceId)
+    // The entry's existing source counts as valid even once archived, matching
+    // what the picker offers — otherwise archiving would strand this entry.
+    const valid =
+      sourceId === entry.source_id || activeSources(sources).some((s) => s.id === sourceId)
     if (!valid || !amount) return
     updateIncome.mutate({
       id: entry.id,
@@ -52,17 +55,29 @@ export function EditIncomeModal({
   return (
     <Modal open={open} title="Edit income" onClose={onClose}>
       <form onSubmit={submit} className="space-y-4">
-        <SourcePicker sources={sources} value={sourceId} onChange={setSourceId} />
+        <SourcePicker
+          sources={sources}
+          value={sourceId}
+          onChange={setSourceId}
+          includeId={entry.source_id}
+        />
         <Field label="Amount">
           <TextInput
+            required
             type="number"
             step="0.01"
+            min="0"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
           />
         </Field>
         <Field label="Date">
-          <TextInput type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          <TextInput
+            required
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+          />
         </Field>
         <Field label="Notes">
           <TextInput value={notes} onChange={(e) => setNotes(e.target.value)} />
