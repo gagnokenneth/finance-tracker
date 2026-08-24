@@ -12,15 +12,16 @@ import { DebtDetail } from './pages/DebtDetail.tsx'
 import { Bills } from './pages/Bills.tsx'
 import { BillDetail } from './pages/BillDetail.tsx'
 import { Income } from './pages/Income.tsx'
+import { Savings } from './pages/Savings.tsx'
 import { Settings } from './pages/Settings.tsx'
 import { SignIn } from './pages/SignIn.tsx'
 
 function AuthedApp() {
   const { user } = useAuth()
   if (!user) return <SignIn />
-  // Debts, Bills, Income and Settings are exposed. The other module pages still
-  // exist in src/pages/ but are deliberately unregistered; unknown paths land on
-  // Debts.
+  // Debts, Bills, Income, Savings and Settings are exposed. The other module
+  // pages still exist in src/pages/ but are deliberately unregistered; unknown
+  // paths land on Debts.
   return (
     <Routes>
       <Route element={<AppShell />}>
@@ -30,6 +31,7 @@ function AuthedApp() {
         <Route path="bills" element={<Bills />} />
         <Route path="bills/:id" element={<BillDetail />} />
         <Route path="income" element={<Income />} />
+        <Route path="savings" element={<Savings />} />
         <Route path="settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="/debts" replace />} />
       </Route>
