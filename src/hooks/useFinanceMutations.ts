@@ -4,6 +4,7 @@ import { financeKey } from './useFinanceData.ts'
 import { useAuth } from '../auth/useAuth.ts'
 import { useToast } from './useToast.ts'
 import { writeCachedCurrency } from '../lib/currency.ts'
+import { errorDetail } from '../lib/errorText.ts'
 import {
   addBillTo,
   addDebtTo,
@@ -86,9 +87,15 @@ export function useFinanceMutations() {
       if (previous) qc.setQueryData(financeKey, predict(previous, vars))
       return { previous }
     },
-    onError: (_error: unknown, _vars: TVars, context: { previous?: FinanceData } | undefined) => {
+    onError: (error: unknown, _vars: TVars, context: { previous?: FinanceData } | undefined) => {
       if (context?.previous) qc.setQueryData(financeKey, context.previous)
-      if (failure) showError(failure)
+      // A refusal the user cannot act on is a weaker version of the same intent
+      // as the fixed strings below: prefer the backend's own reason (e.g. the
+      // savings guard naming the balance) when it carries one, and fall back to
+      // the fixed copy only when errorDetail has nothing useful to add.
+      const detail = errorDetail(error)
+      if (detail) showError(detail)
+      else if (failure) showError(failure)
       /*
        * The snapshot is a guess, not the truth. The write may have reached the
        * sheet before the client gave up on it, and restoring a whole-dataset

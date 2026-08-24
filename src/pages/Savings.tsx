@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useFinanceData } from '../hooks/useFinanceData.ts'
 import { useFinanceMutations } from '../hooks/useFinanceMutations.ts'
-import { savingsBalance, runningBalances, isPaymentKind } from '../lib/savings.ts'
+import { savingsBalance, runningBalances, isPaymentKind, byDateDesc } from '../lib/savings.ts'
 import { monthKey, addMonths, inMonth } from '../lib/currentMonth.ts'
 import { isTemp } from '../lib/tempId.ts'
 import { Money } from '../components/Money.tsx'
@@ -37,7 +37,10 @@ export function Savings() {
   // running balances are computed over every row for the same reason.
   const balance = savingsBalance(data.savings_ledger)
   const balances = runningBalances(data.savings_ledger)
-  const rows = inMonth(data.savings_ledger, month)
+  // inMonth's order doesn't match runningBalances' accumulation order, so the
+  // Balance column would read non-monotone on same-date rows; re-sort to the
+  // exact reverse of the accumulation order instead.
+  const rows = [...inMonth(data.savings_ledger, month)].sort(byDateDesc)
   const net = rows.reduce((sum, r) => sum + r.amount, 0)
 
   return (
@@ -116,7 +119,14 @@ export function Savings() {
       )}
 
       {/* Mounted only while open, so each form resets without a manual reset(). */}
-      {adding && <SavingsFormModal open onClose={() => setAdding(false)} />}
+      {adding && (
+        <SavingsFormModal
+          open
+          month={month}
+          onClose={() => setAdding(false)}
+          onMonthChange={setMonth}
+        />
+      )}
       {editing && (
         <SavingsFormModal
           open

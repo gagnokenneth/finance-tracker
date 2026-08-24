@@ -16,18 +16,23 @@ import type { SavingsLedgerEntry, SavingsMovementKind } from '../../types.ts'
 export function SavingsFormModal({
   open,
   entry,
+  month,
   onClose,
   onMonthChange,
 }: {
   open: boolean
   entry?: SavingsLedgerEntry
+  /** The month currently displayed, so an add landing outside it can be announced. */
+  month?: string
   onClose: () => void
-  /** Called when an edit moves the row out of the month on screen. */
+  /** Called when an add or edit moves the row out of the month on screen. */
   onMonthChange?: (month: string) => void
 }) {
   const { addSavingsEntry, updateSavingsEntry } = useFinanceMutations()
+  // entry.kind is always 'deposit' or 'withdrawal' here: a payment-kind row
+  // exposes no Edit control (Savings.tsx gates on isPaymentKind).
   const [kind, setKind] = useState<SavingsMovementKind>(
-    entry && entry.amount < 0 ? 'withdrawal' : 'deposit',
+    entry ? (entry.kind as SavingsMovementKind) : 'deposit',
   )
   const [amount, setAmount] = useState(entry ? String(Math.abs(entry.amount)) : '')
   const [date, setDate] = useState(entry ? entry.date : isoDate())
@@ -52,6 +57,10 @@ export function SavingsFormModal({
         date,
         notes: notes.trim() || undefined,
       })
+      // Same courtesy as the edit path, and the same string comparison for the
+      // same reason: a new Date(iso) comparison would parse as UTC midnight and
+      // silently pick the wrong month west of UTC.
+      if (month !== undefined && date.slice(0, 7) !== month) onMonthChange?.(date.slice(0, 7))
     }
     onClose()
   }
@@ -74,7 +83,7 @@ export function SavingsFormModal({
             required
             type="number"
             step="0.01"
-            min="0"
+            min="0.01"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
           />

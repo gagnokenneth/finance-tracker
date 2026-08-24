@@ -30,9 +30,18 @@ export function savingsBalance(rows: SavingsLedgerEntry[]): number {
  * pending row before every saved row sharing its date. Saved first, pending
  * last, which is also the order they will settle into.
  */
-function byId(a: number, b: number): number {
+export function byId(a: number, b: number): number {
   if (isTemp(a) !== isTemp(b)) return isTemp(a) ? 1 : -1
   return a - b
+}
+
+/**
+ * Rows ordered exactly opposite `runningBalances`' accumulation order, so a
+ * Balance column rendered top-to-bottom in this order reads as a monotone
+ * sequence instead of jumping around on same-date rows.
+ */
+export function byDateDesc(a: SavingsLedgerEntry, b: SavingsLedgerEntry): number {
+  return b.date.localeCompare(a.date) || byId(b.id, a.id)
 }
 
 /**
