@@ -984,7 +984,11 @@ function updateIncome(p, uid) {
   }
   if (Object.prototype.hasOwnProperty.call(given, 'amount')) patch.amount = given.amount;
   if (Object.prototype.hasOwnProperty.call(given, 'date')) patch.date = given.date;
-  if (Object.prototype.hasOwnProperty.call(given, 'notes')) patch.notes = given.notes;
+  // null explicitly clears the cell — a blank cell is what optStr reads back
+  // as undefined, matching the model's "no notes" shape.
+  if (Object.prototype.hasOwnProperty.call(given, 'notes')) {
+    patch.notes = given.notes === null ? '' : given.notes;
+  }
   return patchRowAt('income', rowIndex, patch);
 }
 

@@ -32,7 +32,7 @@ export function AddIncomeModal({
       source_id: sourceId as number,
       amount: Number(amount),
       date,
-      notes: notes || undefined,
+      notes: notes.trim() || undefined,
     })
     onClose()
   }

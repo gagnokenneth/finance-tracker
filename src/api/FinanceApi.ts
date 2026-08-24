@@ -47,7 +47,11 @@ export type StatementPatch = Partial<Omit<NewStatement, 'min_due' | 'total_due' 
 }
 
 export type NewIncome = Omit<IncomeEntry, 'id' | 'allocation_period_id'>
-export type IncomePatch = Partial<NewIncome>
+/**
+ * null clears notes. undefined cannot: JSON.stringify drops it, so a cleared
+ * note would arrive as "leave this alone" and keep its old text.
+ */
+export type IncomePatch = Partial<Omit<NewIncome, 'notes'>> & { notes?: string | null }
 export type NewIncomeSource = Pick<IncomeSource, 'name'>
 export type IncomeSourcePatch = Partial<Omit<IncomeSource, 'id'>>
 

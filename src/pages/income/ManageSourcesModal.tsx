@@ -21,6 +21,8 @@ export function ManageSourcesModal({
 }) {
   const { addIncomeSource, updateIncomeSource, deleteIncomeSource } = useFinanceMutations()
   const [name, setName] = useState('')
+  const [renamingId, setRenamingId] = useState<number | null>(null)
+  const [renameValue, setRenameValue] = useState('')
   const usage = sourceUsage(entries)
 
   const submit = (e: FormEvent) => {
@@ -29,6 +31,19 @@ export function ManageSourcesModal({
     if (!trimmed) return
     addIncomeSource.mutate({ name: trimmed })
     setName('')
+  }
+
+  const startRename = (source: IncomeSource) => {
+    setRenamingId(source.id)
+    setRenameValue(source.name)
+  }
+
+  const submitRename = (e: FormEvent) => {
+    e.preventDefault()
+    const trimmed = renameValue.trim()
+    if (!trimmed || renamingId === null) return
+    updateIncomeSource.mutate({ id: renamingId, patch: { name: trimmed } })
+    setRenamingId(null)
   }
 
   return (
@@ -48,30 +63,53 @@ export function ManageSourcesModal({
           const pending = isTemp(s.id)
           return (
             <li key={s.id} className="flex items-center justify-between gap-3 py-2">
-              <span className="text-sm text-ink">
-                {s.name}
-                {s.archived && <span className="ml-2 text-xs text-ink-faint">Archived</span>}
-                {pending && <PendingBadge />}
-              </span>
-              <span className="flex items-center gap-2">
-                <RowButton
-                  onClick={() => updateIncomeSource.mutate({ id: s.id, patch: { archived: !s.archived } })}
-                  disabled={pending}
-                >
-                  {s.archived ? 'Restore' : 'Archive'}
-                </RowButton>
-                {/* Offered only when unused. Both backends refuse otherwise, so
-                    this hides an action that would only ever fail. */}
-                {used === 0 && (
-                  <RowButton
-                    tone="danger"
-                    onClick={() => deleteIncomeSource.mutate(s.id)}
-                    disabled={pending}
-                  >
-                    Delete
+              {renamingId === s.id ? (
+                <form onSubmit={submitRename} className="flex flex-1 items-center gap-2">
+                  <TextInput
+                    autoFocus
+                    value={renameValue}
+                    onChange={(e) => setRenameValue(e.target.value)}
+                  />
+                  <RowButton type="submit" tone="primary">
+                    Save
                   </RowButton>
-                )}
-              </span>
+                  <RowButton type="button" onClick={() => setRenamingId(null)}>
+                    Cancel
+                  </RowButton>
+                </form>
+              ) : (
+                <>
+                  <span className="text-sm text-ink">
+                    {s.name}
+                    {s.archived && <span className="ml-2 text-xs text-ink-faint">Archived</span>}
+                    {pending && <PendingBadge />}
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <RowButton onClick={() => startRename(s)} disabled={pending}>
+                      Rename
+                    </RowButton>
+                    <RowButton
+                      onClick={() =>
+                        updateIncomeSource.mutate({ id: s.id, patch: { archived: !s.archived } })
+                      }
+                      disabled={pending}
+                    >
+                      {s.archived ? 'Restore' : 'Archive'}
+                    </RowButton>
+                    {/* Offered only when unused. Both backends refuse otherwise, so
+                        this hides an action that would only ever fail. */}
+                    {used === 0 && (
+                      <RowButton
+                        tone="danger"
+                        onClick={() => deleteIncomeSource.mutate(s.id)}
+                        disabled={pending}
+                      >
+                        Delete
+                      </RowButton>
+                    )}
+                  </span>
+                </>
+              )}
             </li>
           )
         })}

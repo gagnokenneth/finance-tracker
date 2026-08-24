@@ -359,6 +359,9 @@ export class MockApi implements FinanceApi {
 
   async addIncome(input: NewIncome): Promise<FinanceData> {
     const data = this.load()
+    if (!data.income_sources.some((s) => s.id === input.source_id)) {
+      throw new Error(`Income source ${input.source_id} not found`)
+    }
     data.income.push({ id: nextId(data.income), ...input })
     this.save(data)
     return this.delay(data)
@@ -368,7 +371,17 @@ export class MockApi implements FinanceApi {
     const data = this.load()
     const row = data.income.find((r) => r.id === id)
     if (!row) throw new Error(`Income ${id} not found`)
+    // MockApi has no accounts, so only existence is checked here — Code.gs
+    // additionally checks ownership, which this cannot reproduce.
+    if (
+      Object.prototype.hasOwnProperty.call(patch, 'source_id') &&
+      !data.income_sources.some((s) => s.id === patch.source_id)
+    ) {
+      throw new Error(`Income source ${patch.source_id} not found`)
+    }
     Object.assign(row, patch)
+    // null is the wire's "clear this"; the stored model uses undefined.
+    if (patch.notes === null) row.notes = undefined
     this.save(data)
     return this.delay(data)
   }
@@ -407,6 +420,10 @@ export class MockApi implements FinanceApi {
 
   async deleteIncomeSource(id: number): Promise<FinanceData> {
     const data = this.load()
+    const row = data.income_sources.find((s) => s.id === id)
+    // Throws like ownedRowIndex does, so a missing row fails the same way on
+    // both backends instead of silently succeeding here.
+    if (!row) throw new Error(`Income source ${id} not found`)
     const used = data.income.filter((r) => r.source_id === id).length
     if (used > 0) {
       throw new Error(

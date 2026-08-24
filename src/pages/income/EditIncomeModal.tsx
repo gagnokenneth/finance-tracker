@@ -3,7 +3,6 @@ import type { FormEvent } from 'react'
 import { Modal } from '../../components/Modal.tsx'
 import { Field, TextInput, Button, SecondaryButton } from '../../components/ui.tsx'
 import { useFinanceMutations } from '../../hooks/useFinanceMutations.ts'
-import { monthKey } from '../../lib/currentMonth.ts'
 import { SourcePicker } from './SourcePicker.tsx'
 import type { IncomeEntry, IncomeSource } from '../../types.ts'
 
@@ -37,13 +36,15 @@ export function EditIncomeModal({
         source_id: sourceId as number,
         amount: Number(amount),
         date,
-        notes: notes || undefined,
+        notes: notes.trim() || null,
       },
     })
     // An entry moved to another month would otherwise disappear with no
-    // explanation, which reads as data loss.
-    const moved = monthKey(new Date(date)) !== monthKey(new Date(entry.date))
-    if (moved) onMonthChange(monthKey(new Date(date)))
+    // explanation, which reads as data loss. Compared as yyyy-mm string
+    // prefixes, not via `new Date(iso)` — that parses as UTC midnight, which
+    // is the previous day's month anywhere west of UTC.
+    const moved = date.slice(0, 7) !== entry.date.slice(0, 7)
+    if (moved) onMonthChange(date.slice(0, 7))
     onClose()
   }
 

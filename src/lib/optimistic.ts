@@ -297,13 +297,22 @@ export function addIncomeTo(data: FinanceData, vars: NewIncome): FinanceData {
   return { ...data, income: [...data.income, entry] }
 }
 
+/** The wire's null becomes the model's undefined — see IncomePatch. */
+function clearedNotes(patch: IncomePatch): Partial<IncomeEntry> {
+  const applied: Partial<IncomeEntry> = { ...patch } as Partial<IncomeEntry>
+  if (patch.notes === null) applied.notes = undefined
+  return applied
+}
+
 export function applyIncomePatch(
   data: FinanceData,
   vars: { id: number; patch: IncomePatch },
 ): FinanceData {
   return {
     ...data,
-    income: data.income.map((row) => (row.id === vars.id ? { ...row, ...vars.patch } : row)),
+    income: data.income.map((row) =>
+      row.id === vars.id ? { ...row, ...clearedNotes(vars.patch) } : row,
+    ),
   }
 }
 
