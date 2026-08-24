@@ -17,6 +17,11 @@ var SHEETS = {
   debt_statements: ['id', 'user_id', 'debt_id', 'due_date', 'min_due', 'total_due', 'outstanding', 'paid', 'paid_date', 'paid_amount'],
   savings: ['id', 'date', 'amount', 'source', 'total', 'notes'],
   savings_transfers: ['id', 'date', 'amount', 'notes'],
+  income: ['id', 'user_id', 'source', 'amount', 'date', 'notes', 'allocation_period_id'],
+  savings_ledger: ['id', 'user_id', 'date', 'amount', 'kind', 'ref_type', 'ref_id', 'notes'],
+  allocations: ['id', 'user_id', 'name', 'frequency', 'day', 'second_day', 'month', 'closed'],
+  allocation_periods: ['id', 'user_id', 'allocation_id', 'period_date'],
+  allocation_lines: ['id', 'user_id', 'period_id', 'target_type', 'target_id', 'label', 'planned_amount', 'committed', 'committed_date', 'committed_amount', 'source'],
   invites: ['code', 'used_by', 'used_at'],
   settings: ['key', 'value']
 };
@@ -26,7 +31,7 @@ var SHEETS = {
  * so the new shape is applied on the very next request after a deployment,
  * instead of up to an hour later.
  */
-var SCHEMA_VERSION = 5;
+var SCHEMA_VERSION = 6;
 
 /*
  * Tabs whose stale shape may be DISCARDED and recreated. Deliberately excludes
@@ -34,9 +39,9 @@ var SCHEMA_VERSION = 5;
  * and password hash on the next request, re-seed fresh codes, and lock everyone
  * out with no recovery path.
  */
-var REBUILDABLE_SHEETS = ['debts', 'debt_schedule', 'debt_statements', 'bills', 'bill_payables'];
+var REBUILDABLE_SHEETS = ['debts', 'debt_schedule', 'debt_statements', 'bills', 'bill_payables', 'income', 'savings_ledger', 'allocations', 'allocation_periods', 'allocation_lines'];
 
-var DATA_SHEETS = ['funds', 'bills', 'bill_payables', 'expendable', 'debts', 'debt_schedule', 'debt_statements', 'savings', 'savings_transfers'];
+var DATA_SHEETS = ['funds', 'bills', 'bill_payables', 'expendable', 'debts', 'debt_schedule', 'debt_statements', 'savings', 'savings_transfers', 'income', 'savings_ledger', 'allocations', 'allocation_periods', 'allocation_lines'];
 
 /**
  * Sheets getAll actually reads. Every sheet read is a separate round trip, so
@@ -429,6 +434,9 @@ function optNum(v) { return blank(v) ? undefined : Number(v); }
 
 function optDate(v) { return blank(v) ? undefined : fmtDate(v); }
 
+/** Blank text cell as undefined, matching optNum/optDate. */
+function optStr(v) { return blank(v) ? undefined : String(v); }
+
 function readRows(name) {
   var values = sheet(name).getDataRange().getValues();
   if (values.length < 2) return [];
@@ -471,6 +479,30 @@ function coerce(name, r) {
   };
   if (name === 'savings') return { id: num(r.id), date: fmtDate(r.date), amount: num(r.amount), source: String(r.source), total: num(r.total), notes: r.notes ? String(r.notes) : undefined };
   if (name === 'savings_transfers') return { id: num(r.id), date: fmtDate(r.date), amount: num(r.amount), notes: r.notes ? String(r.notes) : undefined };
+  if (name === 'income') return {
+    id: num(r.id), source: String(r.source), amount: num(r.amount), date: fmtDate(r.date),
+    notes: optStr(r.notes), allocation_period_id: optNum(r.allocation_period_id)
+  };
+  if (name === 'savings_ledger') return {
+    // amount is signed: positive is a deposit, negative a withdrawal or a
+    // payment. The balance is the sum and is never stored.
+    id: num(r.id), date: fmtDate(r.date), amount: num(r.amount), kind: String(r.kind),
+    ref_type: optStr(r.ref_type), ref_id: optNum(r.ref_id), notes: optStr(r.notes)
+  };
+  if (name === 'allocations') return {
+    id: num(r.id), name: String(r.name), frequency: String(r.frequency), day: num(r.day),
+    second_day: optNum(r.second_day), month: optNum(r.month), closed: bool(r.closed)
+  };
+  if (name === 'allocation_periods') return {
+    id: num(r.id), allocation_id: num(r.allocation_id), period_date: fmtDate(r.period_date)
+  };
+  if (name === 'allocation_lines') return {
+    id: num(r.id), period_id: num(r.period_id), target_type: String(r.target_type),
+    target_id: optNum(r.target_id), label: optStr(r.label),
+    planned_amount: num(r.planned_amount), committed: bool(r.committed),
+    committed_date: optDate(r.committed_date), committed_amount: optNum(r.committed_amount),
+    source: optStr(r.source)
+  };
   return r;
 }
 
