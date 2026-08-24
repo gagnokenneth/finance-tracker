@@ -1,4 +1,5 @@
 import { monthWindow } from './currentMonth.ts'
+import { isTemp } from './tempId.ts'
 import type { IncomeEntry, IncomeSource } from '../types.ts'
 
 /** Entries dated within a yyyy-mm, newest first. */
@@ -27,7 +28,7 @@ export function sourceName(sources: IncomeSource[], id: number): string {
  * entry saved against one would ship a dangling reference.
  */
 export function activeSources(sources: IncomeSource[]): IncomeSource[] {
-  return sources.filter((s) => !s.archived && s.id > 0)
+  return sources.filter((s) => !s.archived && !isTemp(s.id))
 }
 
 /** How many entries use each source id, for the delete-or-archive decision. */

@@ -4,6 +4,7 @@ import { Modal } from '../../components/Modal.tsx'
 import { Field, TextInput, Button, SecondaryButton } from '../../components/ui.tsx'
 import { useFinanceMutations } from '../../hooks/useFinanceMutations.ts'
 import { isoDate } from '../../lib/currentMonth.ts'
+import { activeSources } from '../../lib/income.ts'
 import { SourcePicker } from './SourcePicker.tsx'
 import type { IncomeSource } from '../../types.ts'
 
@@ -26,7 +27,7 @@ export function AddIncomeModal({
     e.preventDefault()
     // Revalidated here, not just at selection: a refetch can archive or remove
     // the chosen source while this form is open.
-    const valid = sources.some((s) => s.id === sourceId && !s.archived && s.id > 0)
+    const valid = activeSources(sources).some((s) => s.id === sourceId)
     if (!valid || !amount) return
     addIncome.mutate({
       source_id: sourceId as number,

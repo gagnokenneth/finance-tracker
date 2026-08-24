@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import { Modal } from '../../components/Modal.tsx'
 import { Field, TextInput, Button, SecondaryButton } from '../../components/ui.tsx'
 import { useFinanceMutations } from '../../hooks/useFinanceMutations.ts'
+import { activeSources } from '../../lib/income.ts'
 import { SourcePicker } from './SourcePicker.tsx'
 import type { IncomeEntry, IncomeSource } from '../../types.ts'
 
@@ -28,7 +29,7 @@ export function EditIncomeModal({
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    const valid = sources.some((s) => s.id === sourceId && !s.archived && s.id > 0)
+    const valid = activeSources(sources).some((s) => s.id === sourceId)
     if (!valid || !amount) return
     updateIncome.mutate({
       id: entry.id,

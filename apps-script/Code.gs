@@ -13,6 +13,9 @@ var SHEETS = {
   debts: ['id', 'user_id', 'name', 'type'],
   debt_schedule: ['id', 'user_id', 'debt_id', 'due_date', 'amount', 'paid', 'paid_date', 'paid_amount'],
   debt_statements: ['id', 'user_id', 'debt_id', 'due_date', 'min_due', 'total_due', 'outstanding', 'paid', 'paid_date', 'paid_amount'],
+  // allocation_period_id is SERVER-OWNED: no client may write it. updateIncome
+  // whitelists its patch rather than forwarding it, because patchRowAt skips
+  // only the id columns. A new column here needs the same decision made.
   income: ['id', 'user_id', 'source_id', 'amount', 'date', 'notes', 'allocation_period_id'],
   income_sources: ['id', 'user_id', 'name', 'archived'],
   savings_ledger: ['id', 'user_id', 'date', 'amount', 'kind', 'ref_type', 'ref_id', 'notes'],
@@ -984,11 +987,10 @@ function updateIncome(p, uid) {
   }
   if (Object.prototype.hasOwnProperty.call(given, 'amount')) patch.amount = given.amount;
   if (Object.prototype.hasOwnProperty.call(given, 'date')) patch.date = given.date;
-  // null explicitly clears the cell — a blank cell is what optStr reads back
-  // as undefined, matching the model's "no notes" shape.
-  if (Object.prototype.hasOwnProperty.call(given, 'notes')) {
-    patch.notes = given.notes === null ? '' : given.notes;
-  }
+  // null is how the client clears notes, and patchRowAt writes both null and
+  // undefined as a blank cell — which coerce reads back as undefined, the
+  // model's "no notes". So no conversion is needed here.
+  if (Object.prototype.hasOwnProperty.call(given, 'notes')) patch.notes = given.notes;
   return patchRowAt('income', rowIndex, patch);
 }
 
