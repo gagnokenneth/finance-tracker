@@ -12,15 +12,11 @@ import type { FinanceData } from '../types.ts'
  * saw: a rehydrated cache, and a backend response.
  */
 const REQUIRED_ARRAYS: readonly (keyof FinanceData)[] = [
-  'funds',
   'bills',
   'bill_payables',
-  'expendable',
   'debts',
   'debt_schedule',
   'debt_statements',
-  'savings',
-  'savings_transfers',
   'income',
   'savings_ledger',
   'allocations',

@@ -1,18 +1,12 @@
 import type {
   FinanceData,
-  FundEntry,
   Bill,
   BillPayable,
-  ExpendableEntry,
   DebtScheduleRow,
   DebtStatement,
-  SavingsEntry,
-  SavingsTransfer,
   Currency,
 } from '../types.ts'
 
-// Inputs omit server-assigned fields.
-export type NewFund = Omit<FundEntry, 'id'>
 /**
  * A new bill and its first payable, in one call. The client computes
  * first_due_date because all four recurrence rules live in lib/billSchedule.ts;
@@ -30,10 +24,6 @@ export interface PayBillInput {
   paid_amount: number
   next_due_date: string
 }
-export type NewExpendable = Omit<ExpendableEntry, 'id'>
-export type NewSavings = Omit<SavingsEntry, 'id' | 'total'>
-export type NewSavingsTransfer = Omit<SavingsTransfer, 'id'>
-
 export type NewScheduleRow = Omit<DebtScheduleRow, 'id' | 'debt_id'>
 export type NewStatement = Omit<DebtStatement, 'id' | 'debt_id'>
 
@@ -79,11 +69,6 @@ export interface FinanceApi {
   /** Read every sheet at once (all module views derive from this). */
   getAll(): Promise<FinanceData>
 
-  addFund(input: NewFund): Promise<FundEntry>
-
-  addExpendable(input: NewExpendable): Promise<ExpendableEntry>
-  setMonthlyBudget(month: string, amount: number): Promise<void>
-
   /*
    * Debt and currency writes return the whole updated dataset rather than the
    * affected row.
@@ -125,11 +110,4 @@ export interface FinanceApi {
   payBillPayable(id: number, input: PayBillInput): Promise<FinanceData>
 
   setCurrency(currency: Currency): Promise<FinanceData>
-
-  /** Adds a savings entry; returns it with its computed running total. */
-  addSavings(input: NewSavings): Promise<SavingsEntry>
-  /** Moves money back to funds: creates a transfer AND a funds entry labeled "Savings". */
-  transferSavingsToFunds(
-    input: NewSavingsTransfer,
-  ): Promise<{ transfer: SavingsTransfer; fund: FundEntry }>
 }

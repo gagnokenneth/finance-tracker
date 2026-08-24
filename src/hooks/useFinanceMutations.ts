@@ -24,39 +24,21 @@ import {
 } from '../lib/optimistic.ts'
 import type { Currency, FinanceData } from '../types.ts'
 import type {
-  NewFund,
   NewBill,
   BillPatch,
   BillPayablePatch,
   PayBillInput,
-  NewExpendable,
   NewDebt,
   NewScheduleRow,
   NewStatement,
   ScheduleRowPatch,
   StatementPatch,
-  NewSavings,
-  NewSavingsTransfer,
 } from '../api/FinanceApi.ts'
 
 export function useFinanceMutations() {
   const qc = useQueryClient()
   const userId = useAuth().user?.id
   const showError = useToast()
-  const onSuccess = () => {
-    void qc.invalidateQueries({ queryKey: financeKey })
-  }
-
-  const addFund = useMutation({ mutationFn: (i: NewFund) => getApi().addFund(i), onSuccess })
-  const addExpendable = useMutation({
-    mutationFn: (i: NewExpendable) => getApi().addExpendable(i),
-    onSuccess,
-  })
-  const setMonthlyBudget = useMutation({
-    mutationFn: (v: { month: string; amount: number }) =>
-      getApi().setMonthlyBudget(v.month, v.amount),
-    onSuccess,
-  })
 
   /*
    * Debt and currency writes return the whole updated dataset, so the response
@@ -220,19 +202,7 @@ export function useFinanceMutations() {
     },
   })
 
-  const addSavings = useMutation({
-    mutationFn: (i: NewSavings) => getApi().addSavings(i),
-    onSuccess,
-  })
-  const transferSavings = useMutation({
-    mutationFn: (i: NewSavingsTransfer) => getApi().transferSavingsToFunds(i),
-    onSuccess,
-  })
-
   return {
-    addFund,
-    addExpendable,
-    setMonthlyBudget,
     addDebt,
     updateDebt,
     deleteDebt,
@@ -250,7 +220,5 @@ export function useFinanceMutations() {
     deleteBillPayable,
     payBillPayable,
     setCurrency,
-    addSavings,
-    transferSavings,
   }
 }

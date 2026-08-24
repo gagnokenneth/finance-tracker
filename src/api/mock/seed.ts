@@ -2,10 +2,6 @@ import type { FinanceData } from '../../types.ts'
 
 export function createSeed(): FinanceData {
   return {
-    funds: [
-      { id: 1, source: 'Salary', amount: 5000, date: '2026-06-01' },
-      { id: 2, source: 'Freelance', amount: 1000, date: '2026-06-10' },
-    ],
     bills: [
       { id: 1, name: 'Rent', type: 'fixed', frequency: 'monthly', amount: 1500, day: 5, closed: false },
       { id: 2, name: 'Electricity', type: 'variable', frequency: 'monthly', day: 15, closed: false },
@@ -15,26 +11,15 @@ export function createSeed(): FinanceData {
       { id: 2, bill_id: 1, due_date: '2026-07-05', amount: 1500, paid: false },
       { id: 3, bill_id: 2, due_date: '2026-06-15', paid: false },
     ],
-    expendable: [
-      { id: 1, month: '2026-06', daily_amount: 100, date: '2026-06-02' },
-      { id: 2, month: '2026-06', daily_amount: 50, date: '2026-06-03' },
-    ],
     debts: [],
     debt_schedule: [],
     debt_statements: [],
-    savings: [
-      { id: 1, date: '2026-06-01', amount: 500, source: 'funds', total: 500 },
-    ],
-    savings_transfers: [
-      { id: 1, date: '2026-06-20', amount: 200 },
-    ],
     income: [],
     savings_ledger: [],
     allocations: [],
     allocation_periods: [],
     allocation_lines: [],
     settings: {
-      monthlyBudgets: { '2026-06': 900 },
       currency: 'PHP',
     },
   }

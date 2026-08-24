@@ -1,33 +1,25 @@
 import type {
   FinanceApi,
-  NewFund,
   NewBill,
   BillPatch,
   BillPayablePatch,
   PayBillInput,
-  NewExpendable,
   NewDebt,
   NewScheduleRow,
   NewStatement,
   ScheduleRowPatch,
   StatementPatch,
-  NewSavings,
-  NewSavingsTransfer,
   AuthResult,
   SignupInput,
   LoginInput,
 } from '../FinanceApi.ts'
 import type {
   FinanceData,
-  FundEntry,
   Bill,
   BillPayable,
-  ExpendableEntry,
   Debt,
   DebtScheduleRow,
   DebtStatement,
-  SavingsEntry,
-  SavingsTransfer,
   Currency,
 } from '../../types.ts'
 import { createSeed } from './seed.ts'
@@ -146,14 +138,6 @@ export class MockApi implements FinanceApi {
 
   async getAll(): Promise<FinanceData> {
     return this.delay(this.load())
-  }
-
-  async addFund(input: NewFund): Promise<FundEntry> {
-    const data = this.load()
-    const fund: FundEntry = { id: nextId(data.funds), ...input }
-    data.funds.push(fund)
-    this.save(data)
-    return this.delay(fund)
   }
 
   async addBill(input: NewBill): Promise<FinanceData> {
@@ -275,21 +259,6 @@ export class MockApi implements FinanceApi {
     return this.delay(data)
   }
 
-  async addExpendable(input: NewExpendable): Promise<ExpendableEntry> {
-    const data = this.load()
-    const entry: ExpendableEntry = { id: nextId(data.expendable), ...input }
-    data.expendable.push(entry)
-    this.save(data)
-    return this.delay(entry)
-  }
-
-  async setMonthlyBudget(month: string, amount: number): Promise<void> {
-    const data = this.load()
-    data.settings.monthlyBudgets[month] = amount
-    this.save(data)
-    return this.delay(undefined)
-  }
-
   async addDebt(input: NewDebt): Promise<FinanceData> {
     const data = this.load()
     const debt: Debt = { id: nextId(data.debts), name: input.name, type: input.type }
@@ -382,38 +351,5 @@ export class MockApi implements FinanceApi {
     data.settings.currency = currency
     this.save(data)
     return this.delay(data)
-  }
-
-  async addSavings(input: NewSavings): Promise<SavingsEntry> {
-    const data = this.load()
-    const priorTotal =
-      data.savings.reduce((a, s) => a + s.amount, 0) -
-      data.savings_transfers.reduce((a, t) => a + t.amount, 0)
-    const entry: SavingsEntry = {
-      id: nextId(data.savings),
-      total: priorTotal + input.amount,
-      ...input,
-    }
-    data.savings.push(entry)
-    this.save(data)
-    return this.delay(entry)
-  }
-
-  async transferSavingsToFunds(
-    input: NewSavingsTransfer,
-  ): Promise<{ transfer: SavingsTransfer; fund: FundEntry }> {
-    const data = this.load()
-    const transfer: SavingsTransfer = { id: nextId(data.savings_transfers), ...input }
-    data.savings_transfers.push(transfer)
-    const fund: FundEntry = {
-      id: nextId(data.funds),
-      source: 'Savings',
-      amount: input.amount,
-      date: input.date,
-      notes: input.notes,
-    }
-    data.funds.push(fund)
-    this.save(data)
-    return this.delay({ transfer, fund })
   }
 }

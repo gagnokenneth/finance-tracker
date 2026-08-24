@@ -1,30 +1,19 @@
 import type {
   FinanceApi,
-  NewFund,
   NewBill,
   BillPatch,
   BillPayablePatch,
   PayBillInput,
-  NewExpendable,
   NewDebt,
   NewScheduleRow,
   NewStatement,
   ScheduleRowPatch,
   StatementPatch,
-  NewSavings,
-  NewSavingsTransfer,
   AuthResult,
   SignupInput,
   LoginInput,
 } from '../FinanceApi.ts'
-import type {
-  FinanceData,
-  FundEntry,
-  ExpendableEntry,
-  SavingsEntry,
-  SavingsTransfer,
-  Currency,
-} from '../../types.ts'
+import type { FinanceData, Currency } from '../../types.ts'
 import { readToken, clearToken } from '../../auth/session.ts'
 
 /**
@@ -115,10 +104,6 @@ export class AppsScriptApi implements FinanceApi {
     return this.call<FinanceData>('getAll')
   }
 
-  addFund(input: NewFund): Promise<FundEntry> {
-    return this.call<FundEntry>('addFund', input)
-  }
-
   addBill(input: NewBill): Promise<FinanceData> {
     return this.call<FinanceData>('addBill', input)
   }
@@ -145,14 +130,6 @@ export class AppsScriptApi implements FinanceApi {
 
   payBillPayable(id: number, input: PayBillInput): Promise<FinanceData> {
     return this.call<FinanceData>('payBillPayable', { id, input })
-  }
-
-  addExpendable(input: NewExpendable): Promise<ExpendableEntry> {
-    return this.call<ExpendableEntry>('addExpendable', input)
-  }
-
-  async setMonthlyBudget(month: string, amount: number): Promise<void> {
-    await this.call<null>('setMonthlyBudget', { month, amount })
   }
 
   addDebt(input: NewDebt): Promise<FinanceData> {
@@ -193,18 +170,5 @@ export class AppsScriptApi implements FinanceApi {
 
   setCurrency(currency: Currency): Promise<FinanceData> {
     return this.call<FinanceData>('setCurrency', { currency })
-  }
-
-  addSavings(input: NewSavings): Promise<SavingsEntry> {
-    return this.call<SavingsEntry>('addSavings', input)
-  }
-
-  transferSavingsToFunds(
-    input: NewSavingsTransfer,
-  ): Promise<{ transfer: SavingsTransfer; fund: FundEntry }> {
-    return this.call<{ transfer: SavingsTransfer; fund: FundEntry }>(
-      'transferSavingsToFunds',
-      input,
-    )
   }
 }
