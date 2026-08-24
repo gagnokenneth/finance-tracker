@@ -73,10 +73,19 @@ export type SavingsRefType = 'bill_payable' | 'debt_schedule' | 'debt_statement'
 export type AllocationTargetType = SavingsRefType | 'savings' | 'other'
 export type AllocationSource = 'income' | 'savings'
 
+/** A named place money comes from. Archived ones leave the picker but still resolve. */
+export interface IncomeSource {
+  id: number
+  name: string
+  /** Hidden from the picker; historical entries still render its name. */
+  archived: boolean
+}
+
 /** Money in. Flat entries; no recurrence by design. */
 export interface IncomeEntry {
   id: number
-  source: string
+  /** References IncomeSource.id. Renaming a source renames it everywhere. */
+  source_id: number
   amount: number
   date: string // ISO yyyy-mm-dd
   notes?: string
@@ -153,6 +162,7 @@ export interface FinanceData {
   debt_schedule: DebtScheduleRow[]
   debt_statements: DebtStatement[]
   income: IncomeEntry[]
+  income_sources: IncomeSource[]
   savings_ledger: SavingsLedgerEntry[]
   allocations: Allocation[]
   allocation_periods: AllocationPeriod[]

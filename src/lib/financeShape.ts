@@ -18,6 +18,7 @@ const REQUIRED_ARRAYS: readonly (keyof FinanceData)[] = [
   'debt_schedule',
   'debt_statements',
   'income',
+  'income_sources',
   'savings_ledger',
   'allocations',
   'allocation_periods',
