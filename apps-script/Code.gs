@@ -688,10 +688,10 @@ function dispatch(action, p, uid) {
     case 'deleteDebt': return deleteDebt(p, uid);
     case 'addScheduleRow': return addChildRow('debt_schedule', p, uid);
     case 'updateScheduleRow': return updateDebtRow('debt_schedule', 'debt_schedule', p, uid);
-    case 'deleteScheduleRow': return deleteChildRow('debt_schedule', p, uid);
+    case 'deleteScheduleRow': return deleteDebtScheduleRow(p, uid);
     case 'addStatement': return addChildRow('debt_statements', p, uid);
     case 'updateStatement': return updateDebtRow('debt_statements', 'debt_statement', p, uid);
-    case 'deleteStatement': return deleteChildRow('debt_statements', p, uid);
+    case 'deleteStatement': return deleteDebtStatement(p, uid);
     case 'addBill': return addBill(p, uid);
     case 'updateBill': return updateBill(p, uid);
     case 'closeBill': return closeBill(p, uid);
@@ -739,8 +739,25 @@ function updateDebt(p, uid) {
   return null;
 }
 
+/** Ids of `name` rows belonging to this debt/bill, read from the owned rows. */
+function ownedIdsWhere(name, uid, col, value) {
+  var rows = readOwnedRows(name, uid);
+  var out = [];
+  for (var i = 0; i < rows.length; i++) {
+    if (num(rows[i][col]) === num(value)) out.push(num(rows[i].id));
+  }
+  return out;
+}
+
 function deleteDebt(p, uid) {
   var rowIndex = ownedRowIndex('debts', p.id, uid);
+  // Unsettle every child row's ledger entry BEFORE the cascade deletes the
+  // rows themselves, so a failure here cannot leave the settled rows gone with
+  // the ledger rows still present.
+  var scheduleIds = ownedIdsWhere('debt_schedule', uid, 'debt_id', p.id);
+  for (var i = 0; i < scheduleIds.length; i++) unsettleFromSavings(uid, 'debt_schedule', scheduleIds[i]);
+  var statementIds = ownedIdsWhere('debt_statements', uid, 'debt_id', p.id);
+  for (var j = 0; j < statementIds.length; j++) unsettleFromSavings(uid, 'debt_statement', statementIds[j]);
   deleteRowsWhere('debt_schedule', 'debt_id', p.id);
   deleteRowsWhere('debt_statements', 'debt_id', p.id);
   sheet('debts').deleteRow(rowIndex);
@@ -778,8 +795,13 @@ function updateDebtRow(sheetName, refType, p, uid) {
   assertOwned(sheetName, p.id, uid);
   var patch = p.patch || {};
   var hasPaid = Object.prototype.hasOwnProperty.call(patch, 'paid');
-  var unpaying = hasPaid && !bool(patch.paid);
-  var paying = hasPaid && bool(patch.paid);
+  // Classified by TRANSITION, not by payload: the two form modals always
+  // re-send paid/paid_date/paid_amount on an already-paid row, so a payload-only
+  // read of `paid: true` would misclassify a plain edit as a re-pay.
+  var current = getById(sheetName, p.id);
+  var wasPaid = bool(current && current.paid);
+  var unpaying = hasPaid && !bool(patch.paid) && wasPaid;
+  var paying = hasPaid && bool(patch.paid) && !wasPaid;
 
   if (unpaying) {
     var undone = updateChildRow(sheetName, p, uid);
@@ -789,6 +811,11 @@ function updateDebtRow(sheetName, refType, p, uid) {
 
   if (paying) {
     assertNotSavingsFunded(uid, refType, p.id);
+    // Validate before the patch, so a bad amount/date or an insufficient
+    // balance leaves the sheet untouched.
+    if (p.from_savings === true) {
+      assertCanSettleFromSavings(uid, refType, patch.paid_date, patch.paid_amount);
+    }
     var paidResult = updateChildRow(sheetName, p, uid);
     if (p.from_savings === true) {
       settleFromSavings(uid, refType, p.id, patch.paid_date, patch.paid_amount);
@@ -796,18 +823,65 @@ function updateDebtRow(sheetName, refType, p, uid) {
     return paidResult;
   }
 
-  // An edit. Only a change to the payment's own figures can desync the ledger;
-  // editing the installment amount or the due date cannot.
-  if (Object.prototype.hasOwnProperty.call(patch, 'paid_amount') ||
-      Object.prototype.hasOwnProperty.call(patch, 'paid_date')) {
+  // An edit — including a harmless re-send of the SAME paid/paid_date/paid_amount
+  // on an already-paid row. Only a genuine CHANGE to the payment's own figures
+  // can desync the ledger; editing the installment amount or the due date
+  // cannot, and re-sending identical values must not be refused either.
+  if (paidAmountChanged(patch, current) || paidDateChanged(patch, current)) {
     assertNotSavingsFunded(uid, refType, p.id);
   }
   return updateChildRow(sheetName, p, uid);
 }
 
+/**
+ * Whether patch actually changes paid_amount / paid_date, compared by VALUE
+ * rather than by key presence — a caller re-sending the identical figure must
+ * not trip a refusal meant for an actual change. paid_amount compares
+ * numerically; paid_date compares as a string, matching how it is stored.
+ */
+function paidAmountChanged(patch, current) {
+  if (!Object.prototype.hasOwnProperty.call(patch, 'paid_amount')) return false;
+  var newVal = patch.paid_amount;
+  var oldVal = current ? current.paid_amount : undefined;
+  if (blank(newVal) && blank(oldVal)) return false;
+  if (blank(newVal) !== blank(oldVal)) return true;
+  return Number(newVal) !== Number(oldVal);
+}
+
+function paidDateChanged(patch, current) {
+  if (!Object.prototype.hasOwnProperty.call(patch, 'paid_date')) return false;
+  var newVal = patch.paid_date;
+  var oldVal = current ? current.paid_date : undefined;
+  if (blank(newVal) && blank(oldVal)) return false;
+  if (blank(newVal) !== blank(oldVal)) return true;
+  return String(newVal) !== String(oldVal);
+}
+
 function deleteChildRow(name, p, uid) {
   sheet(name).deleteRow(ownedRowIndex(name, p.id, uid));
   return null;
+}
+
+/*
+ * Thin wrappers so the two debt deletes can unsettle the ledger before the
+ * generic delete — deleteChildRow itself stays generic and unchanged; only
+ * dispatch is re-pointed to these, exactly as updateDebtRow already does for
+ * the two debt updates.
+ *
+ * Unsettle runs BEFORE the row is deleted: if unsettling throws, the settled
+ * row and its ledger row both survive, rather than a delete succeeding first
+ * and a failed unsettle leaving the ledger row orphaned.
+ */
+function deleteDebtScheduleRow(p, uid) {
+  assertOwned('debt_schedule', p.id, uid);
+  unsettleFromSavings(uid, 'debt_schedule', p.id);
+  return deleteChildRow('debt_schedule', p, uid);
+}
+
+function deleteDebtStatement(p, uid) {
+  assertOwned('debt_statements', p.id, uid);
+  unsettleFromSavings(uid, 'debt_statement', p.id);
+  return deleteChildRow('debt_statements', p, uid);
 }
 
 /**
@@ -915,6 +989,11 @@ function deleteUnpaidPayables(billId, exceptId) {
 
 function deleteBill(p, uid) {
   var rowIndex = ownedRowIndex('bills', p.id, uid);
+  // Unsettle every payable's ledger entry BEFORE the cascade deletes the
+  // payables themselves, so a failure here cannot leave the payables gone
+  // with the ledger rows still present.
+  var payableIds = ownedIdsWhere('bill_payables', uid, 'bill_id', p.id);
+  for (var i = 0; i < payableIds.length; i++) unsettleFromSavings(uid, 'bill_payable', payableIds[i]);
   deleteRowsWhere('bill_payables', 'bill_id', p.id);
   sheet('bills').deleteRow(rowIndex);
   return null;
@@ -935,12 +1014,18 @@ function updateBillPayable(p, uid) {
    * alone", and reading that as false would un-mint on a patch that only set an
    * amount.
    */
-  var unpaying = Object.prototype.hasOwnProperty.call(patch, 'paid') && !bool(patch.paid);
+  // Classified by TRANSITION, not by payload: `unpaying` requires the row to
+  // have BEEN paid, not merely that the patch sets paid to false — otherwise a
+  // patch on an already-unpaid row would be misread as an un-pay.
+  var hasPaid = Object.prototype.hasOwnProperty.call(patch, 'paid');
+  var unpaying = hasPaid && !bool(patch.paid) && bool(found.row.paid);
   var unmint = bool(found.row.paid) && unpaying && isLatestPaidPayable(found.bill.id, found.row);
-  // Before patchRowAt, while "was this row paid" is still answerable:
+  // Before patchRowAt, while "was this row paid" is still answerable. Compared
+  // by VALUE, not key presence: PayableFormModal always re-sends paid_amount
+  // and paid_date on an already-paid row, and a caller re-sending the identical
+  // figure must not be refused.
   if (!unpaying) {
-    if (Object.prototype.hasOwnProperty.call(patch, 'paid_amount') ||
-        Object.prototype.hasOwnProperty.call(patch, 'paid_date')) {
+    if (paidAmountChanged(patch, found.row) || paidDateChanged(patch, found.row)) {
       assertNotSavingsFunded(uid, 'bill_payable', found.row.id);
     }
   }
@@ -957,6 +1042,9 @@ function updateBillPayable(p, uid) {
 
 function deleteBillPayable(p, uid) {
   var found = ownedPayable(p.id, uid);
+  // Before the delete: if unsettling throws, the payable and its ledger row
+  // both survive, rather than deleting first and risking an orphan.
+  unsettleFromSavings(uid, 'bill_payable', found.row.id);
   sheet('bill_payables').deleteRow(found.rowIndex);
   return null;
 }
@@ -1001,18 +1089,28 @@ function payBillPayable(p, uid) {
   // A stale tab could re-pay a row already funded from savings; that would
   // desync the amount from the ledger row.
   assertNotSavingsFunded(uid, 'bill_payable', found.row.id);
+  // Validate BEFORE anything is written, so a bad amount/date or an
+  // insufficient balance leaves the sheet completely untouched.
+  if (input.from_savings === true) {
+    assertCanSettleFromSavings(uid, 'bill_payable', input.paid_date, input.paid_amount);
+  }
   patchRowAt('bill_payables', found.rowIndex, {
     paid: true,
     paid_date: input.paid_date,
     paid_amount: input.paid_amount
   });
-  if (input.from_savings === true) {
-    settleFromSavings(uid, 'bill_payable', found.row.id, input.paid_date, input.paid_amount);
-  }
-  // Mint the next payable only when nothing else is outstanding, so a
-  // double-submitted Pay cannot leave two competing upcoming rows.
+  // Minted BEFORE the settle: a late failure writing the ledger row must not
+  // kill the bill's recurrence by leaving the payable paid with no successor.
+  // Patch stays before both — settling first would strand an undeletable
+  // ledger row against a payable not yet marked paid.
+  //
+  // Mint only when nothing else is outstanding, so a double-submitted Pay
+  // cannot leave two competing upcoming rows.
   if (!hasOtherUnpaidPayable(found.bill.id, found.row.id)) {
     appendRow('bill_payables', newPayable(found.bill, uid, input.next_due_date));
+  }
+  if (input.from_savings === true) {
+    settleFromSavings(uid, 'bill_payable', found.row.id, input.paid_date, input.paid_amount);
   }
   return null;
 }
@@ -1302,6 +1400,21 @@ function savingsRefRow(uid, refType, refId) {
  * The same check enforces one-source-per-payment: a second call for the same ref
  * cannot add a second row, so a payment can never be split across sources.
  */
+/**
+ * Runs exactly the validation settleFromSavings does — the amount/date checks
+ * and the below-zero check — WITHOUT writing anything. Called up front in
+ * every paying path so the common refusals leave the sheet untouched instead
+ * of patching the row first and only then discovering the settle would have
+ * failed. settleFromSavings keeps its own copy of these checks as a backstop
+ * and stays idempotent.
+ */
+function assertCanSettleFromSavings(uid, refType, paidDate, paidAmount) {
+  assertSavingsDate(paidDate);
+  assertSavingsAmount(paidAmount);
+  var signed = -Math.abs(Number(paidAmount));
+  assertNotBelowZero(savingsBalanceAfter(ownedSavingsRows(uid), null, { date: paidDate, amount: signed }));
+}
+
 function settleFromSavings(uid, refType, refId, paidDate, paidAmount) {
   var found = savingsRefRow(uid, refType, refId);
   if (found.row) return;

@@ -33,7 +33,10 @@ export function PayModal({
   const [date, setDate] = useState(isoDate())
   const [amount, setAmount] = useState(String(defaultAmount))
   const [fromSavings, setFromSavings] = useState(false)
-  const overdrawn = fromSavings && Number(amount) > savingsBalance
+  // Compared in cents, matching assertNotBelowZero's Math.round(x * 100)
+  // guard: the backend is the authority, and comparing raw floats here made
+  // this courtesy check stricter than the guard it previews.
+  const overdrawn = fromSavings && Math.round(Number(amount) * 100) > Math.round(savingsBalance * 100)
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
@@ -50,7 +53,7 @@ export function PayModal({
           <TextInput
             type="number"
             step="0.01"
-            min="0"
+            min="0.01"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             required
