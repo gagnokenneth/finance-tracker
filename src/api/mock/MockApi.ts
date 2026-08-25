@@ -158,23 +158,55 @@ function assertNotSavingsFunded(
   }
 }
 
-/**
- * Runs exactly the validation settleFromSavings does — the amount/date checks
- * and the below-zero check — WITHOUT writing anything. Called up front in
- * every paying path, mirroring assertCanSettleFromSavings in Code.gs, so the
- * common refusals leave the data untouched instead of writing the row first.
+/*
+ * Validates a savings-funded payment and returns the signed amount the write
+ * will use — the already-settled check, the date/amount checks, and the
+ * below-zero guard, all in one place. Mirrors prepareSettleFromSavings in
+ * Code.gs: called BEFORE anything is written, so the common refusals leave
+ * the data untouched instead of writing the row first and discovering the
+ * settle would have failed.
  */
-function assertCanSettleFromSavings(
+function prepareSettleFromSavings(
   data: FinanceData,
+  refType: SavingsRefType,
+  refId: number,
   paidDate: string,
   paidAmount: number,
-): void {
+): number {
+  const found = refRow(data.savings_ledger, refType, refId)
+  if (found) {
+    throw new Error(
+      `That payment came from savings (${Math.abs(found.amount).toFixed(2)}). Un-pay it first, then pay again.`,
+    )
+  }
   assertSavingsDate(paidDate)
   assertSavingsAmount(paidAmount)
   const signed = -Math.abs(paidAmount)
   assertNotBelowZero(
     savingsBalanceAfter(data.savings_ledger, null, { date: paidDate, amount: signed }),
   )
+  return signed
+}
+
+/*
+ * Writes the row prepareSettleFromSavings validated. No checks: mirrors
+ * appendSavingsPayment in Code.gs.
+ */
+function appendSavingsPayment(
+  data: FinanceData,
+  refType: SavingsRefType,
+  refId: number,
+  paidDate: string,
+  signed: number,
+): void {
+  data.savings_ledger.push({
+    id: nextId(data.savings_ledger),
+    date: paidDate,
+    amount: signed,
+    kind: PAYMENT_KIND[refType],
+    ref_type: refType,
+    ref_id: refId,
+  })
 }
 
 /**
@@ -211,31 +243,6 @@ function paidDateChanged(
   return String(newVal) !== String(oldVal)
 }
 
-/** Idempotent, matching Code.gs: a retry finds the row and writes nothing. */
-function settleFromSavings(
-  data: FinanceData,
-  refType: SavingsRefType,
-  refId: number,
-  paidDate: string,
-  paidAmount: number,
-): void {
-  if (refRow(data.savings_ledger, refType, refId)) return
-  assertSavingsDate(paidDate)
-  assertSavingsAmount(paidAmount)
-  const signed = -Math.abs(paidAmount)
-  assertNotBelowZero(
-    savingsBalanceAfter(data.savings_ledger, null, { date: paidDate, amount: signed }),
-  )
-  data.savings_ledger.push({
-    id: nextId(data.savings_ledger),
-    date: paidDate,
-    amount: signed,
-    kind: PAYMENT_KIND[refType],
-    ref_type: refType,
-    ref_id: refId,
-  })
-}
-
 /** Returns the money. A no-op when the payment was not savings-funded. */
 function unsettleFromSavings(
   data: FinanceData,
@@ -248,47 +255,93 @@ function unsettleFromSavings(
 }
 
 /*
- * Mirrors updateDebtRow in Code.gs. A debt row's payment travels through the
- * same generic update as an edit, so this decides which is happening.
- * Called BEFORE the row is mutated for the refusals, and after for the
- * reversal. `previous` is a snapshot of the row's paid/paid_date/paid_amount
- * taken before the patch is applied — classification is by TRANSITION, not by
- * payload, since the two form modals always re-send paid/paid_date/paid_amount
- * on an already-paid row.
+ * Drops every ledger row settling one of `refIds`, in one pass. Mirrors
+ * unsettleManyFromSavings in Code.gs — MockApi has no sheet reads to save, but
+ * the two backends must still agree function-for-function on what is checked
+ * and when.
  */
-function debtPaySideEffects(
+function unsettleManyFromSavings(
+  data: FinanceData,
+  refType: SavingsRefType,
+  refIds: number[],
+): void {
+  if (!refIds.length) return
+  const wanted = new Set(refIds)
+  data.savings_ledger = data.savings_ledger.filter(
+    (r) => !(r.ref_type === refType && r.ref_id !== undefined && wanted.has(r.ref_id)),
+  )
+}
+
+/*
+ * The paying/unpaying classification a debt row's payment transition boils
+ * down to — shared by prepareDebtPaySideEffects and applyDebtPaySideEffects so
+ * the two agree on what happened without recomputing it differently.
+ * Classification is by TRANSITION, not by payload, since the two form modals
+ * always re-send paid/paid_date/paid_amount on an already-paid row.
+ */
+function classifyDebtPayTransition(
+  patch: { paid?: boolean },
+  previous: { paid: boolean },
+): { paying: boolean; unpaying: boolean } {
+  const hasPaid = Object.prototype.hasOwnProperty.call(patch, 'paid')
+  return {
+    paying: hasPaid && patch.paid === true && !previous.paid,
+    unpaying: hasPaid && patch.paid === false && previous.paid,
+  }
+}
+
+/*
+ * Mirrors updateDebtRow's pre-patch refusals in Code.gs. Called BEFORE the row
+ * is mutated, so a bad amount/date, an insufficient balance, or a re-pay of a
+ * row already funded from savings leaves the data untouched. Returns the
+ * signed amount for a savings-funded pay, so applyDebtPaySideEffects can
+ * append it with no further checks — or null when there is nothing to append.
+ */
+function prepareDebtPaySideEffects(
   data: FinanceData,
   refType: SavingsRefType,
   refId: number,
   patch: { paid?: boolean; paid_date?: string | null; paid_amount?: number | null },
   previous: { paid: boolean; paid_date?: string; paid_amount?: number },
   fromSavings: boolean | undefined,
-  phase: 'before' | 'after',
-): void {
-  const hasPaid = Object.prototype.hasOwnProperty.call(patch, 'paid')
-  const unpaying = hasPaid && patch.paid === false && previous.paid
-  const paying = hasPaid && patch.paid === true && !previous.paid
-
-  if (phase === 'before') {
-    if (paying) {
-      assertNotSavingsFunded(data.savings_ledger, refType, refId)
-      // Validate before the patch, so a bad amount/date or an insufficient
-      // balance leaves the data untouched.
-      if (fromSavings === true) {
-        assertCanSettleFromSavings(data, patch.paid_date as string, patch.paid_amount as number)
-      }
-    } else if (
-      !unpaying &&
-      (paidAmountChanged(patch, previous) || paidDateChanged(patch, previous))
-    ) {
-      assertNotSavingsFunded(data.savings_ledger, refType, refId)
+): number | null {
+  const { paying, unpaying } = classifyDebtPayTransition(patch, previous)
+  if (paying) {
+    if (fromSavings === true) {
+      return prepareSettleFromSavings(
+        data,
+        refType,
+        refId,
+        patch.paid_date as string,
+        patch.paid_amount as number,
+      )
     }
-    return
+    assertNotSavingsFunded(data.savings_ledger, refType, refId)
+    return null
   }
+  if (!unpaying && (paidAmountChanged(patch, previous) || paidDateChanged(patch, previous))) {
+    assertNotSavingsFunded(data.savings_ledger, refType, refId)
+  }
+  return null
+}
 
+/*
+ * Mirrors updateDebtRow's post-patch effects in Code.gs: the reversal for an
+ * un-pay, or the ledger append for a savings-funded pay, using the signed
+ * amount prepareDebtPaySideEffects already validated.
+ */
+function applyDebtPaySideEffects(
+  data: FinanceData,
+  refType: SavingsRefType,
+  refId: number,
+  patch: { paid?: boolean; paid_date?: string | null },
+  previous: { paid: boolean },
+  signed: number | null,
+): void {
+  const { unpaying } = classifyDebtPayTransition(patch, previous)
   if (unpaying) unsettleFromSavings(data, refType, refId)
-  else if (paying && fromSavings === true) {
-    settleFromSavings(data, refType, refId, patch.paid_date as string, patch.paid_amount as number)
+  else if (signed !== null) {
+    appendSavingsPayment(data, refType, refId, patch.paid_date as string, signed)
   }
 }
 
@@ -470,9 +523,11 @@ export class MockApi implements FinanceApi {
     // Unsettle every payable's ledger entry BEFORE the cascade deletes the
     // payables themselves, so a failure here cannot leave the payables gone
     // with the ledger rows still present.
-    for (const r of data.bill_payables.filter((r) => r.bill_id === id)) {
-      unsettleFromSavings(data, 'bill_payable', r.id)
-    }
+    unsettleManyFromSavings(
+      data,
+      'bill_payable',
+      data.bill_payables.filter((r) => r.bill_id === id).map((r) => r.id),
+    )
     data.bills = data.bills.filter((b) => b.id !== id)
     data.bill_payables = data.bill_payables.filter((r) => r.bill_id !== id)
     this.save(data)
@@ -531,13 +586,16 @@ export class MockApi implements FinanceApi {
   async payBillPayable(id: number, input: PayBillInput): Promise<FinanceData> {
     const data = this.load()
     const { bill, row } = this.payableBill(data, id)
-    // A stale tab could re-pay a row already funded from savings; that would
-    // desync the amount from the ledger row.
-    assertNotSavingsFunded(data.savings_ledger, 'bill_payable', id)
-    // Validate BEFORE anything is written, so a bad amount/date or an
-    // insufficient balance leaves the data completely untouched.
+    // Validate BEFORE anything is written, so a bad amount/date, an
+    // insufficient balance, or a re-pay of a row already funded from savings
+    // leaves the data completely untouched.
+    let signed: number | null = null
     if (input.from_savings) {
-      assertCanSettleFromSavings(data, input.paid_date, input.paid_amount)
+      signed = prepareSettleFromSavings(data, 'bill_payable', id, input.paid_date, input.paid_amount)
+    } else {
+      // A stale tab could re-pay a row already funded from savings; that would
+      // desync the amount from the ledger row.
+      assertNotSavingsFunded(data.savings_ledger, 'bill_payable', id)
     }
     row.paid = true
     row.paid_date = input.paid_date
@@ -550,8 +608,8 @@ export class MockApi implements FinanceApi {
     if (!stillUnpaid) {
       data.bill_payables.push(this.newPayable(data, bill, input.next_due_date))
     }
-    if (input.from_savings) {
-      settleFromSavings(data, 'bill_payable', id, input.paid_date, input.paid_amount)
+    if (signed !== null) {
+      appendSavingsPayment(data, 'bill_payable', id, input.paid_date, signed)
     }
     this.save(data)
     return this.delay(data)
@@ -588,12 +646,16 @@ export class MockApi implements FinanceApi {
     // Unsettle every child row's ledger entry BEFORE the cascade deletes the
     // rows themselves, so a failure here cannot leave the settled rows gone
     // with the ledger rows still present.
-    for (const r of data.debt_schedule.filter((r) => r.debt_id === id)) {
-      unsettleFromSavings(data, 'debt_schedule', r.id)
-    }
-    for (const r of data.debt_statements.filter((r) => r.debt_id === id)) {
-      unsettleFromSavings(data, 'debt_statement', r.id)
-    }
+    unsettleManyFromSavings(
+      data,
+      'debt_schedule',
+      data.debt_schedule.filter((r) => r.debt_id === id).map((r) => r.id),
+    )
+    unsettleManyFromSavings(
+      data,
+      'debt_statement',
+      data.debt_statements.filter((r) => r.debt_id === id).map((r) => r.id),
+    )
     data.debts = data.debts.filter((d) => d.id !== id)
     data.debt_schedule = data.debt_schedule.filter((r) => r.debt_id !== id)
     data.debt_statements = data.debt_statements.filter((r) => r.debt_id !== id)
@@ -617,10 +679,10 @@ export class MockApi implements FinanceApi {
     const row = data.debt_schedule.find((r) => r.id === id)
     if (!row) throw new Error(`Schedule row ${id} not found`)
     const previous = { paid: row.paid === true, paid_date: row.paid_date, paid_amount: row.paid_amount }
-    debtPaySideEffects(data, 'debt_schedule', id, patch, previous, fromSavings, 'before')
+    const signed = prepareDebtPaySideEffects(data, 'debt_schedule', id, patch, previous, fromSavings)
     Object.assign(row, patch)
     clearPaidFields(row)
-    debtPaySideEffects(data, 'debt_schedule', id, patch, previous, fromSavings, 'after')
+    applyDebtPaySideEffects(data, 'debt_schedule', id, patch, previous, signed)
     this.save(data)
     return this.delay(data)
   }
@@ -649,14 +711,14 @@ export class MockApi implements FinanceApi {
     const row = data.debt_statements.find((r) => r.id === id)
     if (!row) throw new Error(`Statement ${id} not found`)
     const previous = { paid: row.paid === true, paid_date: row.paid_date, paid_amount: row.paid_amount }
-    debtPaySideEffects(data, 'debt_statement', id, patch, previous, fromSavings, 'before')
+    const signed = prepareDebtPaySideEffects(data, 'debt_statement', id, patch, previous, fromSavings)
     Object.assign(row, patch)
     // null is the wire's "clear this"; the stored model uses undefined.
     for (const key of ['min_due', 'total_due', 'outstanding'] as const) {
       if (patch[key] === null) row[key] = undefined
     }
     clearPaidFields(row)
-    debtPaySideEffects(data, 'debt_statement', id, patch, previous, fromSavings, 'after')
+    applyDebtPaySideEffects(data, 'debt_statement', id, patch, previous, signed)
     this.save(data)
     return this.delay(data)
   }

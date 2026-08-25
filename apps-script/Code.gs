@@ -688,10 +688,10 @@ function dispatch(action, p, uid) {
     case 'deleteDebt': return deleteDebt(p, uid);
     case 'addScheduleRow': return addChildRow('debt_schedule', p, uid);
     case 'updateScheduleRow': return updateDebtRow('debt_schedule', 'debt_schedule', p, uid);
-    case 'deleteScheduleRow': return deleteDebtScheduleRow(p, uid);
+    case 'deleteScheduleRow': return deleteDebtRow('debt_schedule', 'debt_schedule', p, uid);
     case 'addStatement': return addChildRow('debt_statements', p, uid);
     case 'updateStatement': return updateDebtRow('debt_statements', 'debt_statement', p, uid);
-    case 'deleteStatement': return deleteDebtStatement(p, uid);
+    case 'deleteStatement': return deleteDebtRow('debt_statements', 'debt_statement', p, uid);
     case 'addBill': return addBill(p, uid);
     case 'updateBill': return updateBill(p, uid);
     case 'closeBill': return closeBill(p, uid);
@@ -754,10 +754,8 @@ function deleteDebt(p, uid) {
   // Unsettle every child row's ledger entry BEFORE the cascade deletes the
   // rows themselves, so a failure here cannot leave the settled rows gone with
   // the ledger rows still present.
-  var scheduleIds = ownedIdsWhere('debt_schedule', uid, 'debt_id', p.id);
-  for (var i = 0; i < scheduleIds.length; i++) unsettleFromSavings(uid, 'debt_schedule', scheduleIds[i]);
-  var statementIds = ownedIdsWhere('debt_statements', uid, 'debt_id', p.id);
-  for (var j = 0; j < statementIds.length; j++) unsettleFromSavings(uid, 'debt_statement', statementIds[j]);
+  unsettleManyFromSavings(uid, 'debt_schedule', ownedIdsWhere('debt_schedule', uid, 'debt_id', p.id));
+  unsettleManyFromSavings(uid, 'debt_statement', ownedIdsWhere('debt_statements', uid, 'debt_id', p.id));
   deleteRowsWhere('debt_schedule', 'debt_id', p.id);
   deleteRowsWhere('debt_statements', 'debt_id', p.id);
   sheet('debts').deleteRow(rowIndex);
@@ -810,15 +808,18 @@ function updateDebtRow(sheetName, refType, p, uid) {
   }
 
   if (paying) {
-    assertNotSavingsFunded(uid, refType, p.id);
-    // Validate before the patch, so a bad amount/date or an insufficient
-    // balance leaves the sheet untouched.
+    // Validate before the patch, so a bad amount/date, an insufficient
+    // balance, or a re-pay of a row already funded from savings leaves the
+    // sheet untouched.
+    var signed = null;
     if (p.from_savings === true) {
-      assertCanSettleFromSavings(uid, refType, patch.paid_date, patch.paid_amount);
+      signed = prepareSettleFromSavings(uid, refType, p.id, patch.paid_date, patch.paid_amount);
+    } else {
+      assertNotSavingsFunded(uid, refType, p.id);
     }
     var paidResult = updateChildRow(sheetName, p, uid);
-    if (p.from_savings === true) {
-      settleFromSavings(uid, refType, p.id, patch.paid_date, patch.paid_amount);
+    if (signed !== null) {
+      appendSavingsPayment(uid, refType, p.id, patch.paid_date, signed);
     }
     return paidResult;
   }
@@ -863,25 +864,14 @@ function deleteChildRow(name, p, uid) {
 }
 
 /*
- * Thin wrappers so the two debt deletes can unsettle the ledger before the
- * generic delete — deleteChildRow itself stays generic and unchanged; only
- * dispatch is re-pointed to these, exactly as updateDebtRow already does for
- * the two debt updates.
- *
- * Unsettle runs BEFORE the row is deleted: if unsettling throws, the settled
- * row and its ledger row both survive, rather than a delete succeeding first
- * and a failed unsettle leaving the ledger row orphaned.
+ * Parameterised on the same (sheetName, refType) pair updateDebtRow takes — the
+ * statement's ref_type is singular while its sheet is plural. Unsettle before
+ * the delete, so a failure cannot leave the row gone with its ledger row behind.
  */
-function deleteDebtScheduleRow(p, uid) {
-  assertOwned('debt_schedule', p.id, uid);
-  unsettleFromSavings(uid, 'debt_schedule', p.id);
-  return deleteChildRow('debt_schedule', p, uid);
-}
-
-function deleteDebtStatement(p, uid) {
-  assertOwned('debt_statements', p.id, uid);
-  unsettleFromSavings(uid, 'debt_statement', p.id);
-  return deleteChildRow('debt_statements', p, uid);
+function deleteDebtRow(sheetName, refType, p, uid) {
+  assertOwned(sheetName, p.id, uid);
+  unsettleFromSavings(uid, refType, p.id);
+  return deleteChildRow(sheetName, p, uid);
 }
 
 /**
@@ -992,8 +982,7 @@ function deleteBill(p, uid) {
   // Unsettle every payable's ledger entry BEFORE the cascade deletes the
   // payables themselves, so a failure here cannot leave the payables gone
   // with the ledger rows still present.
-  var payableIds = ownedIdsWhere('bill_payables', uid, 'bill_id', p.id);
-  for (var i = 0; i < payableIds.length; i++) unsettleFromSavings(uid, 'bill_payable', payableIds[i]);
+  unsettleManyFromSavings(uid, 'bill_payable', ownedIdsWhere('bill_payables', uid, 'bill_id', p.id));
   deleteRowsWhere('bill_payables', 'bill_id', p.id);
   sheet('bills').deleteRow(rowIndex);
   return null;
@@ -1086,13 +1075,16 @@ function hasOtherUnpaidPayable(billId, exceptId) {
 function payBillPayable(p, uid) {
   var found = ownedPayable(p.id, uid);
   var input = p.input || {};
-  // A stale tab could re-pay a row already funded from savings; that would
-  // desync the amount from the ledger row.
-  assertNotSavingsFunded(uid, 'bill_payable', found.row.id);
   // Validate BEFORE anything is written, so a bad amount/date or an
-  // insufficient balance leaves the sheet completely untouched.
+  // insufficient balance — or a re-pay of a row already funded from savings —
+  // leaves the sheet completely untouched.
+  var signed = null;
   if (input.from_savings === true) {
-    assertCanSettleFromSavings(uid, 'bill_payable', input.paid_date, input.paid_amount);
+    signed = prepareSettleFromSavings(uid, 'bill_payable', found.row.id, input.paid_date, input.paid_amount);
+  } else {
+    // A stale tab could re-pay a row already funded from savings; that would
+    // desync the amount from the ledger row.
+    assertNotSavingsFunded(uid, 'bill_payable', found.row.id);
   }
   patchRowAt('bill_payables', found.rowIndex, {
     paid: true,
@@ -1109,8 +1101,8 @@ function payBillPayable(p, uid) {
   if (!hasOtherUnpaidPayable(found.bill.id, found.row.id)) {
     appendRow('bill_payables', newPayable(found.bill, uid, input.next_due_date));
   }
-  if (input.from_savings === true) {
-    settleFromSavings(uid, 'bill_payable', found.row.id, input.paid_date, input.paid_amount);
+  if (signed !== null) {
+    appendSavingsPayment(uid, 'bill_payable', found.row.id, input.paid_date, signed);
   }
   return null;
 }
@@ -1400,30 +1392,42 @@ function savingsRefRow(uid, refType, refId) {
  * The same check enforces one-source-per-payment: a second call for the same ref
  * cannot add a second row, so a payment can never be split across sources.
  */
-/**
- * Runs exactly the validation settleFromSavings does — the amount/date checks
- * and the below-zero check — WITHOUT writing anything. Called up front in
- * every paying path so the common refusals leave the sheet untouched instead
- * of patching the row first and only then discovering the settle would have
- * failed. settleFromSavings keeps its own copy of these checks as a backstop
- * and stays idempotent.
+/*
+ * Validates a savings-funded payment and returns the signed amount the write
+ * will use. ONE ledger read, and it does every check: already-settled, date,
+ * amount, and the below-zero guard.
+ *
+ * Called BEFORE anything is written, so the common refusals leave the sheet
+ * untouched — a late throw used to record the payment and skip minting the next
+ * payable, killing a bill's recurrence.
+ *
+ * This is the single home for that validation. appendSavingsPayment below does
+ * no checking of its own precisely because this ran first; the two used to
+ * duplicate all four checks and read the ledger twice between them.
  */
-function assertCanSettleFromSavings(uid, refType, paidDate, paidAmount) {
+function prepareSettleFromSavings(uid, refType, refId, paidDate, paidAmount) {
+  var found = savingsRefRow(uid, refType, refId);
+  if (found.row) {
+    throw new Error(
+      'That payment came from savings (' +
+        Number(Math.abs(found.row.amount)).toFixed(2) +
+        '). Un-pay it first, then pay again.'
+    );
+  }
   assertSavingsDate(paidDate);
   assertSavingsAmount(paidAmount);
   var signed = -Math.abs(Number(paidAmount));
-  assertNotBelowZero(savingsBalanceAfter(ownedSavingsRows(uid), null, { date: paidDate, amount: signed }));
+  // The as-of-today rule and the cents comparison both come from FT-3 unchanged.
+  assertNotBelowZero(savingsBalanceAfter(found.rows, null, { date: paidDate, amount: signed }));
+  return signed;
 }
 
-function settleFromSavings(uid, refType, refId, paidDate, paidAmount) {
-  var found = savingsRefRow(uid, refType, refId);
-  if (found.row) return;
-  assertSavingsDate(paidDate);
-  assertSavingsAmount(paidAmount);
-  var signed = -Math.abs(Number(paidAmount));
-  // Same guard as any other movement: the as-of-today rule and the cents
-  // comparison both come from FT-3 unchanged.
-  assertNotBelowZero(savingsBalanceAfter(found.rows, null, { date: paidDate, amount: signed }));
+/*
+ * Writes the row prepareSettleFromSavings validated. No reads and no checks:
+ * repeating them would be another ledger round trip for an answer this request
+ * already has.
+ */
+function appendSavingsPayment(uid, refType, refId, paidDate, signed) {
   appendRow('savings_ledger', {
     id: nextId('savings_ledger'),
     user_id: uid,
@@ -1441,6 +1445,36 @@ function unsettleFromSavings(uid, refType, refId) {
   var found = savingsRefRow(uid, refType, refId);
   if (!found.row) return;
   sheet('savings_ledger').deleteRow(ownedRowIndex('savings_ledger', found.row.id, uid));
+}
+
+/*
+ * Drops every ledger row settling one of `refIds`, in ONE read and one
+ * bottom-up pass.
+ *
+ * The per-child alternative re-read the whole ledger for each child: a bill with
+ * 24 payables meant 24 reads, and each read is a separate round trip on a
+ * platform charging over a second of fixed overhead per request.
+ *
+ * Bottom-up so an earlier deletion cannot shift a row still to be removed.
+ */
+function unsettleManyFromSavings(uid, refType, refIds) {
+  if (!refIds.length) return;
+  var sh = sheet('savings_ledger');
+  var last = sh.getLastRow();
+  if (last < 2) return;
+  var headers = SHEETS.savings_ledger;
+  var values = sh.getRange(2, 1, last - 1, headers.length).getValues();
+  var userCol = headers.indexOf('user_id');
+  var typeCol = headers.indexOf('ref_type');
+  var idCol = headers.indexOf('ref_id');
+  var wanted = {};
+  for (var i = 0; i < refIds.length; i++) wanted[String(num(refIds[i]))] = true;
+  for (var r = values.length - 1; r >= 0; r--) {
+    if (num(values[r][userCol]) !== num(uid)) continue;
+    if (String(values[r][typeCol]) !== refType) continue;
+    if (!wanted[String(num(values[r][idCol]))]) continue;
+    sh.deleteRow(r + 2);
+  }
 }
 
 /*
