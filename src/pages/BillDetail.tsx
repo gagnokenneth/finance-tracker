@@ -6,7 +6,7 @@ import { billCaption, payablesFor, recurrenceOf, upcomingPayable } from '../lib/
 import { nextDueDate } from '../lib/billSchedule.ts'
 import { dueStatus } from '../lib/debts.ts'
 import { isTemp } from '../lib/tempId.ts'
-import { balanceAsOf, paymentsByRef } from '../lib/savings.ts'
+import { balanceAsOf, paymentsByRef, refKey } from '../lib/savings.ts'
 import { Money } from '../components/Money.tsx'
 import { Table } from '../components/Table.tsx'
 import { DueBadge } from '../components/DueBadge.tsx'
@@ -96,7 +96,7 @@ export function BillDetail() {
             </>
           )}
         </span>
-        {fundedByRef.has(`bill_payable:${row.id}`) && (
+        {fundedByRef.has(refKey('bill_payable', row.id)) && (
           <span className="text-xs text-ink-faint">from savings</span>
         )}
       </span>

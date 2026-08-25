@@ -100,6 +100,16 @@ function savingsPaymentRow(
   }
 }
 
+/** The set-wise form, for a cascade that removes many settled rows at once. */
+function withoutSavingsPaymentsFor(
+  rows: SavingsLedgerEntry[],
+  refType: SavingsRefType,
+  refIds: number[],
+): SavingsLedgerEntry[] {
+  const dropped = new Set(refIds)
+  return rows.filter((r) => !(r.ref_type === refType && r.ref_id !== undefined && dropped.has(r.ref_id)))
+}
+
 function withoutSavingsPayment(
   rows: SavingsLedgerEntry[],
   refType: SavingsRefType,
@@ -259,11 +269,21 @@ function savingsLedgerAfterDebtPatch(
 }
 
 export function removeScheduleRow(data: FinanceData, id: number): FinanceData {
-  return { ...data, debt_schedule: data.debt_schedule.filter((row) => row.id !== id) }
+  return {
+    ...data,
+    debt_schedule: data.debt_schedule.filter((row) => row.id !== id),
+    // Both backends drop the ledger row that settled this one; a prediction that
+    // kept it would understate the savings balance until the response landed.
+    savings_ledger: withoutSavingsPayment(data.savings_ledger, 'debt_schedule', id),
+  }
 }
 
 export function removeStatement(data: FinanceData, id: number): FinanceData {
-  return { ...data, debt_statements: data.debt_statements.filter((row) => row.id !== id) }
+  return {
+    ...data,
+    debt_statements: data.debt_statements.filter((row) => row.id !== id),
+    savings_ledger: withoutSavingsPayment(data.savings_ledger, 'debt_statement', id),
+  }
 }
 
 export function renameDebt(data: FinanceData, vars: { id: number; name: string }): FinanceData {
@@ -303,6 +323,12 @@ export function removeBill(data: FinanceData, id: number): FinanceData {
     ...data,
     bills: data.bills.filter((bill) => bill.id !== id),
     bill_payables: data.bill_payables.filter((row) => row.bill_id !== id),
+    // The cascade drops every payable, so it drops every ledger row settling one.
+    savings_ledger: withoutSavingsPaymentsFor(
+      data.savings_ledger,
+      'bill_payable',
+      data.bill_payables.filter((row) => row.bill_id === id).map((row) => row.id),
+    ),
   }
 }
 
@@ -350,7 +376,11 @@ export function applyBillPayablePatch(
 }
 
 export function removeBillPayable(data: FinanceData, id: number): FinanceData {
-  return { ...data, bill_payables: data.bill_payables.filter((row) => row.id !== id) }
+  return {
+    ...data,
+    bill_payables: data.bill_payables.filter((row) => row.id !== id),
+    savings_ledger: withoutSavingsPayment(data.savings_ledger, 'bill_payable', id),
+  }
 }
 
 /** Deleting a debt takes its rows with it, the same cascade the backend applies. */
@@ -360,6 +390,15 @@ export function removeDebt(data: FinanceData, id: number): FinanceData {
     debts: data.debts.filter((debt) => debt.id !== id),
     debt_schedule: data.debt_schedule.filter((row) => row.debt_id !== id),
     debt_statements: data.debt_statements.filter((row) => row.debt_id !== id),
+    savings_ledger: withoutSavingsPaymentsFor(
+      withoutSavingsPaymentsFor(
+        data.savings_ledger,
+        'debt_schedule',
+        data.debt_schedule.filter((row) => row.debt_id === id).map((row) => row.id),
+      ),
+      'debt_statement',
+      data.debt_statements.filter((row) => row.debt_id === id).map((row) => row.id),
+    ),
   }
 }
 

@@ -13,7 +13,7 @@ import {
 } from '../lib/debts.ts'
 import { nextMonthOn } from '../lib/currentMonth.ts'
 import { isTemp } from '../lib/tempId.ts'
-import { balanceAsOf, paymentsByRef } from '../lib/savings.ts'
+import { balanceAsOf, paymentsByRef, refKey } from '../lib/savings.ts'
 import { Money } from '../components/Money.tsx'
 import { Table } from '../components/Table.tsx'
 import { DueBadge } from '../components/DueBadge.tsx'
@@ -170,7 +170,7 @@ export function DebtDetail() {
             </>
           )}
         </span>
-        {fundedByRef.has(`${'amount' in row ? 'debt_schedule' : 'debt_statement'}:${row.id}`) && (
+        {fundedByRef.has(refKey('amount' in row ? 'debt_schedule' : 'debt_statement', row.id)) && (
           <span className="text-xs text-ink-faint">from savings</span>
         )}
       </span>

@@ -1,6 +1,11 @@
 import { isTemp } from './tempId.ts'
 import { isoDate } from './currentMonth.ts'
-import type { SavingsLedgerEntry, SavingsLedgerKind, SavingsMovementKind } from '../types.ts'
+import type {
+  SavingsLedgerEntry,
+  SavingsLedgerKind,
+  SavingsMovementKind,
+  SavingsRefType,
+} from '../types.ts'
 
 /** Rows the user cannot edit here: FT-4 writes them against a real payment. */
 export function isPaymentKind(kind: SavingsLedgerKind): boolean {
@@ -107,8 +112,16 @@ export function paymentsByRef(rows: SavingsLedgerEntry[]): Map<string, SavingsLe
   const index = new Map<string, SavingsLedgerEntry>()
   for (const row of rows) {
     if (row.ref_type !== undefined && row.ref_id !== undefined) {
-      index.set(`${row.ref_type}:${row.ref_id}`, row)
+      index.set(refKey(row.ref_type, row.ref_id), row)
     }
   }
   return index
+}
+
+/**
+ * The key paymentsByRef indexes on. Exported so a caller looking a payment up
+ * cannot spell the separator differently from the map that holds it.
+ */
+export function refKey(refType: SavingsRefType, refId: number): string {
+  return `${refType}:${refId}`
 }
