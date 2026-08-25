@@ -154,8 +154,12 @@ export class AppsScriptApi implements FinanceApi {
     return this.call<FinanceData>('addScheduleRow', { debtId, input })
   }
 
-  updateScheduleRow(id: number, patch: ScheduleRowPatch): Promise<FinanceData> {
-    return this.call<FinanceData>('updateScheduleRow', { id, patch })
+  updateScheduleRow(
+    id: number,
+    patch: ScheduleRowPatch,
+    fromSavings?: boolean,
+  ): Promise<FinanceData> {
+    return this.call<FinanceData>('updateScheduleRow', { id, patch, from_savings: fromSavings })
   }
 
   deleteScheduleRow(id: number): Promise<FinanceData> {
@@ -166,8 +170,12 @@ export class AppsScriptApi implements FinanceApi {
     return this.call<FinanceData>('addStatement', { debtId, input })
   }
 
-  updateStatement(id: number, patch: StatementPatch): Promise<FinanceData> {
-    return this.call<FinanceData>('updateStatement', { id, patch })
+  updateStatement(
+    id: number,
+    patch: StatementPatch,
+    fromSavings?: boolean,
+  ): Promise<FinanceData> {
+    return this.call<FinanceData>('updateStatement', { id, patch, from_savings: fromSavings })
   }
 
   deleteStatement(id: number): Promise<FinanceData> {

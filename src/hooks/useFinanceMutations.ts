@@ -148,8 +148,8 @@ export function useFinanceMutations() {
     ...optimistic(addScheduleRowTo, 'That payment did not save. It has been removed.'),
   })
   const updateScheduleRow = useMutation({
-    mutationFn: (v: { id: number; patch: ScheduleRowPatch }) =>
-      getApi().updateScheduleRow(v.id, v.patch),
+    mutationFn: (v: { id: number; patch: ScheduleRowPatch; fromSavings?: boolean }) =>
+      getApi().updateScheduleRow(v.id, v.patch, v.fromSavings),
     ...optimistic(applyScheduleRowPatch, 'That installment did not save. The row is back as it was.'),
   })
   const deleteScheduleRow = useMutation({
@@ -174,8 +174,8 @@ export function useFinanceMutations() {
     ),
   })
   const updateStatement = useMutation({
-    mutationFn: (v: { id: number; patch: StatementPatch }) =>
-      getApi().updateStatement(v.id, v.patch),
+    mutationFn: (v: { id: number; patch: StatementPatch; fromSavings?: boolean }) =>
+      getApi().updateStatement(v.id, v.patch, v.fromSavings),
     ...optimistic(applyStatementPatch, 'That statement did not save. The row is back as it was.'),
   })
   const deleteStatement = useMutation({

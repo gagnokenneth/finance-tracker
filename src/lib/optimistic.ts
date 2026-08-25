@@ -9,6 +9,7 @@ import type {
   IncomeSource,
   SavingsLedgerEntry,
   SavingsMovementKind,
+  SavingsRefType,
 } from '../types.ts'
 import type {
   BillPatch,
@@ -80,6 +81,31 @@ function newPayable(bill: Pick<Bill, 'id' | 'type' | 'amount'>, dueDate: string)
     amount: bill.type === 'fixed' ? bill.amount : undefined,
     paid: false,
   }
+}
+
+/** The row settleFromSavings writes. Mirrors it in both backends. */
+function savingsPaymentRow(
+  refType: SavingsRefType,
+  refId: number,
+  paidDate: string,
+  paidAmount: number,
+): SavingsLedgerEntry {
+  return {
+    id: tempId(),
+    date: paidDate,
+    amount: -Math.abs(paidAmount),
+    kind: refType === 'bill_payable' ? 'bill_payment' : 'debt_payment',
+    ref_type: refType,
+    ref_id: refId,
+  }
+}
+
+function withoutSavingsPayment(
+  rows: SavingsLedgerEntry[],
+  refType: SavingsRefType,
+  refId: number,
+): SavingsLedgerEntry[] {
+  return rows.filter((r) => !(r.ref_type === refType && r.ref_id === refId))
 }
 
 /** Creates the bill and its first payable, as addBill does in one write. */
@@ -169,31 +195,67 @@ export function payBillPayableIn(
   return {
     ...data,
     bill_payables: stillUnpaid ? paid : [...paid, newPayable(bill, vars.input.next_due_date)],
+    savings_ledger: vars.input.from_savings
+      ? [
+          ...data.savings_ledger,
+          savingsPaymentRow('bill_payable', vars.id, vars.input.paid_date, vars.input.paid_amount),
+        ]
+      : data.savings_ledger,
   }
 }
 
 export function applyScheduleRowPatch(
   data: FinanceData,
-  vars: { id: number; patch: ScheduleRowPatch },
+  vars: { id: number; patch: ScheduleRowPatch; fromSavings?: boolean },
 ): FinanceData {
   return {
     ...data,
     debt_schedule: data.debt_schedule.map((row) =>
       row.id === vars.id ? clearPaidWhenUnpaid({ ...row, ...vars.patch }) : row,
     ),
+    savings_ledger: savingsLedgerAfterDebtPatch(data.savings_ledger, 'debt_schedule', vars),
   }
 }
 
 export function applyStatementPatch(
   data: FinanceData,
-  vars: { id: number; patch: StatementPatch },
+  vars: { id: number; patch: StatementPatch; fromSavings?: boolean },
 ): FinanceData {
   return {
     ...data,
     debt_statements: data.debt_statements.map((row) =>
       row.id === vars.id ? clearPaidWhenUnpaid({ ...row, ...clearedAmounts(vars.patch) }) : row,
     ),
+    savings_ledger: savingsLedgerAfterDebtPatch(data.savings_ledger, 'debt_statement', vars),
   }
+}
+
+/**
+ * The ledger side effect of a debt row's paid patch, shared by the schedule
+ * and statement predictions so they cannot drift from each other. Mirrors
+ * debtPaySideEffects: append the row on a savings-funded pay, remove it on
+ * un-pay, leave it alone on a plain edit.
+ */
+function savingsLedgerAfterDebtPatch(
+  rows: SavingsLedgerEntry[],
+  refType: SavingsRefType,
+  vars: { id: number; patch: { paid?: boolean; paid_date?: string; paid_amount?: number }; fromSavings?: boolean },
+): SavingsLedgerEntry[] {
+  if (vars.patch.paid === true && vars.fromSavings) {
+    return [
+      ...rows,
+      savingsPaymentRow(
+        refType,
+        vars.id,
+        vars.patch.paid_date as string,
+        vars.patch.paid_amount as number,
+      ),
+    ]
+  }
+  if (vars.patch.paid === false) {
+    return withoutSavingsPayment(rows, refType, vars.id)
+  }
+  return rows
 }
 
 export function removeScheduleRow(data: FinanceData, id: number): FinanceData {
@@ -280,6 +342,10 @@ export function applyBillPayablePatch(
     bill_payables: unmint
       ? rows.filter((row) => row.id === vars.id || row.bill_id !== before.bill_id || row.paid)
       : rows,
+    savings_ledger:
+      vars.patch.paid === false
+        ? withoutSavingsPayment(data.savings_ledger, 'bill_payable', vars.id)
+        : data.savings_ledger,
   }
 }
 

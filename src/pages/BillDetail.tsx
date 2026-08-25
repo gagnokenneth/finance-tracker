@@ -75,6 +75,7 @@ export function BillDetail() {
         // Computed here because all four recurrence rules live in
         // lib/billSchedule.ts; the backend writes the date it is given.
         next_due_date: nextDueDate(recurrenceOf(bill), row.due_date),
+        from_savings: false,
       },
     })
   }

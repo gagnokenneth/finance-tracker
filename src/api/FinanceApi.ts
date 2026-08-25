@@ -26,6 +26,8 @@ export interface PayBillInput {
   paid_date: string
   paid_amount: number
   next_due_date: string
+  /** Draws the amount from the savings balance, recording one ledger row. */
+  from_savings: boolean
 }
 export type NewScheduleRow = Omit<DebtScheduleRow, 'id' | 'debt_id'>
 export type NewStatement = Omit<DebtStatement, 'id' | 'debt_id'>
@@ -114,11 +116,19 @@ export interface FinanceApi {
 
   addScheduleRow(debtId: number, input: NewScheduleRow): Promise<FinanceData>
   /** Paying is an update: { paid: true, paid_date, paid_amount }. */
-  updateScheduleRow(id: number, patch: ScheduleRowPatch): Promise<FinanceData>
+  updateScheduleRow(
+    id: number,
+    patch: ScheduleRowPatch,
+    fromSavings?: boolean,
+  ): Promise<FinanceData>
   deleteScheduleRow(id: number): Promise<FinanceData>
 
   addStatement(debtId: number, input: NewStatement): Promise<FinanceData>
-  updateStatement(id: number, patch: StatementPatch): Promise<FinanceData>
+  updateStatement(
+    id: number,
+    patch: StatementPatch,
+    fromSavings?: boolean,
+  ): Promise<FinanceData>
   deleteStatement(id: number): Promise<FinanceData>
 
   /* Bill writes return the whole updated dataset, for the same reasons above. */
