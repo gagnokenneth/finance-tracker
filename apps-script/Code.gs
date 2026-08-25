@@ -687,10 +687,10 @@ function dispatch(action, p, uid) {
     case 'updateDebt': return updateDebt(p, uid);
     case 'deleteDebt': return deleteDebt(p, uid);
     case 'addScheduleRow': return addChildRow('debt_schedule', p, uid);
-    case 'updateScheduleRow': return updateChildRow('debt_schedule', p, uid);
+    case 'updateScheduleRow': return updateDebtRow('debt_schedule', 'debt_schedule', p, uid);
     case 'deleteScheduleRow': return deleteChildRow('debt_schedule', p, uid);
     case 'addStatement': return addChildRow('debt_statements', p, uid);
-    case 'updateStatement': return updateChildRow('debt_statements', p, uid);
+    case 'updateStatement': return updateDebtRow('debt_statements', 'debt_statement', p, uid);
     case 'deleteStatement': return deleteChildRow('debt_statements', p, uid);
     case 'addBill': return addBill(p, uid);
     case 'updateBill': return updateBill(p, uid);
@@ -761,6 +761,48 @@ function addChildRow(name, p, uid) {
 function updateChildRow(name, p, uid) {
   var rowIndex = ownedRowIndex(name, p.id, uid);
   return patchRowAt(name, rowIndex, normalizePaidPatch(p.patch));
+}
+
+/*
+ * A debt row's payment travels through the same generic update as an edit, so
+ * this decides which one is happening. Bills have a dedicated payBillPayable and
+ * need no equivalent.
+ *
+ * sheetName is the tab; refType is what savings_ledger stores, and the two
+ * differ for statements (debt_statements vs debt_statement).
+ */
+function updateDebtRow(sheetName, refType, p, uid) {
+  // Authorize before reading the ledger or refusing anything. Costs one extra
+  // narrow two-column read on top of updateChildRow's own, which is the price of
+  // deciding before the patch.
+  assertOwned(sheetName, p.id, uid);
+  var patch = p.patch || {};
+  var hasPaid = Object.prototype.hasOwnProperty.call(patch, 'paid');
+  var unpaying = hasPaid && !bool(patch.paid);
+  var paying = hasPaid && bool(patch.paid);
+
+  if (unpaying) {
+    var undone = updateChildRow(sheetName, p, uid);
+    unsettleFromSavings(uid, refType, p.id);
+    return undone;
+  }
+
+  if (paying) {
+    assertNotSavingsFunded(uid, refType, p.id);
+    var paidResult = updateChildRow(sheetName, p, uid);
+    if (p.from_savings === true) {
+      settleFromSavings(uid, refType, p.id, patch.paid_date, patch.paid_amount);
+    }
+    return paidResult;
+  }
+
+  // An edit. Only a change to the payment's own figures can desync the ledger;
+  // editing the installment amount or the due date cannot.
+  if (Object.prototype.hasOwnProperty.call(patch, 'paid_amount') ||
+      Object.prototype.hasOwnProperty.call(patch, 'paid_date')) {
+    assertNotSavingsFunded(uid, refType, p.id);
+  }
+  return updateChildRow(sheetName, p, uid);
 }
 
 function deleteChildRow(name, p, uid) {
@@ -895,10 +937,21 @@ function updateBillPayable(p, uid) {
    */
   var unpaying = Object.prototype.hasOwnProperty.call(patch, 'paid') && !bool(patch.paid);
   var unmint = bool(found.row.paid) && unpaying && isLatestPaidPayable(found.bill.id, found.row);
+  // Before patchRowAt, while "was this row paid" is still answerable:
+  if (!unpaying) {
+    if (Object.prototype.hasOwnProperty.call(patch, 'paid_amount') ||
+        Object.prototype.hasOwnProperty.call(patch, 'paid_date')) {
+      assertNotSavingsFunded(uid, 'bill_payable', found.row.id);
+    }
+  }
   // Patch first, so found.rowIndex is still valid when it is used — the deletion
   // shifts indices, and nothing may rely on that index afterwards.
   var result = patchRowAt('bill_payables', found.rowIndex, patch);
   if (unmint) deleteUnpaidPayables(found.bill.id, found.row.id);
+  // Un-paying reverses both halves — the escape hatch for a savings-funded
+  // payment, since editing its amount is refused. After the patch so a failure
+  // cannot credit savings for a payment still recorded as paid.
+  if (unpaying) unsettleFromSavings(uid, 'bill_payable', found.row.id);
   return result;
 }
 
@@ -945,11 +998,17 @@ function hasOtherUnpaidPayable(billId, exceptId) {
 function payBillPayable(p, uid) {
   var found = ownedPayable(p.id, uid);
   var input = p.input || {};
+  // A stale tab could re-pay a row already funded from savings; that would
+  // desync the amount from the ledger row.
+  assertNotSavingsFunded(uid, 'bill_payable', found.row.id);
   patchRowAt('bill_payables', found.rowIndex, {
     paid: true,
     paid_date: input.paid_date,
     paid_amount: input.paid_amount
   });
+  if (input.from_savings === true) {
+    settleFromSavings(uid, 'bill_payable', found.row.id, input.paid_date, input.paid_amount);
+  }
   // Mint the next payable only when nothing else is outstanding, so a
   // double-submitted Pay cannot leave two competing upcoming rows.
   if (!hasOtherUnpaidPayable(found.bill.id, found.row.id)) {
@@ -1201,6 +1260,89 @@ function assertNotBelowZero(balance) {
 function assertNotPaymentRow(row) {
   if (row && (row.kind === 'bill_payment' || row.kind === 'debt_payment')) {
     throw new Error('That movement settled a bill or debt. Change it there instead.');
+  }
+}
+
+/*
+ * The kind a settled row's payment is recorded under. Keyed by ref_type, whose
+ * statement value is SINGULAR (debt_statement) while its sheet is plural
+ * (debt_statements) — SavingsRefType in src/types.ts is the authority.
+ */
+var PAYMENT_KIND = {
+  bill_payable: 'bill_payment',
+  debt_schedule: 'debt_payment',
+  debt_statement: 'debt_payment'
+};
+
+/*
+ * The caller's ledger row for a settled row, plus the rows it was found in so a
+ * caller needing the balance does not read the sheet twice.
+ *
+ * Scoped to readOwnedRows, so a crafted ref_id can never reach another user's
+ * ledger — ref_id is not an id this user owns, it is a foreign key they supply.
+ */
+function savingsRefRow(uid, refType, refId) {
+  var rows = readOwnedRows('savings_ledger', uid);
+  for (var i = 0; i < rows.length; i++) {
+    if (String(rows[i].ref_type) === refType && num(rows[i].ref_id) === num(refId)) {
+      return { row: coerce('savings_ledger', rows[i]), rows: rows };
+    }
+  }
+  return { row: null, rows: rows };
+}
+
+/*
+ * Records a payment as a savings outflow. IDEMPOTENT: a retried Pay finds the
+ * existing row and writes nothing, which is what makes the user's natural retry
+ * after a timeout safe. The FT-4 ticket placed this guarantee inside
+ * payBillPayable's hasOtherUnpaidPayable check, but that guard protects minting
+ * the next payable, not the payment — a double-submit patches the same row
+ * harmlessly and would append TWO ledger rows.
+ *
+ * The same check enforces one-source-per-payment: a second call for the same ref
+ * cannot add a second row, so a payment can never be split across sources.
+ */
+function settleFromSavings(uid, refType, refId, paidDate, paidAmount) {
+  var found = savingsRefRow(uid, refType, refId);
+  if (found.row) return;
+  assertSavingsDate(paidDate);
+  assertSavingsAmount(paidAmount);
+  var signed = -Math.abs(Number(paidAmount));
+  // Same guard as any other movement: the as-of-today rule and the cents
+  // comparison both come from FT-3 unchanged.
+  assertNotBelowZero(savingsBalanceAfter(found.rows, null, { date: paidDate, amount: signed }));
+  appendRow('savings_ledger', {
+    id: nextId('savings_ledger'),
+    user_id: uid,
+    date: paidDate,
+    amount: signed,
+    kind: PAYMENT_KIND[refType],
+    ref_type: refType,
+    ref_id: refId,
+    notes: ''
+  });
+}
+
+/** Returns the money. A no-op when the payment was not savings-funded. */
+function unsettleFromSavings(uid, refType, refId) {
+  var found = savingsRefRow(uid, refType, refId);
+  if (!found.row) return;
+  sheet('savings_ledger').deleteRow(ownedRowIndex('savings_ledger', found.row.id, uid));
+}
+
+/*
+ * Refuses a change that would leave a savings-funded payment disagreeing with
+ * its ledger row. Un-paying is the sanctioned way out — see the reversal
+ * decision in the spec — so this fires only for a re-pay or an amount edit.
+ */
+function assertNotSavingsFunded(uid, refType, refId) {
+  var found = savingsRefRow(uid, refType, refId);
+  if (found.row) {
+    throw new Error(
+      'That payment came from savings (' +
+        Number(Math.abs(found.row.amount)).toFixed(2) +
+        '). Un-pay it first, then pay again.'
+    );
   }
 }
 
