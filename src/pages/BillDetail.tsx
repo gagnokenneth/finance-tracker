@@ -6,6 +6,7 @@ import { billCaption, payablesFor, recurrenceOf, upcomingPayable } from '../lib/
 import { nextDueDate } from '../lib/billSchedule.ts'
 import { dueStatus } from '../lib/debts.ts'
 import { isTemp } from '../lib/tempId.ts'
+import { balanceAsOf, paymentsByRef } from '../lib/savings.ts'
 import { Money } from '../components/Money.tsx'
 import { Table } from '../components/Table.tsx'
 import { DueBadge } from '../components/DueBadge.tsx'
@@ -62,6 +63,8 @@ export function BillDetail() {
   const rows = payablesFor(data.bill_payables, bill.id)
   const upcoming = upcomingPayable(data.bill_payables, bill.id)
   const unpaidCount = rows.filter((r) => !r.paid).length
+  // FT-3 wrote paymentsByRef with no callers for exactly this.
+  const fundedByRef = paymentsByRef(data.savings_ledger)
 
   const submitPay = (result: PayResult) => {
     if (!payRow) return
@@ -72,10 +75,10 @@ export function BillDetail() {
       input: {
         paid_date: result.paid_date,
         paid_amount: result.paid_amount,
+        from_savings: result.from_savings,
         // Computed here because all four recurrence rules live in
         // lib/billSchedule.ts; the backend writes the date it is given.
         next_due_date: nextDueDate(recurrenceOf(bill), row.due_date),
-        from_savings: false,
       },
     })
   }
@@ -93,6 +96,9 @@ export function BillDetail() {
             </>
           )}
         </span>
+        {fundedByRef.has(`bill_payable:${row.id}`) && (
+          <span className="text-xs text-ink-faint">from savings</span>
+        )}
       </span>
     ) : (
       <StatusBadge status={dueStatus(row.due_date)} />
@@ -277,6 +283,7 @@ export function BillDetail() {
         <PayModal
           open
           defaultAmount={payRow.amount}
+          savingsBalance={balanceAsOf(data.savings_ledger)}
           onSubmit={submitPay}
           onClose={() => setPayRow(null)}
         />

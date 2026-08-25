@@ -2,12 +2,14 @@ import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { isoDate } from '../lib/currentMonth.ts'
 import { Modal } from './Modal.tsx'
-import { Field, TextInput, Button, SecondaryButton } from './ui.tsx'
+import { Field, TextInput, SelectInput, Button, SecondaryButton } from './ui.tsx'
 
 export interface PayResult {
   paid: true
   paid_date: string
   paid_amount: number
+  /** Whether this payment draws on the savings balance. */
+  from_savings: boolean
 }
 
 /**
@@ -18,20 +20,24 @@ export interface PayResult {
 export function PayModal({
   open,
   defaultAmount,
+  savingsBalance,
   onSubmit,
   onClose,
 }: {
   open: boolean
   defaultAmount: number
+  savingsBalance: number
   onSubmit: (result: PayResult) => void
   onClose: () => void
 }) {
   const [date, setDate] = useState(isoDate())
   const [amount, setAmount] = useState(String(defaultAmount))
+  const [fromSavings, setFromSavings] = useState(false)
+  const overdrawn = fromSavings && Number(amount) > savingsBalance
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    onSubmit({ paid: true, paid_date: date, paid_amount: Number(amount) })
+    onSubmit({ paid: true, paid_date: date, paid_amount: Number(amount), from_savings: fromSavings })
   }
 
   return (
@@ -50,11 +56,30 @@ export function PayModal({
             required
           />
         </Field>
+        <Field label="Paid from">
+          <SelectInput
+            value={fromSavings ? 'savings' : 'other'}
+            onChange={(e) => setFromSavings(e.target.value === 'savings')}
+          >
+            <option value="other">Income or cash (not tracked)</option>
+            <option value="savings">Savings</option>
+          </SelectInput>
+          {fromSavings && (
+            <p className="mt-1 text-xs text-ink-faint">
+              Savings balance {savingsBalance.toFixed(2)}
+            </p>
+          )}
+          {overdrawn && (
+            <p className="mt-1 text-xs text-overdue">
+              That is more than the savings balance.
+            </p>
+          )}
+        </Field>
         <div className="mt-1 flex justify-end gap-2">
           <SecondaryButton type="button" onClick={onClose}>
             Cancel
           </SecondaryButton>
-          <Button type="submit">
+          <Button type="submit" disabled={overdrawn}>
             Record payment
           </Button>
         </div>

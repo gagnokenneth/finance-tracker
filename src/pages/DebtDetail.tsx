@@ -13,6 +13,7 @@ import {
 } from '../lib/debts.ts'
 import { nextMonthOn } from '../lib/currentMonth.ts'
 import { isTemp } from '../lib/tempId.ts'
+import { balanceAsOf, paymentsByRef } from '../lib/savings.ts'
 import { Money } from '../components/Money.tsx'
 import { Table } from '../components/Table.tsx'
 import { DueBadge } from '../components/DueBadge.tsx'
@@ -88,6 +89,8 @@ export function DebtDetail() {
 
   const balance = totalBalance(debt, data.debt_schedule, data.debt_statements)
   const next = nextDueDate(debt, data.debt_schedule, data.debt_statements)
+  // FT-3 wrote paymentsByRef with no callers for exactly this.
+  const fundedByRef = paymentsByRef(data.savings_ledger)
 
   const closeRowForm = () => setRowForm(null)
 
@@ -124,8 +127,11 @@ export function DebtDetail() {
   const submitPay = (result: PayResult) => {
     if (!payRow) return
     setPayRow(null)
+    // Destructured, NOT spread as the patch: from_savings is not a column, and
+    // patchRowAt ignores unknown keys silently rather than failing loudly.
+    const { from_savings: fromSavings, ...patch } = result
     if ('amount' in payRow) {
-      updateScheduleRow.mutate({ id: payRow.id, patch: result })
+      updateScheduleRow.mutate({ id: payRow.id, patch, fromSavings })
       return
     }
     const row = payRow
@@ -134,7 +140,7 @@ export function DebtDetail() {
     // rejected payment leaves no statement for a month that was not paid.
     const isLatest = rows[rows.length - 1]?.id === row.id
     updateStatement.mutate(
-      { id: row.id, patch: result },
+      { id: row.id, patch, fromSavings },
       {
         onSuccess: isLatest ? () => startStatement(nextMonthOn(row.due_date)) : undefined,
       },
@@ -164,6 +170,9 @@ export function DebtDetail() {
             </>
           )}
         </span>
+        {fundedByRef.has(`${'amount' in row ? 'debt_schedule' : 'debt_statement'}:${row.id}`) && (
+          <span className="text-xs text-ink-faint">from savings</span>
+        )}
       </span>
     ) : (
       <StatusBadge status={dueStatus(row.due_date)} />
@@ -348,6 +357,7 @@ export function DebtDetail() {
         <PayModal
           open
           defaultAmount={'amount' in payRow ? payRow.amount : (payRow.min_due ?? 0)}
+          savingsBalance={balanceAsOf(data.savings_ledger)}
           onSubmit={submitPay}
           onClose={() => setPayRow(null)}
         />
