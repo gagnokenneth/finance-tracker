@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { isoDate } from '../lib/currentMonth.ts'
 import { Modal } from './Modal.tsx'
+import { Money } from './Money.tsx'
 import { Field, TextInput, SelectInput, Button, SecondaryButton } from './ui.tsx'
 
 export interface PayResult {
@@ -33,10 +34,18 @@ export function PayModal({
   const [date, setDate] = useState(isoDate())
   const [amount, setAmount] = useState(String(defaultAmount))
   const [fromSavings, setFromSavings] = useState(false)
-  // Compared in cents, matching assertNotBelowZero's Math.round(x * 100)
-  // guard: the backend is the authority, and comparing raw floats here made
-  // this courtesy check stricter than the guard it previews.
-  const overdrawn = fromSavings && Math.round(Number(amount) * 100) > Math.round(savingsBalance * 100)
+  /*
+   * Compared in cents, matching assertNotBelowZero's Math.round(x * 100) guard:
+   * the backend is the authority, and comparing raw floats here made this
+   * courtesy check stricter than the guard it previews.
+   *
+   * Only for a payment dated today or earlier. The backend counts a future-dated
+   * outflow against nothing (balanceAsOf excludes rows whose date has not
+   * arrived), so blocking one here would refuse a write the authority accepts.
+   */
+  const counted = date <= isoDate()
+  const overdrawn =
+    fromSavings && counted && Math.round(Number(amount) * 100) > Math.round(savingsBalance * 100)
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
@@ -50,10 +59,12 @@ export function PayModal({
           <TextInput type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
         </Field>
         <Field label="Amount paid">
+          {/* Savings requires a positive amount; the untracked source does not,
+              and a variable payable or a statement can legitimately be 0. */}
           <TextInput
             type="number"
             step="0.01"
-            min="0.01"
+            min={fromSavings ? '0.01' : '0'}
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             required
@@ -69,7 +80,7 @@ export function PayModal({
           </SelectInput>
           {fromSavings && (
             <p className="mt-1 text-xs text-ink-faint">
-              Savings balance {savingsBalance.toFixed(2)}
+              Savings balance <Money value={savingsBalance} />
             </p>
           )}
           {overdrawn && (

@@ -335,11 +335,18 @@ function applyDebtPaySideEffects(
   refType: SavingsRefType,
   refId: number,
   patch: { paid?: boolean; paid_date?: string | null },
-  previous: { paid: boolean },
   signed: number | null,
 ): void {
-  const { unpaying } = classifyDebtPayTransition(patch, previous)
-  if (unpaying) unsettleFromSavings(data, refType, refId)
+  /*
+   * The reversal fires on the PAYLOAD, not the transition. A row left unpaid with
+   * its ledger row still present — an un-pay that failed after the patch — would
+   * otherwise be unrecoverable: paying is refused because the ref is settled, and
+   * a transition-based un-pay does nothing. unsettleFromSavings is a no-op when
+   * there is no row, so this is safe on an ordinary edit.
+   */
+  if (Object.prototype.hasOwnProperty.call(patch, 'paid') && patch.paid === false) {
+    unsettleFromSavings(data, refType, refId)
+  }
   else if (signed !== null) {
     appendSavingsPayment(data, refType, refId, patch.paid_date as string, signed)
   }
@@ -512,6 +519,15 @@ export class MockApi implements FinanceApi {
     const bill = this.openBill(data, id)
     // The trailing unpaid payable would otherwise sit at the top of the detail
     // view forever, reading as a bill being neglected.
+    //
+    // Unsettle first: a payable can be unpaid while still carrying a ledger row
+    // (an un-pay that failed after the patch), and dropping it without
+    // unsettling would orphan that row with a dangling ref_id.
+    unsettleManyFromSavings(
+      data,
+      'bill_payable',
+      data.bill_payables.filter((r) => r.bill_id === id && !r.paid).map((r) => r.id),
+    )
     data.bill_payables = data.bill_payables.filter((r) => r.bill_id !== id || r.paid)
     bill.closed = true
     this.save(data)
@@ -567,7 +583,10 @@ export class MockApi implements FinanceApi {
         (r) => r.id === id || r.bill_id !== bill.id || r.paid,
       )
     }
-    if (unpaying) unsettleFromSavings(data, 'bill_payable', id)
+    // Reversal on the PAYLOAD, not the transition — see prepareDebtPaySideEffects.
+    if (Object.prototype.hasOwnProperty.call(patch, 'paid') && patch.paid === false) {
+      unsettleFromSavings(data, 'bill_payable', id)
+    }
     this.save(data)
     return this.delay(data)
   }
@@ -682,7 +701,7 @@ export class MockApi implements FinanceApi {
     const signed = prepareDebtPaySideEffects(data, 'debt_schedule', id, patch, previous, fromSavings)
     Object.assign(row, patch)
     clearPaidFields(row)
-    applyDebtPaySideEffects(data, 'debt_schedule', id, patch, previous, signed)
+    applyDebtPaySideEffects(data, 'debt_schedule', id, patch, signed)
     this.save(data)
     return this.delay(data)
   }
@@ -718,7 +737,7 @@ export class MockApi implements FinanceApi {
       if (patch[key] === null) row[key] = undefined
     }
     clearPaidFields(row)
-    applyDebtPaySideEffects(data, 'debt_statement', id, patch, previous, signed)
+    applyDebtPaySideEffects(data, 'debt_statement', id, patch, signed)
     this.save(data)
     return this.delay(data)
   }

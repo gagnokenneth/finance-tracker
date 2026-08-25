@@ -801,7 +801,12 @@ function updateDebtRow(sheetName, refType, p, uid) {
   var unpaying = hasPaid && !bool(patch.paid) && wasPaid;
   var paying = hasPaid && bool(patch.paid) && !wasPaid;
 
-  if (unpaying) {
+  /*
+   * The reversal fires on the PAYLOAD, not the transition — see the same note in
+   * updateBillPayable. A row left unpaid with its ledger row still present (an
+   * un-pay that failed after the patch) would otherwise be unrecoverable.
+   */
+  if (hasPaid && !bool(patch.paid)) {
     var undone = updateChildRow(sheetName, p, uid);
     unsettleFromSavings(uid, refType, p.id);
     return undone;
@@ -949,7 +954,7 @@ function updateBill(p, uid) {
 
 function closeBill(p, uid) {
   openBill(p.id, uid);
-  deleteUnpaidPayables(p.id);
+  deleteUnpaidPayables(uid, p.id);
   setCell('bills', p.id, 'closed', true);
   return null;
 }
@@ -961,7 +966,14 @@ function closeBill(p, uid) {
  * Pass exceptId when undoing a payment: the row being unpaid must survive while
  * the payable that payment minted goes. Closing a bill spares nothing.
  */
-function deleteUnpaidPayables(billId, exceptId) {
+/*
+ * Takes uid so it can unsettle: closeBill and the un-mint path both delete
+ * unpaid payables, and a payable can be unpaid while still carrying a ledger row
+ * (an un-pay that failed after the patch). Deleting it without unsettling leaves
+ * that row orphaned with a dangling ref_id, which FT-3's read-only rule makes
+ * unfixable from the Savings page.
+ */
+function deleteUnpaidPayables(uid, billId, exceptId) {
   var sh = sheet('bill_payables');
   var last = sh.getLastRow();
   if (last < 2) return;
@@ -970,10 +982,20 @@ function deleteUnpaidPayables(billId, exceptId) {
   var idCol = headers.indexOf('id');
   var billCol = headers.indexOf('bill_id');
   var paidCol = headers.indexOf('paid');
+  var doomed = [];
   for (var i = vals.length - 1; i >= 0; i--) {
     if (num(vals[i][billCol]) !== num(billId)) continue;
     if (exceptId !== undefined && num(vals[i][idCol]) === num(exceptId)) continue;
-    if (!bool(vals[i][paidCol])) sh.deleteRow(i + 2);
+    if (bool(vals[i][paidCol])) continue;
+    doomed.push(num(vals[i][idCol]));
+  }
+  // Unsettle before deleting, in one ledger read, so a failure cannot leave the
+  // payables gone with their ledger rows behind.
+  unsettleManyFromSavings(uid, 'bill_payable', doomed);
+  for (var d = vals.length - 1; d >= 0; d--) {
+    if (num(vals[d][billCol]) !== num(billId)) continue;
+    if (exceptId !== undefined && num(vals[d][idCol]) === num(exceptId)) continue;
+    if (!bool(vals[d][paidCol])) sh.deleteRow(d + 2);
   }
 }
 
@@ -1008,6 +1030,16 @@ function updateBillPayable(p, uid) {
   // patch on an already-unpaid row would be misread as an un-pay.
   var hasPaid = Object.prototype.hasOwnProperty.call(patch, 'paid');
   var unpaying = hasPaid && !bool(patch.paid) && bool(found.row.paid);
+  /*
+   * The reversal fires on the PAYLOAD, not the transition. If a previous un-pay
+   * patched the row unpaid and then failed before unsettling, the row is unpaid
+   * with its ledger row still present — and a transition-based test would make
+   * every later un-pay a no-op, leaving no way to clear it: paying is refused
+   * because the ref is settled, and un-paying does nothing. Reversing on the
+   * payload makes re-submitting the un-pay the recovery. unsettleFromSavings is
+   * a no-op when there is no row, so this is safe on an ordinary edit.
+   */
+  var reversing = hasPaid && !bool(patch.paid);
   var unmint = bool(found.row.paid) && unpaying && isLatestPaidPayable(found.bill.id, found.row);
   // Before patchRowAt, while "was this row paid" is still answerable. Compared
   // by VALUE, not key presence: PayableFormModal always re-sends paid_amount
@@ -1021,11 +1053,11 @@ function updateBillPayable(p, uid) {
   // Patch first, so found.rowIndex is still valid when it is used — the deletion
   // shifts indices, and nothing may rely on that index afterwards.
   var result = patchRowAt('bill_payables', found.rowIndex, patch);
-  if (unmint) deleteUnpaidPayables(found.bill.id, found.row.id);
+  if (unmint) deleteUnpaidPayables(uid, found.bill.id, found.row.id);
   // Un-paying reverses both halves — the escape hatch for a savings-funded
   // payment, since editing its amount is refused. After the patch so a failure
   // cannot credit savings for a payment still recorded as paid.
-  if (unpaying) unsettleFromSavings(uid, 'bill_payable', found.row.id);
+  if (reversing) unsettleFromSavings(uid, 'bill_payable', found.row.id);
   return result;
 }
 
@@ -1382,17 +1414,6 @@ function savingsRefRow(uid, refType, refId) {
 }
 
 /*
- * Records a payment as a savings outflow. IDEMPOTENT: a retried Pay finds the
- * existing row and writes nothing, which is what makes the user's natural retry
- * after a timeout safe. The FT-4 ticket placed this guarantee inside
- * payBillPayable's hasOtherUnpaidPayable check, but that guard protects minting
- * the next payable, not the payment — a double-submit patches the same row
- * harmlessly and would append TWO ledger rows.
- *
- * The same check enforces one-source-per-payment: a second call for the same ref
- * cannot add a second row, so a payment can never be split across sources.
- */
-/*
  * Validates a savings-funded payment and returns the signed amount the write
  * will use. ONE ledger read, and it does every check: already-settled, date,
  * amount, and the below-zero guard.
@@ -1404,6 +1425,13 @@ function savingsRefRow(uid, refType, refId) {
  * This is the single home for that validation. appendSavingsPayment below does
  * no checking of its own precisely because this ran first; the two used to
  * duplicate all four checks and read the ledger twice between them.
+ *
+ * A retried Pay is REFUSED here, not absorbed — the already-settled branch
+ * throws rather than returning quietly. That is what stops a double-submit
+ * appending two ledger rows and deducting savings twice, and it is also what
+ * enforces one-source-per-payment: a second call for the same ref cannot add a
+ * second row. Do not weaken the caller-side guards on the belief that retries
+ * pass through harmlessly.
  */
 function prepareSettleFromSavings(uid, refType, refId, paidDate, paidAmount) {
   var found = savingsRefRow(uid, refType, refId);
