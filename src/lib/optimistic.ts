@@ -59,13 +59,22 @@ function clearPaidWhenUnpaid<T extends DebtScheduleRow | DebtStatement | BillPay
   return next
 }
 
-/** The wire's null becomes the model's undefined — see StatementPatch. */
-function clearedAmounts(patch: StatementPatch): Partial<DebtStatement> {
-  const applied: Partial<DebtStatement> = { ...patch } as Partial<DebtStatement>
-  for (const key of ['min_due', 'total_due', 'outstanding'] as const) {
-    if (patch[key] === null) applied[key] = undefined
+/*
+ * The wire's null becomes the model's undefined. Every clearable field is
+ * typed `T | null` on its patch because JSON.stringify drops undefined — see
+ * StatementPatch — so each prediction has to undo that here.
+ */
+function clearNulls<T extends object>(patch: T, keys: readonly (keyof T)[]): T {
+  const applied = { ...patch }
+  for (const key of keys) {
+    if (applied[key] === null) applied[key] = undefined as T[keyof T]
   }
   return applied
+}
+
+/** See StatementPatch. */
+function clearedAmounts(patch: StatementPatch): Partial<DebtStatement> {
+  return clearNulls(patch, ['min_due', 'total_due', 'outstanding']) as Partial<DebtStatement>
 }
 
 /**
@@ -407,11 +416,9 @@ export function addIncomeTo(data: FinanceData, vars: NewIncome): FinanceData {
   return { ...data, income: [...data.income, entry] }
 }
 
-/** The wire's null becomes the model's undefined — see IncomePatch. */
+/** See IncomePatch. */
 function clearedNotes(patch: IncomePatch): Partial<IncomeEntry> {
-  const applied: Partial<IncomeEntry> = { ...patch } as Partial<IncomeEntry>
-  if (patch.notes === null) applied.notes = undefined
-  return applied
+  return clearNulls(patch, ['notes']) as Partial<IncomeEntry>
 }
 
 export function applyIncomePatch(

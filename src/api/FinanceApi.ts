@@ -10,6 +10,29 @@ import type {
   SavingsMovementKind,
 } from '../types.ts'
 
+/** The keys of T that may be absent — the ones a Patch has to rule on. */
+type OptionalKeys<T> = { [K in keyof T]-?: object extends Pick<T, K> ? K : never }[keyof T]
+
+/**
+ * A sparse patch: the keys present are the fields to change.
+ *
+ * `Clearable` names the fields a caller may also set to null, and null is the
+ * ONLY way to unset one. undefined cannot do it — JSON.stringify drops the key
+ * on the way out, so Apps Script sees "leave this alone" and keeps the old
+ * value, while the optimistic prediction and the mock never serialise and
+ * clear it. So: every optional field a form can leave empty belongs in
+ * Clearable. The exceptions are fields only the backend writes — paid_date
+ * and paid_amount are cleared server-side when a row goes unpaid, never by a
+ * client patch.
+ *
+ * Bills take the other road: BillPatch carries the whole object, so an absent
+ * field unambiguously means cleared. Either convention works. Mixing them
+ * inside one patch type does not, which is what this helper prevents.
+ */
+type Patch<T, Clearable extends OptionalKeys<T> = never> = Partial<Omit<T, Clearable>> & {
+  [K in Clearable]?: T[K] | null
+}
+
 /**
  * A new bill and its first payable, in one call. The client computes
  * first_due_date because all four recurrence rules live in lib/billSchedule.ts;
@@ -17,9 +40,16 @@ import type {
  */
 export type NewBill = Omit<Bill, 'id' | 'closed'> & { first_due_date: string }
 
-/** Patches never carry id or closed — closing goes through closeBill. */
-export type BillPatch = Partial<Omit<Bill, 'id' | 'closed'>>
-export type BillPayablePatch = Partial<Omit<BillPayable, 'id' | 'bill_id'>>
+/**
+ * Whole-object, not sparse: a bill's editor always submits every field, and
+ * normalizeBillPatch in Code.gs blanks the optional ones it does not find. A
+ * sparse bill patch would clear fields it never mentioned on the real backend
+ * while the mock and the prediction kept them, so the type does not allow one.
+ *
+ * Never carries id or closed — closing goes through closeBill.
+ */
+export type BillPatch = Omit<Bill, 'id' | 'closed'>
+export type BillPayablePatch = Patch<Omit<BillPayable, 'id' | 'bill_id'>>
 
 /** Paying also mints the next payable, so the next due date comes with it. */
 export interface PayBillInput {
@@ -38,25 +68,13 @@ export type NewDebt =
   | { name: string; type: 'revolving'; rows: NewStatement[] }
 
 /** Patches never carry id or debt_id — a row cannot be renumbered or moved. */
-export type ScheduleRowPatch = Partial<NewScheduleRow>
-/**
- * null clears a money field. undefined cannot: JSON.stringify drops it, so a
- * cleared amount would arrive as "leave this alone" and keep its old figure.
- */
-export type StatementPatch = Partial<Omit<NewStatement, 'min_due' | 'total_due' | 'outstanding'>> & {
-  min_due?: number | null
-  total_due?: number | null
-  outstanding?: number | null
-}
+export type ScheduleRowPatch = Patch<NewScheduleRow>
+export type StatementPatch = Patch<NewStatement, 'min_due' | 'total_due' | 'outstanding'>
 
 export type NewIncome = Omit<IncomeEntry, 'id'>
-/**
- * null clears notes. undefined cannot: JSON.stringify drops it, so a cleared
- * note would arrive as "leave this alone" and keep its old text.
- */
-export type IncomePatch = Partial<Omit<NewIncome, 'notes'>> & { notes?: string | null }
+export type IncomePatch = Patch<NewIncome, 'notes'>
 export type NewIncomeSource = Pick<IncomeSource, 'name'>
-export type IncomeSourcePatch = Partial<Omit<IncomeSource, 'id'>>
+export type IncomeSourcePatch = Patch<Omit<IncomeSource, 'id'>>
 
 /** amount is a POSITIVE magnitude; the backend derives the stored sign from kind. */
 export interface NewSavingsEntry {
@@ -65,14 +83,7 @@ export interface NewSavingsEntry {
   amount: number
   notes?: string
 }
-/**
- * null clears notes. undefined cannot: JSON.stringify drops it, so a cleared
- * note would arrive as "leave this alone" — the same reason IncomePatch and
- * StatementPatch type their clearable fields this way.
- */
-export type SavingsEntryPatch = Partial<Omit<NewSavingsEntry, 'notes'>> & {
-  notes?: string | null
-}
+export type SavingsEntryPatch = Patch<NewSavingsEntry, 'notes'>
 
 export interface AuthResult {
   token: string
