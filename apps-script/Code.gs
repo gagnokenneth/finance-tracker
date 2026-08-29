@@ -1160,10 +1160,10 @@ function addIncome(p, uid) {
 }
 
 /*
- * Whitelisted, not forwarded. patchRowAt skips only id, user_id, debt_id and
- * bill_id, so an unfiltered patch would let a client write server-owned fields.
- * NewIncome omitting the field constrains only the honest frontend; this is
- * what constrains the rest.
+ * Fields are copied one-by-one, not forwarded wholesale, because each one
+ * needs its own validator run before it's accepted: assertOwnedSource,
+ * assertIncomeAmount and assertIncomeDate. A blanket copy of given into patch
+ * would let any of them through unchecked.
  */
 function updateIncome(p, uid) {
   var rowIndex = ownedRowIndex('income', p.id, uid);
