@@ -13,15 +13,9 @@ var SHEETS = {
   debts: ['id', 'user_id', 'name', 'type'],
   debt_schedule: ['id', 'user_id', 'debt_id', 'due_date', 'amount', 'paid', 'paid_date', 'paid_amount'],
   debt_statements: ['id', 'user_id', 'debt_id', 'due_date', 'min_due', 'total_due', 'outstanding', 'paid', 'paid_date', 'paid_amount'],
-  // allocation_period_id is SERVER-OWNED: no client may write it. updateIncome
-  // whitelists its patch rather than forwarding it, because patchRowAt skips
-  // only the id columns. A new column here needs the same decision made.
-  income: ['id', 'user_id', 'source_id', 'amount', 'date', 'notes', 'allocation_period_id'],
+  income: ['id', 'user_id', 'source_id', 'amount', 'date', 'notes'],
   income_sources: ['id', 'user_id', 'name', 'archived'],
   savings_ledger: ['id', 'user_id', 'date', 'amount', 'kind', 'ref_type', 'ref_id', 'notes'],
-  allocations: ['id', 'user_id', 'name', 'frequency', 'day', 'second_day', 'month', 'closed'],
-  allocation_periods: ['id', 'user_id', 'allocation_id', 'period_date'],
-  allocation_lines: ['id', 'user_id', 'period_id', 'target_type', 'target_id', 'label', 'planned_amount', 'committed', 'committed_date', 'committed_amount', 'source'],
   invites: ['code', 'used_by', 'used_at']
 };
 
@@ -30,7 +24,7 @@ var SHEETS = {
  * so the new shape is applied on the very next request after a deployment,
  * instead of up to an hour later.
  */
-var SCHEMA_VERSION = 8;
+var SCHEMA_VERSION = 9;
 
 /*
  * Tabs whose stale shape may be DISCARDED and recreated. Deliberately excludes
@@ -38,9 +32,9 @@ var SCHEMA_VERSION = 8;
  * and password hash on the next request, re-seed fresh codes, and lock everyone
  * out with no recovery path.
  */
-var REBUILDABLE_SHEETS = ['debts', 'debt_schedule', 'debt_statements', 'bills', 'bill_payables', 'income', 'income_sources', 'savings_ledger', 'allocations', 'allocation_periods', 'allocation_lines'];
+var REBUILDABLE_SHEETS = ['debts', 'debt_schedule', 'debt_statements', 'bills', 'bill_payables', 'income', 'income_sources', 'savings_ledger'];
 
-var DATA_SHEETS = ['bills', 'bill_payables', 'debts', 'debt_schedule', 'debt_statements', 'income', 'income_sources', 'savings_ledger', 'allocations', 'allocation_periods', 'allocation_lines'];
+var DATA_SHEETS = ['bills', 'bill_payables', 'debts', 'debt_schedule', 'debt_statements', 'income', 'income_sources', 'savings_ledger'];
 
 /**
  * Sheets getAll actually reads. Every sheet read is a separate round trip, so
@@ -479,8 +473,7 @@ function coerce(name, r) {
   };
   if (name === 'income') return {
     id: num(r.id), source_id: num(r.source_id), amount: num(r.amount),
-    date: fmtDate(r.date), notes: optStr(r.notes),
-    allocation_period_id: optNum(r.allocation_period_id)
+    date: fmtDate(r.date), notes: optStr(r.notes)
   };
   if (name === 'income_sources') return {
     id: num(r.id), name: String(r.name), archived: bool(r.archived)
@@ -490,20 +483,6 @@ function coerce(name, r) {
     // payment. The balance is the sum and is never stored.
     id: num(r.id), date: fmtDate(r.date), amount: num(r.amount), kind: String(r.kind),
     ref_type: optStr(r.ref_type), ref_id: optNum(r.ref_id), notes: optStr(r.notes)
-  };
-  if (name === 'allocations') return {
-    id: num(r.id), name: String(r.name), frequency: String(r.frequency), day: num(r.day),
-    second_day: optNum(r.second_day), month: optNum(r.month), closed: bool(r.closed)
-  };
-  if (name === 'allocation_periods') return {
-    id: num(r.id), allocation_id: num(r.allocation_id), period_date: fmtDate(r.period_date)
-  };
-  if (name === 'allocation_lines') return {
-    id: num(r.id), period_id: num(r.period_id), target_type: String(r.target_type),
-    target_id: optNum(r.target_id), label: optStr(r.label),
-    planned_amount: num(r.planned_amount), committed: bool(r.committed),
-    committed_date: optDate(r.committed_date), committed_amount: optNum(r.committed_amount),
-    source: optStr(r.source)
   };
   return r;
 }
@@ -672,8 +651,8 @@ function getAll(uid) {
 
 /*
  * Every sheet served here is per-user: its second column is user_id and its
- * handlers go through readOwnedRows / assertOwned. The allocation sheets exist
- * but have no actions yet; each module ticket adds its own. Anything added here without an ownership check would let any
+ * handlers go through readOwnedRows / assertOwned. Each module ticket adds its
+ * own actions. Anything added here without an ownership check would let any
  * authenticated user read and write another user's rows.
  *
  * A foreign key needs its own check: the income handlers call assertOwnedSource
@@ -1175,19 +1154,16 @@ function addIncome(p, uid) {
     source_id: input.source_id,
     amount: input.amount,
     date: input.date,
-    notes: input.notes,
-    allocation_period_id: ''
+    notes: input.notes
   });
   return null;
 }
 
 /*
  * Whitelisted, not forwarded. patchRowAt skips only id, user_id, debt_id and
- * bill_id, so an unfiltered patch would let a client write
- * allocation_period_id — a column FT-5 owns. Worse, a client could clear its
- * own link and then delete income that funds an allocation, defeating the
- * guard in deleteIncome. NewIncome omitting the field constrains only the
- * honest frontend; this is what constrains the rest.
+ * bill_id, so an unfiltered patch would let a client write server-owned fields.
+ * NewIncome omitting the field constrains only the honest frontend; this is
+ * what constrains the rest.
  */
 function updateIncome(p, uid) {
   var rowIndex = ownedRowIndex('income', p.id, uid);
@@ -1214,12 +1190,6 @@ function updateIncome(p, uid) {
 
 function deleteIncome(p, uid) {
   var rowIndex = ownedRowIndex('income', p.id, uid);
-  var row = getById('income', p.id);
-  // Unreachable until FT-5 sets this column. Implemented now because
-  // retrofitting a guard after the dependent feature exists costs more.
-  if (row && !blank(row.allocation_period_id)) {
-    throw new Error('That income funds allocation period ' + row.allocation_period_id + '. Unlink it first.');
-  }
   sheet('income').deleteRow(rowIndex);
   return null;
 }
