@@ -72,8 +72,6 @@ export type SavingsLedgerKind = 'deposit' | 'withdrawal' | 'bill_payment' | 'deb
 /** The two kinds a user creates directly. The payment kinds are written by FT-4. */
 export type SavingsMovementKind = Extract<SavingsLedgerKind, 'deposit' | 'withdrawal'>
 export type SavingsRefType = 'bill_payable' | 'debt_schedule' | 'debt_statement'
-export type AllocationTargetType = SavingsRefType | 'savings' | 'other'
-export type AllocationSource = 'income' | 'savings'
 
 /** A named place money comes from. Archived ones leave the picker but still resolve. */
 export interface IncomeSource {
@@ -91,8 +89,6 @@ export interface IncomeEntry {
   amount: number
   date: string // ISO yyyy-mm-dd
   notes?: string
-  /** Set when this entry funds an allocation period. Blocks deletion. */
-  allocation_period_id?: number
 }
 
 /**
@@ -113,44 +109,6 @@ export interface SavingsLedgerEntry {
   notes?: string
 }
 
-/** A recurring allocation plan. Instances live in allocation_periods. */
-export interface Allocation {
-  id: number
-  name: string
-  frequency: BillFrequency
-  day: number
-  second_day?: number
-  month?: number
-  closed: boolean
-}
-
-/** One occurrence of an allocation. */
-export interface AllocationPeriod {
-  id: number
-  allocation_id: number
-  period_date: string
-}
-
-/**
- * One earmark within a period. planned_amount is the intent; the committed
- * fields record what actually happened. planned_amount is independent of the
- * target's own amount, because a variable bill's payable has no figure until
- * its statement arrives.
- */
-export interface AllocationLine {
-  id: number
-  period_id: number
-  target_type: AllocationTargetType
-  /** Unset for target_type 'other', which uses label instead. */
-  target_id?: number
-  label?: string
-  planned_amount: number
-  committed: boolean
-  committed_date?: string
-  committed_amount?: number
-  source?: AllocationSource
-}
-
 export interface Settings {
   /** Per-user: comes from the caller's own row, not a global setting. */
   currency: Currency
@@ -166,8 +124,5 @@ export interface FinanceData {
   income: IncomeEntry[]
   income_sources: IncomeSource[]
   savings_ledger: SavingsLedgerEntry[]
-  allocations: Allocation[]
-  allocation_periods: AllocationPeriod[]
-  allocation_lines: AllocationLine[]
   settings: Settings
 }

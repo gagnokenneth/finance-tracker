@@ -49,7 +49,7 @@ export type StatementPatch = Partial<Omit<NewStatement, 'min_due' | 'total_due' 
   outstanding?: number | null
 }
 
-export type NewIncome = Omit<IncomeEntry, 'id' | 'allocation_period_id'>
+export type NewIncome = Omit<IncomeEntry, 'id'>
 /**
  * null clears notes. undefined cannot: JSON.stringify drops it, so a cleared
  * note would arrive as "leave this alone" and keep its old text.
@@ -153,7 +153,6 @@ export interface FinanceApi {
 
   addIncome(input: NewIncome): Promise<FinanceData>
   updateIncome(id: number, patch: IncomePatch): Promise<FinanceData>
-  /** Refused when the entry funds an allocation period. */
   deleteIncome(id: number): Promise<FinanceData>
 
   addIncomeSource(input: NewIncomeSource): Promise<FinanceData>

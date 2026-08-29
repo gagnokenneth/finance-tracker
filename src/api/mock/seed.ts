@@ -17,9 +17,6 @@ export function createSeed(): FinanceData {
     income: [],
     income_sources: [],
     savings_ledger: [],
-    allocations: [],
-    allocation_periods: [],
-    allocation_lines: [],
     settings: {
       currency: 'PHP',
     },

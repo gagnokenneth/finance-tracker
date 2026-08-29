@@ -796,11 +796,6 @@ export class MockApi implements FinanceApi {
     // Throws like ownedRowIndex does, so a missing row fails the same way on
     // both backends instead of silently succeeding here.
     if (!row) throw new Error(`Income ${id} not found`)
-    if (row.allocation_period_id !== undefined) {
-      throw new Error(
-        `That income funds allocation period ${row.allocation_period_id}. Unlink it first.`,
-      )
-    }
     data.income = data.income.filter((r) => r.id !== id)
     this.save(data)
     return this.delay(data)
