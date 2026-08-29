@@ -31,3 +31,6 @@ docs/
 *.njsproj
 *.sln
 *.sw?
+
+# Subagent-driven-development scratch (ledger, briefs, reports) — not project output
+.superpowers/
