@@ -1,6 +1,7 @@
 import { useFinanceData } from '../hooks/useFinanceData.ts'
 import { duePages } from '../lib/dashboard.ts'
 import type { DueItem } from '../lib/dashboard.ts'
+import { Card } from '../components/Card.tsx'
 import { DueCard } from '../components/DueCard.tsx'
 import { LoadError } from '../components/LoadError.tsx'
 import { LoadingScreen } from '../components/LoadingScreen.tsx'
@@ -8,14 +9,13 @@ import { LoadingScreen } from '../components/LoadingScreen.tsx'
 function Section({ title, items }: { title: string; items: DueItem[] }) {
   if (items.length === 0) return null
   return (
-    <div className="space-y-2">
-      <h2 className="text-lg font-semibold tracking-tight text-ink">{title}</h2>
+    <Card title={title}>
       <div className="space-y-2">
         {items.map((item) => (
           <DueCard key={`${item.kind}-${item.id}`} item={item} />
         ))}
       </div>
-    </div>
+    </Card>
   )
 }
 
