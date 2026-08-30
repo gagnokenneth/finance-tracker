@@ -1,40 +1,18 @@
 import { useFinanceData } from '../hooks/useFinanceData.ts'
 import { duePages } from '../lib/dashboard.ts'
 import type { DueItem } from '../lib/dashboard.ts'
-import { Money } from '../components/Money.tsx'
-import { CardRow } from '../components/CardRow.tsx'
-import { DueBadge } from '../components/DueBadge.tsx'
+import { DueCard } from '../components/DueCard.tsx'
 import { LoadError } from '../components/LoadError.tsx'
 import { LoadingScreen } from '../components/LoadingScreen.tsx'
-
-function DueRow({ item }: { item: DueItem }) {
-  return (
-    <CardRow to={item.to} pending={false}>
-      <div className="flex items-start justify-between gap-4">
-        <span className="font-semibold tracking-tight text-ink">{item.label}</span>
-        {item.amount !== undefined && (
-          <Money value={item.amount} className="text-base font-semibold" />
-        )}
-      </div>
-      <p className="mt-1 text-xs font-semibold tracking-wide text-ink-faint uppercase">
-        {item.kind === 'bill' ? 'Bill' : 'Debt'}
-      </p>
-      <div className="mt-4 flex items-center gap-2 text-xs text-ink-faint">
-        <span>Due</span>
-        <DueBadge dueDate={item.dueDate} />
-      </div>
-    </CardRow>
-  )
-}
 
 function Section({ title, items }: { title: string; items: DueItem[] }) {
   if (items.length === 0) return null
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       <h2 className="text-lg font-semibold tracking-tight text-ink">{title}</h2>
-      <div className="space-y-3">
+      <div className="space-y-2">
         {items.map((item) => (
-          <DueRow key={`${item.kind}-${item.id}`} item={item} />
+          <DueCard key={`${item.kind}-${item.id}`} item={item} />
         ))}
       </div>
     </div>
