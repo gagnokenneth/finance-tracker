@@ -7,6 +7,7 @@ import { useAuth } from './auth/useAuth.ts'
 import { makeQueryClient, persistOptionsFor } from './lib/queryClient.ts'
 import { AppShell } from './components/AppShell.tsx'
 import { ToastProvider } from './components/ToastProvider.tsx'
+import { Dashboard } from './pages/Dashboard.tsx'
 import { Debts } from './pages/Debts.tsx'
 import { DebtDetail } from './pages/DebtDetail.tsx'
 import { Bills } from './pages/Bills.tsx'
@@ -19,13 +20,14 @@ import { SignIn } from './pages/SignIn.tsx'
 function AuthedApp() {
   const { user } = useAuth()
   if (!user) return <SignIn />
-  // Debts, Bills, Income, Savings and Settings are exposed. The other module
-  // pages still exist in src/pages/ but are deliberately unregistered; unknown
-  // paths land on Debts.
+  // Dashboard, Debts, Bills, Income, Savings and Settings are exposed. The
+  // other module pages still exist in src/pages/ but are deliberately
+  // unregistered; unknown paths land on the Dashboard.
   return (
     <Routes>
       <Route element={<AppShell />}>
-        <Route index element={<Navigate to="/debts" replace />} />
+        <Route index element={<Navigate to="/dashboard" replace />} />
+        <Route path="dashboard" element={<Dashboard />} />
         <Route path="debts" element={<Debts />} />
         <Route path="debts/:id" element={<DebtDetail />} />
         <Route path="bills" element={<Bills />} />
@@ -33,7 +35,7 @@ function AuthedApp() {
         <Route path="income" element={<Income />} />
         <Route path="savings" element={<Savings />} />
         <Route path="settings" element={<Settings />} />
-        <Route path="*" element={<Navigate to="/debts" replace />} />
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Route>
     </Routes>
   )

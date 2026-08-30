@@ -5,6 +5,7 @@ import { useAuth } from '../auth/useAuth.ts'
 import { financeKey } from '../hooks/useFinanceData.ts'
 
 const NAV_ITEMS = [
+  { to: '/dashboard', label: 'Dashboard' },
   { to: '/debts', label: 'Debts' },
   { to: '/bills', label: 'Bills' },
   { to: '/income', label: 'Income' },
