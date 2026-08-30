@@ -13,7 +13,7 @@ export function DueCard({ item }: { item: DueItem }) {
   return (
     <Link
       to={item.to}
-      className="flex items-center justify-between gap-3 rounded-lg border border-edge bg-white px-3 py-2 transition-shadow hover:shadow-md hover:shadow-ink/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+      className="flex items-center justify-between gap-3 rounded-lg border border-edge bg-white px-3 py-2 transition-[box-shadow,border-color] hover:border-brand/30 hover:shadow-md hover:shadow-ink/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
     >
       <div className="flex min-w-0 items-center gap-2">
         <span className="truncate text-sm font-medium text-ink">{item.label}</span>

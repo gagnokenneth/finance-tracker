@@ -13,6 +13,7 @@ import { DueBadge } from '../components/DueBadge.tsx'
 import { StatusBadge } from '../components/StatusBadge.tsx'
 import { PendingBadge } from '../components/PendingBadge.tsx'
 import { ConfirmDialog } from '../components/ConfirmDialog.tsx'
+import { EmptyState } from '../components/EmptyState.tsx'
 import { LoadError } from '../components/LoadError.tsx'
 import { LoadingScreen } from '../components/LoadingScreen.tsx'
 import { PayModal } from '../components/PayModal.tsx'
@@ -205,14 +206,11 @@ export function BillDetail() {
       </section>
 
       {rows.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-edge bg-white p-12 text-center">
-          <p className="font-medium text-ink">No payables</p>
-          <p className="mt-1 text-sm text-ink-soft">
-            {bill.closed
-              ? 'This bill was closed before any payment was recorded.'
-              : 'Something went wrong generating this bill’s first payable.'}
-          </p>
-        </div>
+        <EmptyState title="No payables">
+          {bill.closed
+            ? 'This bill was closed before any payment was recorded.'
+            : 'Something went wrong generating this bill’s first payable.'}
+        </EmptyState>
       ) : (
         <Table headers={HEADERS}>
           {rows.map((row) => (

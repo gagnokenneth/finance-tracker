@@ -17,6 +17,7 @@ import { Table } from '../components/Table.tsx'
 import { Button, SecondaryButton, RowButton } from '../components/ui.tsx'
 import { ConfirmDialog } from '../components/ConfirmDialog.tsx'
 import { PendingBadge } from '../components/PendingBadge.tsx'
+import { EmptyState } from '../components/EmptyState.tsx'
 import { LoadError } from '../components/LoadError.tsx'
 import { LoadingScreen } from '../components/LoadingScreen.tsx'
 import { SavingsFormModal } from './savings/SavingsFormModal.tsx'
@@ -95,12 +96,9 @@ export function Savings() {
       </Card>
 
       {rows.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-edge bg-white p-12 text-center">
-          <p className="font-medium text-ink">Nothing moved in {month}</p>
-          <p className="mt-1 text-sm text-ink-soft">
-            Add a deposit, or step back a month to see earlier movements.
-          </p>
-        </div>
+        <EmptyState title={`Nothing moved in ${month}`}>
+          Add a deposit, or step back a month to see earlier movements.
+        </EmptyState>
       ) : (
         <Table headers={['Date', 'Kind', 'Amount', 'Balance', 'Notes', '']}>
           {rows.map((row) => {

@@ -8,6 +8,7 @@ import { DueBadge } from '../components/DueBadge.tsx'
 import { PendingBadge } from '../components/PendingBadge.tsx'
 import { InstallmentStrip } from '../components/InstallmentStrip.tsx'
 import { Button } from '../components/ui.tsx'
+import { EmptyState } from '../components/EmptyState.tsx'
 import { LoadError } from '../components/LoadError.tsx'
 import { LoadingScreen } from '../components/LoadingScreen.tsx'
 import { AddDebtModal } from './debts/AddDebtModal.tsx'
@@ -84,12 +85,9 @@ export function Debts() {
       </div>
 
       {data.debts.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-edge bg-white p-12 text-center">
-          <p className="font-medium text-ink">Nothing tracked yet</p>
-          <p className="mt-1 text-sm text-ink-soft">
-            Add a loan or a credit card to start counting down payments.
-          </p>
-        </div>
+        <EmptyState title="Nothing tracked yet">
+          Add a loan or a credit card to start counting down payments.
+        </EmptyState>
       ) : (
         <div className="space-y-3">
           {data.debts.map((d) => (

@@ -24,7 +24,7 @@ export function CardRow({
   return (
     <Link
       to={to}
-      className={`${SHELL} transition-shadow hover:shadow-md hover:shadow-ink/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand`}
+      className={`${SHELL} transition-[box-shadow,border-color] hover:border-brand/30 hover:shadow-md hover:shadow-ink/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand`}
     >
       {children}
     </Link>

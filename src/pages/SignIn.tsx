@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import { useAuth } from '../auth/useAuth.ts'
 import { MIN_PASSWORD_LENGTH, USERNAME_RULE, isValidUsername } from '../auth/password.ts'
 import { Field, TextInput } from '../components/ui.tsx'
+import { Strip } from '../components/Strip.tsx'
 import { isLiveApi } from '../api/index.ts'
 
 type Mode = 'signin' | 'signup'
@@ -61,11 +62,7 @@ export function SignIn() {
     <div className="flex min-h-screen items-center justify-center bg-paper px-4">
       <div className="w-full max-w-sm rounded-2xl border border-edge bg-white p-8 shadow-lg shadow-ink/5">
         {/* A settled strip: the state this app exists to get you to. */}
-        <div aria-hidden className="flex gap-[3px]">
-          {Array.from({ length: 12 }, (_, i) => (
-            <span key={i} className="h-1.5 flex-1 rounded-[2px] bg-settled" />
-          ))}
-        </div>
+        <Strip ticks={12} tickClassName="h-1.5 flex-1" className="gap-[3px]" />
 
         <h1 className="mt-6 text-2xl font-semibold tracking-tight text-ink">Finance Tracker</h1>
         <p className="mt-2 text-sm text-ink-soft">

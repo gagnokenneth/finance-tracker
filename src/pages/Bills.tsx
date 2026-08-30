@@ -7,6 +7,7 @@ import { CardRow } from '../components/CardRow.tsx'
 import { DueBadge } from '../components/DueBadge.tsx'
 import { PendingBadge } from '../components/PendingBadge.tsx'
 import { Button } from '../components/ui.tsx'
+import { EmptyState } from '../components/EmptyState.tsx'
 import { LoadError } from '../components/LoadError.tsx'
 import { LoadingScreen } from '../components/LoadingScreen.tsx'
 import { AddBillModal } from './bills/AddBillModal.tsx'
@@ -82,12 +83,9 @@ export function Bills() {
       </div>
 
       {bills.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-edge bg-white p-12 text-center">
-          <p className="font-medium text-ink">Nothing tracked yet</p>
-          <p className="mt-1 text-sm text-ink-soft">
-            Add rent, a utility, or a subscription to see what is due next.
-          </p>
-        </div>
+        <EmptyState title="Nothing tracked yet">
+          Add rent, a utility, or a subscription to see what is due next.
+        </EmptyState>
       ) : (
         <div className="space-y-3">
           {bills.map((b) => (

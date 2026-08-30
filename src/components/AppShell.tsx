@@ -3,6 +3,7 @@ import { NavLink, Outlet } from 'react-router-dom'
 import { useIsFetching, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../auth/useAuth.ts'
 import { financeKey } from '../hooks/useFinanceData.ts'
+import { Strip } from './Strip.tsx'
 
 const NAV_ITEMS = [
   { to: '/dashboard', label: 'Dashboard' },
@@ -42,8 +43,10 @@ export function AppShell() {
   const [open, setOpen] = useState(false)
 
   const linkClass = ({ isActive }: { isActive: boolean }) =>
-    `rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-      isActive ? 'bg-ink text-white' : 'text-ink-soft hover:bg-paper hover:text-ink'
+    `rounded-r-lg border-l-2 px-3 py-2 text-sm font-medium transition-colors ${
+      isActive
+        ? 'border-brand bg-brand/8 text-brand'
+        : 'border-transparent text-ink-soft hover:border-edge hover:bg-paper hover:text-ink'
     }`
 
   return (
@@ -58,6 +61,7 @@ export function AppShell() {
         >
           ☰
         </button>
+        <Strip ticks={4} tickClassName="h-3 w-1" className="gap-[2px]" />
         <span className="font-semibold tracking-tight text-ink">Finance Tracker</span>
       </div>
 
@@ -76,7 +80,10 @@ export function AppShell() {
         }`}
       >
         <div className="px-5 py-5">
-          <div className="text-base font-semibold tracking-tight text-ink">Finance Tracker</div>
+          <div className="flex items-center gap-2">
+            <Strip ticks={4} tickClassName="h-3.5 w-1" className="gap-[2px]" />
+            <div className="text-base font-semibold tracking-tight text-ink">Finance Tracker</div>
+          </div>
           {/* Deliberately names no module: adding one should not mean editing
               this line. */}
           <div className="mt-0.5 text-xs text-ink-faint">Personal finance</div>
