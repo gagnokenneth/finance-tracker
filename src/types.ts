@@ -136,6 +136,37 @@ export interface Task {
   note_id?: number
 }
 
+export type NoteKind = 'freeform' | 'checklist'
+/** PM-4 will add 'goal' here — a union member costs nothing to add later,
+ *  unlike a sheet column, so there is no reason to add it before Goals exists. */
+export type NoteLinkType = 'bill' | 'debt' | 'task'
+
+/**
+ * A freeform or checklist note, optionally linked to a Bill, Debt, or Task
+ * for context. Deliberately dateless — the moment something needs a due
+ * date it is a Task, not a Note (see the design spec's Notes/Goals/Task
+ * boundary). kind never changes after creation.
+ */
+export interface Note {
+  id: number
+  kind: NoteKind
+  title: string
+  /** Only meaningful when kind is 'freeform'. */
+  body?: string
+  linked_type?: NoteLinkType
+  linked_id?: number
+}
+
+/** One row of a checklist note. */
+export interface NoteItem {
+  id: number
+  note_id: number
+  text: string
+  done: boolean
+  /** Insertion order today — no reorder UI in this ticket, see the plan. */
+  sort_order: number
+}
+
 export interface Settings {
   /** Per-user: comes from the caller's own row, not a global setting. */
   currency: Currency
@@ -152,5 +183,7 @@ export interface FinanceData {
   income_sources: IncomeSource[]
   savings_ledger: SavingsLedgerEntry[]
   tasks: Task[]
+  notes: Note[]
+  note_items: NoteItem[]
   settings: Settings
 }

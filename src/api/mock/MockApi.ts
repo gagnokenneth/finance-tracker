@@ -21,6 +21,10 @@ import type {
   NewTask,
   TaskPatch,
   CompleteTaskInput,
+  NewNote,
+  NotePatch,
+  NewNoteItem,
+  NoteItemPatch,
 } from '../FinanceApi.ts'
 import type {
   FinanceData,
@@ -35,6 +39,9 @@ import type {
   SavingsMovementKind,
   SavingsRefType,
   Task,
+  Note,
+  NoteItem,
+  NoteLinkType,
 } from '../../types.ts'
 import { createSeed } from './seed.ts'
 import { backfillArrays } from '../../lib/financeShape.ts'
@@ -975,6 +982,114 @@ export class MockApi implements FinanceApi {
         note_id: task.note_id,
       })
     }
+    this.save(data)
+    return this.delay(data)
+  }
+
+  private ownedNote(data: FinanceData, id: number): Note {
+    const note = data.notes.find((n) => n.id === id)
+    if (!note) throw new Error(`Note ${id} not found`)
+    return note
+  }
+
+  private ownedNoteItem(data: FinanceData, id: number): NoteItem {
+    const item = data.note_items.find((i) => i.id === id)
+    if (!item) throw new Error(`Note item ${id} not found`)
+    return item
+  }
+
+  /** Mirrors assertOwnedLink in Code.gs. */
+  private assertOwnedLink(
+    data: FinanceData,
+    linkedType: NoteLinkType | undefined,
+    linkedId: number | undefined,
+  ): void {
+    if (!linkedType) {
+      if (linkedId !== undefined) throw new Error('A link needs a type.')
+      return
+    }
+    if (linkedId === undefined) throw new Error('A link needs a target.')
+    const rows: { id: number }[] =
+      linkedType === 'bill' ? data.bills : linkedType === 'debt' ? data.debts : data.tasks
+    if (!rows.some((r) => r.id === linkedId)) throw new Error(`${linkedType} ${linkedId} not found`)
+  }
+
+  async addNote(input: NewNote): Promise<FinanceData> {
+    const data = this.load()
+    if (!input.title.trim()) throw new Error('A note needs a title')
+    this.assertOwnedLink(data, input.linked_type, input.linked_id)
+    const note: Note = {
+      id: nextId(data.notes),
+      ...input,
+      body: input.kind === 'freeform' ? input.body : undefined,
+    }
+    data.notes.push(note)
+    this.save(data)
+    return this.delay(data)
+  }
+
+  async updateNote(id: number, patch: NotePatch): Promise<FinanceData> {
+    const data = this.load()
+    const note = this.ownedNote(data, id)
+    if (Object.prototype.hasOwnProperty.call(patch, 'title') && !(patch.title ?? '').trim()) {
+      throw new Error('A note needs a title')
+    }
+    if (
+      Object.prototype.hasOwnProperty.call(patch, 'linked_type') ||
+      Object.prototype.hasOwnProperty.call(patch, 'linked_id')
+    ) {
+      const linkedType = Object.prototype.hasOwnProperty.call(patch, 'linked_type')
+        ? (patch.linked_type ?? undefined)
+        : note.linked_type
+      const linkedId = Object.prototype.hasOwnProperty.call(patch, 'linked_id')
+        ? (patch.linked_id ?? undefined)
+        : note.linked_id
+      this.assertOwnedLink(data, linkedType, linkedId)
+    }
+    Object.assign(note, patch)
+    // null is the wire's "clear this"; the stored model uses undefined.
+    for (const key of ['body', 'linked_type', 'linked_id'] as const) {
+      if (patch[key] === null) note[key] = undefined
+    }
+    this.save(data)
+    return this.delay(data)
+  }
+
+  async deleteNote(id: number): Promise<FinanceData> {
+    const data = this.load()
+    this.ownedNote(data, id)
+    data.note_items = data.note_items.filter((i) => i.note_id !== id)
+    data.notes = data.notes.filter((n) => n.id !== id)
+    this.save(data)
+    return this.delay(data)
+  }
+
+  async addNoteItem(noteId: number, input: NewNoteItem): Promise<FinanceData> {
+    const data = this.load()
+    const note = this.ownedNote(data, noteId)
+    if (note.kind !== 'checklist') throw new Error('Only a checklist note can have items.')
+    if (!input.text.trim()) throw new Error('A checklist item needs text')
+    const sortOrder = Math.max(-1, ...data.note_items.filter((i) => i.note_id === noteId).map((i) => i.sort_order)) + 1
+    data.note_items.push({ id: nextId(data.note_items), note_id: noteId, text: input.text, done: false, sort_order: sortOrder })
+    this.save(data)
+    return this.delay(data)
+  }
+
+  async updateNoteItem(id: number, patch: NoteItemPatch): Promise<FinanceData> {
+    const data = this.load()
+    const item = this.ownedNoteItem(data, id)
+    if (Object.prototype.hasOwnProperty.call(patch, 'text') && !(patch.text ?? '').trim()) {
+      throw new Error('A checklist item needs text')
+    }
+    Object.assign(item, patch)
+    this.save(data)
+    return this.delay(data)
+  }
+
+  async deleteNoteItem(id: number): Promise<FinanceData> {
+    const data = this.load()
+    this.ownedNoteItem(data, id)
+    data.note_items = data.note_items.filter((i) => i.id !== id)
     this.save(data)
     return this.delay(data)
   }

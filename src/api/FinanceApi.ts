@@ -9,6 +9,8 @@ import type {
   IncomeSource,
   SavingsMovementKind,
   Task,
+  Note,
+  NoteItem,
 } from '../types.ts'
 
 /** The keys of T that may be absent — the ones a Patch has to rule on. */
@@ -104,6 +106,15 @@ export interface CompleteTaskInput {
   /** Only when the task recurs — computed by nextTaskDate in lib/tasks.ts. */
   next_date?: string
 }
+
+export type NewNote = Omit<Note, 'id'>
+/** kind is never in the patch — see Note's own doc comment. */
+export type NotePatch = Patch<Omit<Note, 'id' | 'kind'>, 'body' | 'linked_type' | 'linked_id'>
+
+export type NewNoteItem = Omit<NoteItem, 'id' | 'done' | 'sort_order'>
+/** Neither field is ever cleared to null — text is always required,
+ *  done is a plain boolean like Task's own completed field. */
+export type NoteItemPatch = Patch<Omit<NoteItem, 'id' | 'note_id' | 'sort_order'>>
 
 export interface AuthResult {
   token: string
@@ -206,4 +217,17 @@ export interface FinanceApi {
   deleteTask(id: number): Promise<FinanceData>
   /** Marks done and mints the next occurrence when the task recurs. */
   completeTask(id: number, input: CompleteTaskInput): Promise<FinanceData>
+
+  /* Note writes return the whole updated dataset, for the same reasons above. */
+
+  addNote(input: NewNote): Promise<FinanceData>
+  /** kind can never be patched — see NotePatch. */
+  updateNote(id: number, patch: NotePatch): Promise<FinanceData>
+  /** Cascades its items. */
+  deleteNote(id: number): Promise<FinanceData>
+
+  /** Refused when the note is not a checklist. */
+  addNoteItem(noteId: number, input: NewNoteItem): Promise<FinanceData>
+  updateNoteItem(id: number, patch: NoteItemPatch): Promise<FinanceData>
+  deleteNoteItem(id: number): Promise<FinanceData>
 }

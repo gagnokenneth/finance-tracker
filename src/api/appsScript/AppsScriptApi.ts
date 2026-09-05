@@ -21,6 +21,10 @@ import type {
   NewTask,
   TaskPatch,
   CompleteTaskInput,
+  NewNote,
+  NotePatch,
+  NewNoteItem,
+  NoteItemPatch,
 } from '../FinanceApi.ts'
 import type { FinanceData, Currency } from '../../types.ts'
 import { readToken, clearToken } from '../../auth/session.ts'
@@ -236,5 +240,24 @@ export class AppsScriptApi implements FinanceApi {
   }
   completeTask(id: number, input: CompleteTaskInput): Promise<FinanceData> {
     return this.call<FinanceData>('completeTask', { id, input })
+  }
+
+  addNote(input: NewNote): Promise<FinanceData> {
+    return this.call<FinanceData>('addNote', { input })
+  }
+  updateNote(id: number, patch: NotePatch): Promise<FinanceData> {
+    return this.call<FinanceData>('updateNote', { id, patch })
+  }
+  deleteNote(id: number): Promise<FinanceData> {
+    return this.call<FinanceData>('deleteNote', { id })
+  }
+  addNoteItem(noteId: number, input: NewNoteItem): Promise<FinanceData> {
+    return this.call<FinanceData>('addNoteItem', { noteId, input })
+  }
+  updateNoteItem(id: number, patch: NoteItemPatch): Promise<FinanceData> {
+    return this.call<FinanceData>('updateNoteItem', { id, patch })
+  }
+  deleteNoteItem(id: number): Promise<FinanceData> {
+    return this.call<FinanceData>('deleteNoteItem', { id })
   }
 }
