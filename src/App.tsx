@@ -9,6 +9,7 @@ import { AppShell } from './components/AppShell.tsx'
 import { ToastProvider } from './components/ToastProvider.tsx'
 import { Dashboard } from './pages/Dashboard.tsx'
 import { Calendar } from './pages/Calendar.tsx'
+import { Tasks } from './pages/Tasks.tsx'
 import { Debts } from './pages/Debts.tsx'
 import { DebtDetail } from './pages/DebtDetail.tsx'
 import { Bills } from './pages/Bills.tsx'
@@ -21,8 +22,8 @@ import { SignIn } from './pages/SignIn.tsx'
 function AuthedApp() {
   const { user } = useAuth()
   if (!user) return <SignIn />
-  // Dashboard, Calendar, Debts, Bills, Income, Savings and Settings are
-  // exposed. The other module pages still exist in src/pages/ but are
+  // Dashboard, Calendar, Tasks, Debts, Bills, Income, Savings and Settings
+  // are exposed. The other module pages still exist in src/pages/ but are
   // deliberately unregistered; unknown paths land on the Dashboard.
   return (
     <Routes>
@@ -30,6 +31,7 @@ function AuthedApp() {
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="calendar" element={<Calendar />} />
+        <Route path="tasks" element={<Tasks />} />
         <Route path="debts" element={<Debts />} />
         <Route path="debts/:id" element={<DebtDetail />} />
         <Route path="bills" element={<Bills />} />
