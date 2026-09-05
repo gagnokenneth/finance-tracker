@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useFinanceData } from '../hooks/useFinanceData.ts'
 import { eventsInRange, STATUS_DOT } from '../lib/calendar.ts'
 import type { CalendarEvent } from '../lib/calendar.ts'
-import { monthKey, addMonths, monthWindow, dateOn, daysInMonth, isoDate } from '../lib/currentMonth.ts'
+import { monthKey, addMonths, monthWindow, dateOn, daysInMonth, isoDate, shiftDays } from '../lib/currentMonth.ts'
 import { SecondaryButton } from '../components/ui.tsx'
 import { LoadError } from '../components/LoadError.tsx'
 import { LoadingScreen } from '../components/LoadingScreen.tsx'
@@ -12,16 +12,17 @@ const WEEKDAY_LABEL = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 /**
  * Every ISO date the grid needs to render, in order — the visible month
- * plus enough of the neighboring months to fill whole weeks. dateOn's own
- * arithmetic (year/month rollover via the JS Date constructor) handles day
- * numbers below 1 or above the month's length correctly on its own, so no
- * special-casing is needed for the leading/trailing padding days.
+ * plus enough of the neighboring months to fill whole weeks. Uses shiftDays,
+ * not dateOn's own arithmetic directly: dateOn clamps a day number above the
+ * month's length (by design, for bill-recurrence callers), which silently
+ * produced duplicate trailing dates here instead of rolling into next month.
  */
 function monthGrid(year: number, monthNum: number): string[] {
   const firstWeekday = new Date(year, monthNum - 1, 1).getDay()
   const total = daysInMonth(year, monthNum)
   const cellCount = Math.ceil((firstWeekday + total) / 7) * 7
-  return Array.from({ length: cellCount }, (_, i) => dateOn(year, monthNum, i - firstWeekday + 1))
+  const firstOfMonth = dateOn(year, monthNum, 1)
+  return Array.from({ length: cellCount }, (_, i) => shiftDays(firstOfMonth, i - firstWeekday))
 }
 
 function CalendarDay({
@@ -48,7 +49,7 @@ function CalendarDay({
       <div className="mt-1 space-y-0.5">
         {events.map((e) => (
           <Link
-            key={`${e.source}-${e.id}`}
+            key={`${e.source}-${e.to}-${e.id}`}
             to={e.to}
             className="flex items-center gap-1 rounded px-1 py-0.5 text-xs hover:bg-paper"
           >

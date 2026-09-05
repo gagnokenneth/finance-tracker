@@ -21,9 +21,9 @@ import { SignIn } from './pages/SignIn.tsx'
 function AuthedApp() {
   const { user } = useAuth()
   if (!user) return <SignIn />
-  // Dashboard, Debts, Bills, Income, Savings and Settings are exposed. The
-  // other module pages still exist in src/pages/ but are deliberately
-  // unregistered; unknown paths land on the Dashboard.
+  // Dashboard, Calendar, Debts, Bills, Income, Savings and Settings are
+  // exposed. The other module pages still exist in src/pages/ but are
+  // deliberately unregistered; unknown paths land on the Dashboard.
   return (
     <Routes>
       <Route element={<AppShell />}>

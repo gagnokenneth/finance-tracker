@@ -29,6 +29,20 @@ export function dateOn(year: number, month: number, day: number): string {
 }
 
 /**
+ * `iso` shifted by `days` (negative shifts backward). Unlike dateOn, this never
+ * clamps — it rolls into the next or previous month/year via the Date
+ * constructor's own normalization, which is what plain day-counting (a
+ * calendar grid's cells, a "N days from now" window) needs. dateOn's clamping
+ * is deliberate for its own callers (a bill's day-of-month recurrence must
+ * clamp Jan 31 -> Feb 28, not roll into March) — this is a different need,
+ * not a replacement.
+ */
+export function shiftDays(iso: string, days: number): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  return isoDate(new Date(y, m - 1, d + days))
+}
+
+/**
  * The same day of the following month, clamped. A statement due Jan 31 puts
  * the next one on Feb 28 — and, having lost the 31st, keeps it on the 28th
  * after that. A card's statement day drifts the same way when a month is
