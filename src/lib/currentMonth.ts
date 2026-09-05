@@ -13,7 +13,7 @@ export function isoDate(date: Date = new Date()): string {
   return `${y}-${m}-${d}`
 }
 
-function daysInMonth(year: number, month: number): number {
+export function daysInMonth(year: number, month: number): number {
   return new Date(year, month, 0).getDate()
 }
 

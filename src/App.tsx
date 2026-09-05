@@ -8,6 +8,7 @@ import { makeQueryClient, persistOptionsFor } from './lib/queryClient.ts'
 import { AppShell } from './components/AppShell.tsx'
 import { ToastProvider } from './components/ToastProvider.tsx'
 import { Dashboard } from './pages/Dashboard.tsx'
+import { Calendar } from './pages/Calendar.tsx'
 import { Debts } from './pages/Debts.tsx'
 import { DebtDetail } from './pages/DebtDetail.tsx'
 import { Bills } from './pages/Bills.tsx'
@@ -28,6 +29,7 @@ function AuthedApp() {
       <Route element={<AppShell />}>
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<Dashboard />} />
+        <Route path="calendar" element={<Calendar />} />
         <Route path="debts" element={<Debts />} />
         <Route path="debts/:id" element={<DebtDetail />} />
         <Route path="bills" element={<Bills />} />
