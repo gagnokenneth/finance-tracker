@@ -19,6 +19,7 @@ var SHEETS = {
   tasks: ['id', 'user_id', 'title', 'notes', 'date', 'start_time', 'end_time', 'recurrence', 'completed', 'completed_date', 'goal_id', 'note_id'],
   notes: ['id', 'user_id', 'kind', 'title', 'body', 'linked_type', 'linked_id'],
   note_items: ['id', 'user_id', 'note_id', 'text', 'done', 'sort_order'],
+  goals: ['id', 'user_id', 'title', 'target_date', 'parent_goal_id', 'linked_type', 'linked_id', 'status', 'notes'],
   invites: ['code', 'used_by', 'used_at']
 };
 
@@ -27,7 +28,7 @@ var SHEETS = {
  * so the new shape is applied on the very next request after a deployment,
  * instead of up to an hour later.
  */
-var SCHEMA_VERSION = 11;
+var SCHEMA_VERSION = 12;
 
 /*
  * Tabs whose stale shape may be DISCARDED and recreated. Deliberately excludes
@@ -35,9 +36,9 @@ var SCHEMA_VERSION = 11;
  * and password hash on the next request, re-seed fresh codes, and lock everyone
  * out with no recovery path.
  */
-var REBUILDABLE_SHEETS = ['debts', 'debt_schedule', 'debt_statements', 'bills', 'bill_payables', 'income', 'income_sources', 'savings_ledger', 'tasks', 'notes', 'note_items'];
+var REBUILDABLE_SHEETS = ['debts', 'debt_schedule', 'debt_statements', 'bills', 'bill_payables', 'income', 'income_sources', 'savings_ledger', 'tasks', 'notes', 'note_items', 'goals'];
 
-var DATA_SHEETS = ['bills', 'bill_payables', 'debts', 'debt_schedule', 'debt_statements', 'income', 'income_sources', 'savings_ledger', 'tasks', 'notes', 'note_items'];
+var DATA_SHEETS = ['bills', 'bill_payables', 'debts', 'debt_schedule', 'debt_statements', 'income', 'income_sources', 'savings_ledger', 'tasks', 'notes', 'note_items', 'goals'];
 
 /**
  * Sheets getAll actually reads. Every sheet read is a separate round trip, so
@@ -47,7 +48,7 @@ var DATA_SHEETS = ['bills', 'bill_payables', 'debts', 'debt_schedule', 'debt_sta
  * the same change. A sheet in DATA_SHEETS but not here is reported as an empty
  * array, so its page renders blank even though the rows exist.
  */
-var ACTIVE_SHEETS = ['debts', 'debt_schedule', 'debt_statements', 'bills', 'bill_payables', 'income', 'income_sources', 'savings_ledger', 'tasks', 'notes', 'note_items'];
+var ACTIVE_SHEETS = ['debts', 'debt_schedule', 'debt_statements', 'bills', 'bill_payables', 'income', 'income_sources', 'savings_ledger', 'tasks', 'notes', 'note_items', 'goals'];
 
 /** Actions that return the full dataset instead of the affected row. */
 var RETURNS_DATA = {
@@ -62,7 +63,8 @@ var RETURNS_DATA = {
   addSavingsEntry: true, updateSavingsEntry: true, deleteSavingsEntry: true,
   addTask: true, updateTask: true, deleteTask: true, completeTask: true,
   addNote: true, updateNote: true, deleteNote: true,
-  addNoteItem: true, updateNoteItem: true, deleteNoteItem: true
+  addNoteItem: true, updateNoteItem: true, deleteNoteItem: true,
+  addGoal: true, updateGoal: true, deleteGoal: true
 };
 
 function doGet() {
@@ -504,6 +506,11 @@ function coerce(name, r) {
     id: num(r.id), note_id: num(r.note_id), text: String(r.text), done: bool(r.done),
     sort_order: num(r.sort_order)
   };
+  if (name === 'goals') return {
+    id: num(r.id), title: String(r.title), target_date: optDate(r.target_date),
+    parent_goal_id: optNum(r.parent_goal_id), linked_type: optStr(r.linked_type),
+    linked_id: optNum(r.linked_id), status: String(r.status), notes: optStr(r.notes)
+  };
   return r;
 }
 
@@ -718,6 +725,9 @@ function dispatch(action, p, uid) {
     case 'addNoteItem': return addNoteItem(p, uid);
     case 'updateNoteItem': return updateNoteItem(p, uid);
     case 'deleteNoteItem': return deleteNoteItem(p, uid);
+    case 'addGoal': return addGoal(p, uid);
+    case 'updateGoal': return updateGoal(p, uid);
+    case 'deleteGoal': return deleteGoal(p, uid);
     default: throw new Error('Unknown action: ' + action);
   }
 }
@@ -1818,5 +1828,143 @@ function updateNoteItem(p, uid) {
 function deleteNoteItem(p, uid) {
   var rowIndex = ownedRowIndex('note_items', p.id, uid);
   sheet('note_items').deleteRow(rowIndex);
+  return null;
+}
+
+/** The sheet a Goal's financial link lives on. 'savings' has none — a user
+ *  has one balance, not many rows to pick from. */
+var GOAL_LINK_SHEETS = { bill: 'bills', debt: 'debts' };
+
+/*
+ * linked_type and linked_id ride together, the same rule Notes' own
+ * assertOwnedLink enforces — but this is NOT that function reused: Goals'
+ * version has an extra branch Notes never needed, because 'savings' is a
+ * valid linked_type with no sheet to validate linked_id against.
+ */
+function assertOwnedGoalLink(linkedType, linkedId, uid) {
+  if (blank(linkedType)) {
+    if (!blank(linkedId)) throw new Error('A link needs a type.');
+    return;
+  }
+  if (linkedType === 'savings') {
+    if (!blank(linkedId)) throw new Error('A savings link has no target.');
+    return;
+  }
+  var sheetName = GOAL_LINK_SHEETS[linkedType];
+  if (!sheetName) throw new Error('That is not a kind of thing a goal can link to.');
+  if (blank(linkedId)) throw new Error('A link needs a target.');
+  assertOwned(sheetName, linkedId, uid);
+}
+
+/*
+ * Depth is fixed at 2: a row that is ITSELF a subgoal (has its own
+ * parent_goal_id set) may never be chosen as someone else's parent. One read
+ * is enough — there is no deeper chain to walk, as long as this check never
+ * has an exception. assertOwned runs first so a nonexistent or unowned
+ * parent throws a clear ownership error before its parent_goal_id is read.
+ */
+function assertGoalDepth(parentGoalId, uid) {
+  if (blank(parentGoalId)) return;
+  assertOwned('goals', parentGoalId, uid);
+  var parent = getById('goals', parentGoalId);
+  if (!blank(parent.parent_goal_id)) {
+    throw new Error('A subgoal cannot itself have subgoals.');
+  }
+}
+
+var GOAL_STATUSES = { active: true, achieved: true, not_achieved: true, abandoned: true };
+
+function addGoal(p, uid) {
+  var input = p.input || {};
+  if (blank(input.title)) throw new Error('A goal needs a title');
+  assertGoalDepth(input.parent_goal_id, uid);
+  assertOwnedGoalLink(input.linked_type, input.linked_id, uid);
+  appendRow('goals', {
+    id: nextId('goals'),
+    user_id: uid,
+    title: input.title,
+    target_date: input.target_date,
+    parent_goal_id: input.parent_goal_id,
+    linked_type: input.linked_type,
+    linked_id: input.linked_id,
+    status: 'active',
+    notes: input.notes
+  });
+  return null;
+}
+
+/*
+ * parent_goal_id is never in this whitelist — set once at creation, never
+ * patched. Re-parenting would need to re-validate depth-2 for the new parent
+ * AND confirm this goal has no subgoals of its own (which would become a
+ * 3-level chain once moved) — real validation for a feature this ticket
+ * does not build.
+ */
+function updateGoal(p, uid) {
+  var rowIndex = ownedRowIndex('goals', p.id, uid);
+  var given = p.patch || {};
+  var patch = {};
+  if (Object.prototype.hasOwnProperty.call(given, 'title')) {
+    if (blank(given.title)) throw new Error('A goal needs a title');
+    patch.title = given.title;
+  }
+  if (Object.prototype.hasOwnProperty.call(given, 'target_date')) patch.target_date = given.target_date;
+  if (Object.prototype.hasOwnProperty.call(given, 'notes')) patch.notes = given.notes;
+  if (Object.prototype.hasOwnProperty.call(given, 'status')) {
+    if (!GOAL_STATUSES[given.status]) throw new Error('Not a valid status');
+    patch.status = given.status;
+  }
+  if (
+    Object.prototype.hasOwnProperty.call(given, 'linked_type') ||
+    Object.prototype.hasOwnProperty.call(given, 'linked_id')
+  ) {
+    var current = getById('goals', p.id);
+    var linkedType = Object.prototype.hasOwnProperty.call(given, 'linked_type')
+      ? given.linked_type
+      : current.linked_type;
+    var linkedId = Object.prototype.hasOwnProperty.call(given, 'linked_id')
+      ? given.linked_id
+      : current.linked_id;
+    assertOwnedGoalLink(linkedType, linkedId, uid);
+    patch.linked_type = linkedType;
+    patch.linked_id = linkedId;
+  }
+  return patchRowAt('goals', rowIndex, patch);
+}
+
+/**
+ * Blanks goal_id on every task row pointing at any of these goal ids, in ONE
+ * read — the same batched shape clearIncomeFundingFor already established
+ * in this file (FT-8) for the identical problem: don't read the child sheet
+ * once per parent id.
+ */
+function detachTasksFromGoals(uid, goalIds) {
+  if (!goalIds.length) return;
+  var sh = sheet('tasks');
+  var last = sh.getLastRow();
+  if (last < 2) return;
+  var headers = SHEETS.tasks;
+  var values = sh.getRange(2, 1, last - 1, headers.length).getValues();
+  var userCol = headers.indexOf('user_id');
+  var goalCol = headers.indexOf('goal_id');
+  var wanted = {};
+  for (var i = 0; i < goalIds.length; i++) wanted[String(num(goalIds[i]))] = true;
+  for (var r = 0; r < values.length; r++) {
+    if (num(values[r][userCol]) !== num(uid)) continue;
+    if (blank(values[r][goalCol])) continue;
+    if (!wanted[String(num(values[r][goalCol]))]) continue;
+    sh.getRange(r + 2, goalCol + 1).setValue('');
+  }
+}
+
+function deleteGoal(p, uid) {
+  var rowIndex = ownedRowIndex('goals', p.id, uid);
+  var subgoalIds = ownedIdsWhere('goals', uid, 'parent_goal_id', p.id);
+  var allIds = subgoalIds.concat([num(p.id)]);
+  // Detach before the cascade deletes the rows themselves, so a failure here
+  // cannot leave a task pointing at a goal id that no longer exists.
+  detachTasksFromGoals(uid, allIds);
+  deleteRowsWhere('goals', 'parent_goal_id', p.id);
+  sheet('goals').deleteRow(rowIndex);
   return null;
 }
