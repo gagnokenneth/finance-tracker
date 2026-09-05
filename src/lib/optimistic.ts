@@ -10,6 +10,7 @@ import type {
   SavingsLedgerEntry,
   SavingsMovementKind,
   SavingsRefType,
+  Task,
 } from '../types.ts'
 import type {
   BillPatch,
@@ -27,6 +28,9 @@ import type {
   IncomeSourcePatch,
   NewSavingsEntry,
   SavingsEntryPatch,
+  NewTask,
+  TaskPatch,
+  CompleteTaskInput,
 } from '../api/FinanceApi.ts'
 import { tempId } from './tempId.ts'
 import { signedAmount } from './savings.ts'
@@ -505,4 +509,61 @@ export function applySavingsEntryPatch(
 
 export function removeSavingsEntry(data: FinanceData, id: number): FinanceData {
   return { ...data, savings_ledger: data.savings_ledger.filter((row) => row.id !== id) }
+}
+
+export function addTaskTo(data: FinanceData, vars: NewTask): FinanceData {
+  const task: Task = { id: tempId(), ...vars, completed: false }
+  return { ...data, tasks: [...data.tasks, task] }
+}
+
+/** See TaskPatch — completed is never cleared to anything but false here. */
+export function applyTaskPatch(
+  data: FinanceData,
+  vars: { id: number; patch: TaskPatch },
+): FinanceData {
+  return {
+    ...data,
+    tasks: data.tasks.map((t) => {
+      if (t.id !== vars.id) return t
+      const patched = { ...t, ...clearNulls(vars.patch, ['notes', 'start_time', 'end_time', 'recurrence', 'goal_id', 'note_id']) } as Task
+      if (vars.patch.completed === false) patched.completed_date = undefined
+      return patched
+    }),
+  }
+}
+
+export function removeTask(data: FinanceData, id: number): FinanceData {
+  return { ...data, tasks: data.tasks.filter((t) => t.id !== id) }
+}
+
+/**
+ * Marks done and, when the task recurs, predicts the mint — mirrors
+ * payBillPayableIn exactly: the next occurrence's fields come from the
+ * ORIGINAL task, not the patched one, since the completed/completed_date
+ * fields on a fresh occurrence must be false/absent regardless of what the
+ * one just completed now holds.
+ */
+export function completeTaskIn(
+  data: FinanceData,
+  vars: { id: number; input: CompleteTaskInput },
+): FinanceData {
+  const task = data.tasks.find((t) => t.id === vars.id)
+  if (!task) return data
+  const completed = data.tasks.map((t) =>
+    t.id === vars.id ? { ...t, completed: true, completed_date: vars.input.completed_date } : t,
+  )
+  if (!task.recurrence || !vars.input.next_date) return { ...data, tasks: completed }
+  const next = {
+    id: tempId(),
+    title: task.title,
+    notes: task.notes,
+    date: vars.input.next_date,
+    start_time: task.start_time,
+    end_time: task.end_time,
+    recurrence: task.recurrence,
+    completed: false,
+    goal_id: task.goal_id,
+    note_id: task.note_id,
+  }
+  return { ...data, tasks: [...completed, next as Task] }
 }

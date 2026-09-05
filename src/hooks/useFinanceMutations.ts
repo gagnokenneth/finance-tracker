@@ -31,6 +31,10 @@ import {
   addSavingsEntryTo,
   applySavingsEntryPatch,
   removeSavingsEntry,
+  addTaskTo,
+  applyTaskPatch,
+  removeTask,
+  completeTaskIn,
 } from '../lib/optimistic.ts'
 import type { Currency, FinanceData } from '../types.ts'
 import type {
@@ -49,6 +53,9 @@ import type {
   IncomeSourcePatch,
   NewSavingsEntry,
   SavingsEntryPatch,
+  NewTask,
+  TaskPatch,
+  CompleteTaskInput,
 } from '../api/FinanceApi.ts'
 
 export function useFinanceMutations() {
@@ -214,6 +221,23 @@ export function useFinanceMutations() {
     ...optimistic(payBillPayableIn, 'That payment did not save. The payable is unpaid again.'),
   })
 
+  const addTask = useMutation({
+    mutationFn: (i: NewTask) => getApi().addTask(i),
+    ...optimistic(addTaskTo, 'That task did not save. It has been removed.'),
+  })
+  const updateTask = useMutation({
+    mutationFn: (v: { id: number; patch: TaskPatch }) => getApi().updateTask(v.id, v.patch),
+    ...optimistic(applyTaskPatch, 'That task did not save. It is back as it was.'),
+  })
+  const deleteTask = useMutation({
+    mutationFn: (id: number) => getApi().deleteTask(id),
+    ...optimistic(removeTask, 'That task could not be deleted. It has been restored.'),
+  })
+  const completeTask = useMutation({
+    mutationFn: (v: { id: number; input: CompleteTaskInput }) => getApi().completeTask(v.id, v.input),
+    ...optimistic(completeTaskIn, 'That task did not save as done. It is back as not done.'),
+  })
+
   const setCurrency = useMutation({
     mutationFn: (c: Currency) => getApi().setCurrency(c),
     // Settings renders its own failure line, so this one stays off the toasts.
@@ -297,5 +321,9 @@ export function useFinanceMutations() {
     addSavingsEntry,
     updateSavingsEntry,
     deleteSavingsEntry,
+    addTask,
+    updateTask,
+    deleteTask,
+    completeTask,
   }
 }
