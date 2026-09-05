@@ -7,6 +7,7 @@ import { monthKey, addMonths, monthWindow, dateOn, daysInMonth, isoDate, shiftDa
 import { SecondaryButton } from '../components/ui.tsx'
 import { LoadError } from '../components/LoadError.tsx'
 import { LoadingScreen } from '../components/LoadingScreen.tsx'
+import { AddTaskModal } from './tasks/AddTaskModal.tsx'
 
 const WEEKDAY_LABEL = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -30,21 +31,33 @@ function CalendarDay({
   inMonth,
   isToday,
   events,
+  onAddTask,
 }: {
   date: string
   inMonth: boolean
   isToday: boolean
   events: CalendarEvent[]
+  onAddTask: (date: string) => void
 }) {
   const day = Number(date.slice(8, 10))
   return (
     <div
-      className={`min-h-24 rounded-lg border p-1.5 ${
+      className={`group min-h-24 rounded-lg border p-1.5 ${
         isToday ? 'border-brand bg-brand/5' : 'border-edge'
       } ${inMonth ? 'bg-white' : 'bg-paper/60'}`}
     >
-      <div className={`tnum font-mono text-xs ${inMonth ? 'text-ink-soft' : 'text-ink-faint'}`}>
-        {day}
+      <div className="flex items-center justify-between">
+        <span className={`tnum font-mono text-xs ${inMonth ? 'text-ink-soft' : 'text-ink-faint'}`}>
+          {day}
+        </span>
+        <button
+          type="button"
+          aria-label={`Add task on ${date}`}
+          onClick={() => onAddTask(date)}
+          className="rounded px-1 text-xs text-ink-faint opacity-0 hover:bg-paper hover:text-ink group-hover:opacity-100 focus-visible:opacity-100"
+        >
+          +
+        </button>
       </div>
       <div className="mt-1 space-y-0.5">
         {events.map((e) => (
@@ -68,6 +81,7 @@ function CalendarDay({
 export function Calendar() {
   const { data, isPending, isError, error } = useFinanceData()
   const [month, setMonth] = useState(monthKey())
+  const [addingTaskOn, setAddingTaskOn] = useState<string | null>(null)
 
   if (isPending) return <LoadingScreen />
   if (isError || !data) return <LoadError error={error} />
@@ -128,9 +142,14 @@ export function Calendar() {
             inMonth={date >= monthStart && date <= monthEnd}
             isToday={date === today}
             events={byDate.get(date) ?? []}
+            onAddTask={setAddingTaskOn}
           />
         ))}
       </div>
+
+      {addingTaskOn && (
+        <AddTaskModal open initialDate={addingTaskOn} onClose={() => setAddingTaskOn(null)} />
+      )}
     </div>
   )
 }

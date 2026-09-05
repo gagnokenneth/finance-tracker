@@ -3,7 +3,7 @@ import type { RowStatus } from './debts.ts'
 import { sourceName } from './income.ts'
 import type { FinanceData } from '../types.ts'
 
-export type CalendarSource = 'bill' | 'debt' | 'income' | 'savings'
+export type CalendarSource = 'bill' | 'debt' | 'income' | 'savings' | 'task'
 
 /**
  * One dated row from any module, flattened to what the calendar needs to
@@ -114,11 +114,31 @@ function savingsEvents(data: FinanceData, start: string, end: string): CalendarE
 }
 
 /**
- * Every dated row from Bills, Debts, Income and Savings whose date falls
- * within [start, end] (inclusive, both ISO yyyy-mm-dd). Tasks and Goals are
- * not sources here yet — they don't exist until their own tickets ship;
- * adding them later means adding one more `xEvents` function and one more
- * spread below, not touching this function's signature.
+ * Tasks are the calendar's one editable source — see the interaction model
+ * in the design spec: editing still routes to the Tasks page (there is no
+ * inline editor here either), but a task is the one thing the calendar can
+ * CREATE directly, via Calendar.tsx's own "+" affordance.
+ */
+function taskEvents(data: FinanceData, start: string, end: string): CalendarEvent[] {
+  return data.tasks
+    .filter((row) => inRange(row.date, start, end))
+    .map((row) => ({
+      id: row.id,
+      source: 'task' as const,
+      label: row.title,
+      date: row.date,
+      to: '/tasks',
+      editable: true,
+      status: row.completed ? ('paid' as const) : undefined,
+    }))
+}
+
+/**
+ * Every dated row from Bills, Debts, Income, Savings and Tasks whose date
+ * falls within [start, end] (inclusive, both ISO yyyy-mm-dd). Goals is not a
+ * source here yet — it doesn't exist until PM-4 ships; adding it later means
+ * adding one more `xEvents` function and one more spread below, not
+ * touching this function's signature.
  */
 export function eventsInRange(data: FinanceData, start: string, end: string): CalendarEvent[] {
   return [
@@ -126,5 +146,6 @@ export function eventsInRange(data: FinanceData, start: string, end: string): Ca
     ...debtEvents(data, start, end),
     ...incomeEvents(data, start, end),
     ...savingsEvents(data, start, end),
+    ...taskEvents(data, start, end),
   ]
 }
