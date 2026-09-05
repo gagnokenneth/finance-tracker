@@ -17,6 +17,8 @@ var SHEETS = {
   income_sources: ['id', 'user_id', 'name', 'archived'],
   savings_ledger: ['id', 'user_id', 'date', 'amount', 'kind', 'ref_type', 'ref_id', 'notes'],
   tasks: ['id', 'user_id', 'title', 'notes', 'date', 'start_time', 'end_time', 'recurrence', 'completed', 'completed_date', 'goal_id', 'note_id'],
+  notes: ['id', 'user_id', 'kind', 'title', 'body', 'linked_type', 'linked_id'],
+  note_items: ['id', 'user_id', 'note_id', 'text', 'done', 'sort_order'],
   invites: ['code', 'used_by', 'used_at']
 };
 
@@ -25,7 +27,7 @@ var SHEETS = {
  * so the new shape is applied on the very next request after a deployment,
  * instead of up to an hour later.
  */
-var SCHEMA_VERSION = 10;
+var SCHEMA_VERSION = 11;
 
 /*
  * Tabs whose stale shape may be DISCARDED and recreated. Deliberately excludes
@@ -33,9 +35,9 @@ var SCHEMA_VERSION = 10;
  * and password hash on the next request, re-seed fresh codes, and lock everyone
  * out with no recovery path.
  */
-var REBUILDABLE_SHEETS = ['debts', 'debt_schedule', 'debt_statements', 'bills', 'bill_payables', 'income', 'income_sources', 'savings_ledger', 'tasks'];
+var REBUILDABLE_SHEETS = ['debts', 'debt_schedule', 'debt_statements', 'bills', 'bill_payables', 'income', 'income_sources', 'savings_ledger', 'tasks', 'notes', 'note_items'];
 
-var DATA_SHEETS = ['bills', 'bill_payables', 'debts', 'debt_schedule', 'debt_statements', 'income', 'income_sources', 'savings_ledger', 'tasks'];
+var DATA_SHEETS = ['bills', 'bill_payables', 'debts', 'debt_schedule', 'debt_statements', 'income', 'income_sources', 'savings_ledger', 'tasks', 'notes', 'note_items'];
 
 /**
  * Sheets getAll actually reads. Every sheet read is a separate round trip, so
@@ -45,7 +47,7 @@ var DATA_SHEETS = ['bills', 'bill_payables', 'debts', 'debt_schedule', 'debt_sta
  * the same change. A sheet in DATA_SHEETS but not here is reported as an empty
  * array, so its page renders blank even though the rows exist.
  */
-var ACTIVE_SHEETS = ['debts', 'debt_schedule', 'debt_statements', 'bills', 'bill_payables', 'income', 'income_sources', 'savings_ledger', 'tasks'];
+var ACTIVE_SHEETS = ['debts', 'debt_schedule', 'debt_statements', 'bills', 'bill_payables', 'income', 'income_sources', 'savings_ledger', 'tasks', 'notes', 'note_items'];
 
 /** Actions that return the full dataset instead of the affected row. */
 var RETURNS_DATA = {
@@ -58,7 +60,9 @@ var RETURNS_DATA = {
   addIncomeSource: true, updateIncomeSource: true, deleteIncomeSource: true,
   setCurrency: true,
   addSavingsEntry: true, updateSavingsEntry: true, deleteSavingsEntry: true,
-  addTask: true, updateTask: true, deleteTask: true, completeTask: true
+  addTask: true, updateTask: true, deleteTask: true, completeTask: true,
+  addNote: true, updateNote: true, deleteNote: true,
+  addNoteItem: true, updateNoteItem: true, deleteNoteItem: true
 };
 
 function doGet() {
@@ -492,6 +496,14 @@ function coerce(name, r) {
     completed: bool(r.completed), completed_date: optDate(r.completed_date),
     goal_id: optNum(r.goal_id), note_id: optNum(r.note_id)
   };
+  if (name === 'notes') return {
+    id: num(r.id), kind: String(r.kind), title: String(r.title), body: optStr(r.body),
+    linked_type: optStr(r.linked_type), linked_id: optNum(r.linked_id)
+  };
+  if (name === 'note_items') return {
+    id: num(r.id), note_id: num(r.note_id), text: String(r.text), done: bool(r.done),
+    sort_order: num(r.sort_order)
+  };
   return r;
 }
 
@@ -700,6 +712,12 @@ function dispatch(action, p, uid) {
     case 'updateTask': return updateTask(p, uid);
     case 'deleteTask': return deleteTask(p, uid);
     case 'completeTask': return completeTask(p, uid);
+    case 'addNote': return addNote(p, uid);
+    case 'updateNote': return updateNote(p, uid);
+    case 'deleteNote': return deleteNote(p, uid);
+    case 'addNoteItem': return addNoteItem(p, uid);
+    case 'updateNoteItem': return updateNoteItem(p, uid);
+    case 'deleteNoteItem': return deleteNoteItem(p, uid);
     default: throw new Error('Unknown action: ' + action);
   }
 }
@@ -1679,5 +1697,126 @@ function completeTask(p, uid) {
       note_id: current.note_id
     });
   }
+  return null;
+}
+
+/** The sheet a link target lives on, keyed by linked_type. */
+var NOTE_LINK_SHEETS = { bill: 'bills', debt: 'debts', task: 'tasks' };
+
+/*
+ * linked_type and linked_id ride together: both blank (no link), or both
+ * present and owned. Never validates one against the other's STALE value —
+ * a patch that changes what kind of thing is linked must resolve the new
+ * pair together, the same rule the (now-removed) AllocationLinePatch used
+ * for target_type/target_id.
+ */
+function assertOwnedLink(linkedType, linkedId, uid) {
+  if (blank(linkedType)) {
+    if (!blank(linkedId)) throw new Error('A link needs a type.');
+    return;
+  }
+  var sheetName = NOTE_LINK_SHEETS[linkedType];
+  if (!sheetName) throw new Error('That is not a kind of thing a note can link to.');
+  if (blank(linkedId)) throw new Error('A link needs a target.');
+  assertOwned(sheetName, linkedId, uid);
+}
+
+function addNote(p, uid) {
+  var input = p.input || {};
+  if (blank(input.title)) throw new Error('A note needs a title');
+  if (input.kind !== 'freeform' && input.kind !== 'checklist') {
+    throw new Error('Not a kind of note');
+  }
+  assertOwnedLink(input.linked_type, input.linked_id, uid);
+  appendRow('notes', {
+    id: nextId('notes'),
+    user_id: uid,
+    kind: input.kind,
+    title: input.title,
+    body: input.kind === 'freeform' ? input.body : '',
+    linked_type: input.linked_type,
+    linked_id: input.linked_id
+  });
+  return null;
+}
+
+/** kind is never patchable — converting freeform<->checklist means delete and recreate. */
+function updateNote(p, uid) {
+  var rowIndex = ownedRowIndex('notes', p.id, uid);
+  var given = p.patch || {};
+  var patch = {};
+  if (Object.prototype.hasOwnProperty.call(given, 'title')) {
+    if (blank(given.title)) throw new Error('A note needs a title');
+    patch.title = given.title;
+  }
+  if (Object.prototype.hasOwnProperty.call(given, 'body')) patch.body = given.body;
+  if (
+    Object.prototype.hasOwnProperty.call(given, 'linked_type') ||
+    Object.prototype.hasOwnProperty.call(given, 'linked_id')
+  ) {
+    var current = getById('notes', p.id);
+    var linkedType = Object.prototype.hasOwnProperty.call(given, 'linked_type')
+      ? given.linked_type
+      : current.linked_type;
+    var linkedId = Object.prototype.hasOwnProperty.call(given, 'linked_id')
+      ? given.linked_id
+      : current.linked_id;
+    assertOwnedLink(linkedType, linkedId, uid);
+    patch.linked_type = linkedType;
+    patch.linked_id = linkedId;
+  }
+  return patchRowAt('notes', rowIndex, patch);
+}
+
+function deleteNote(p, uid) {
+  var rowIndex = ownedRowIndex('notes', p.id, uid);
+  deleteRowsWhere('note_items', 'note_id', p.id);
+  sheet('notes').deleteRow(rowIndex);
+  return null;
+}
+
+/** One more than the highest sort_order already used by this note's items. */
+function nextSortOrder(noteId) {
+  var rows = readRows('note_items');
+  var max = -1;
+  for (var i = 0; i < rows.length; i++) {
+    if (num(rows[i].note_id) !== num(noteId)) continue;
+    if (num(rows[i].sort_order) > max) max = num(rows[i].sort_order);
+  }
+  return max + 1;
+}
+
+function addNoteItem(p, uid) {
+  var note = getById('notes', p.noteId);
+  ownedRowIndex('notes', p.noteId, uid); // throws if not owned
+  if (String(note.kind) !== 'checklist') throw new Error('Only a checklist note can have items.');
+  var input = p.input || {};
+  if (blank(input.text)) throw new Error('A checklist item needs text');
+  appendRow('note_items', {
+    id: nextId('note_items'),
+    user_id: uid,
+    note_id: p.noteId,
+    text: input.text,
+    done: false,
+    sort_order: nextSortOrder(p.noteId)
+  });
+  return null;
+}
+
+function updateNoteItem(p, uid) {
+  var rowIndex = ownedRowIndex('note_items', p.id, uid);
+  var given = p.patch || {};
+  var patch = {};
+  if (Object.prototype.hasOwnProperty.call(given, 'text')) {
+    if (blank(given.text)) throw new Error('A checklist item needs text');
+    patch.text = given.text;
+  }
+  if (Object.prototype.hasOwnProperty.call(given, 'done')) patch.done = bool(given.done);
+  return patchRowAt('note_items', rowIndex, patch);
+}
+
+function deleteNoteItem(p, uid) {
+  var rowIndex = ownedRowIndex('note_items', p.id, uid);
+  sheet('note_items').deleteRow(rowIndex);
   return null;
 }
