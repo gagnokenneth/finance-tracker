@@ -1,5 +1,5 @@
 import { shiftDays, nextMonthOn } from './currentMonth.ts'
-import type { TaskRecurrence } from '../types.ts'
+import type { Task, TaskRecurrence } from '../types.ts'
 
 /**
  * The date a completed recurring task's successor should carry. Computed
@@ -23,6 +23,6 @@ export const RECURRENCE_LABEL: Record<TaskRecurrence, string> = {
 
 /** Newest-scheduled-first is wrong for a todo list — soonest first is the
  *  actionable order, matching how Bills' schedule table already sorts. */
-export function tasksSorted(tasks: import('../types.ts').Task[]): import('../types.ts').Task[] {
+export function tasksSorted(tasks: Task[]): Task[] {
   return [...tasks].sort((a, b) => a.date.localeCompare(b.date))
 }

@@ -1681,4 +1681,3 @@ function completeTask(p, uid) {
   }
   return null;
 }
-

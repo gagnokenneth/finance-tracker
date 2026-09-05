@@ -516,6 +516,11 @@ export function addTaskTo(data: FinanceData, vars: NewTask): FinanceData {
   return { ...data, tasks: [...data.tasks, task] }
 }
 
+/** See TaskPatch — the wire's null becomes the model's undefined. */
+function clearedTaskFields(patch: TaskPatch): Partial<Task> {
+  return clearNulls(patch, ['notes', 'start_time', 'end_time', 'recurrence', 'goal_id', 'note_id']) as Partial<Task>
+}
+
 /** See TaskPatch — completed is never cleared to anything but false here. */
 export function applyTaskPatch(
   data: FinanceData,
@@ -525,7 +530,7 @@ export function applyTaskPatch(
     ...data,
     tasks: data.tasks.map((t) => {
       if (t.id !== vars.id) return t
-      const patched = { ...t, ...clearNulls(vars.patch, ['notes', 'start_time', 'end_time', 'recurrence', 'goal_id', 'note_id']) } as Task
+      const patched = { ...t, ...clearedTaskFields(vars.patch) }
       if (vars.patch.completed === false) patched.completed_date = undefined
       return patched
     }),
@@ -553,7 +558,7 @@ export function completeTaskIn(
     t.id === vars.id ? { ...t, completed: true, completed_date: vars.input.completed_date } : t,
   )
   if (!task.recurrence || !vars.input.next_date) return { ...data, tasks: completed }
-  const next = {
+  const next: Task = {
     id: tempId(),
     title: task.title,
     notes: task.notes,
@@ -565,5 +570,5 @@ export function completeTaskIn(
     goal_id: task.goal_id,
     note_id: task.note_id,
   }
-  return { ...data, tasks: [...completed, next as Task] }
+  return { ...data, tasks: [...completed, next] }
 }

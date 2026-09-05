@@ -25,7 +25,7 @@ const ROW = 'block rounded-xl border border-edge bg-white p-5'
 
 export function Tasks() {
   const { data, isPending, isError, error } = useFinanceData()
-  const { completeTask, deleteTask } = useFinanceMutations()
+  const { completeTask, updateTask, deleteTask } = useFinanceMutations()
   const [adding, setAdding] = useState(false)
   const [editing, setEditing] = useState<Task | null>(null)
   const [deleting, setDeleting] = useState<Task | null>(null)
@@ -97,14 +97,33 @@ export function Tasks() {
               </div>
             )
           })}
-          {done.map((task) => (
-            <div key={task.id} className={ROW}>
-              <div className="flex items-start justify-between gap-4">
-                <span className="font-medium text-ink-soft line-through">{task.title}</span>
-                <span className="tnum font-mono text-sm text-ink-faint">{task.completed_date}</span>
+          {done.map((task) => {
+            const pending = isTemp(task.id)
+            return (
+              <div key={task.id} className={ROW}>
+                <div className="flex items-start justify-between gap-4">
+                  <span className="font-medium text-ink-soft line-through">{task.title}</span>
+                  <span className="tnum font-mono text-sm text-ink-faint">{task.completed_date}</span>
+                </div>
+                <div className="mt-4 flex items-center gap-2">
+                  {pending ? (
+                    <PendingBadge />
+                  ) : (
+                    <>
+                      <RowButton
+                        onClick={() => updateTask.mutate({ id: task.id, patch: { completed: false } })}
+                      >
+                        Undo
+                      </RowButton>
+                      <RowButton tone="danger" onClick={() => setDeleting(task)}>
+                        Delete
+                      </RowButton>
+                    </>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 

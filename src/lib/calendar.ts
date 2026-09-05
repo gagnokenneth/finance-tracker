@@ -17,8 +17,10 @@ export interface CalendarEvent {
   label: string
   date: string
   to: string
-  /** True only once Tasks exist (a later ticket) — everything today routes
-   *  to its own page instead of being edited inline on the calendar. */
+  /** True for task events. Not currently read anywhere: every event,
+   *  editable or not, still just navigates via `to` — there is no inline
+   *  editor on the calendar for anything. Kept for a future ticket that
+   *  might want to distinguish them (e.g. an inline quick-toggle). */
   editable: boolean
   /** Undefined for income/savings, which have no due-or-paid concept. */
   status?: RowStatus
@@ -129,7 +131,7 @@ function taskEvents(data: FinanceData, start: string, end: string): CalendarEven
       date: row.date,
       to: '/tasks',
       editable: true,
-      status: row.completed ? ('paid' as const) : undefined,
+      status: row.completed ? ('paid' as const) : dueStatus(row.date),
     }))
 }
 
