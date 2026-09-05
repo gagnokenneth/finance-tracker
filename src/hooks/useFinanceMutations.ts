@@ -35,6 +35,12 @@ import {
   applyTaskPatch,
   removeTask,
   completeTaskIn,
+  addNoteTo,
+  applyNotePatch,
+  removeNote,
+  addNoteItemTo,
+  applyNoteItemPatch,
+  removeNoteItem,
 } from '../lib/optimistic.ts'
 import type { Currency, FinanceData } from '../types.ts'
 import type {
@@ -56,6 +62,10 @@ import type {
   NewTask,
   TaskPatch,
   CompleteTaskInput,
+  NewNote,
+  NotePatch,
+  NewNoteItem,
+  NoteItemPatch,
 } from '../api/FinanceApi.ts'
 
 export function useFinanceMutations() {
@@ -238,6 +248,31 @@ export function useFinanceMutations() {
     ...optimistic(completeTaskIn, 'That task did not save as done. It is back as not done.'),
   })
 
+  const addNote = useMutation({
+    mutationFn: (i: NewNote) => getApi().addNote(i),
+    ...optimistic(addNoteTo, 'That note did not save. It has been removed.'),
+  })
+  const updateNote = useMutation({
+    mutationFn: (v: { id: number; patch: NotePatch }) => getApi().updateNote(v.id, v.patch),
+    ...optimistic(applyNotePatch, 'That note did not save. It is back as it was.'),
+  })
+  const deleteNote = useMutation({
+    mutationFn: (id: number) => getApi().deleteNote(id),
+    ...optimistic(removeNote, 'That note could not be deleted. It has been restored.'),
+  })
+  const addNoteItem = useMutation({
+    mutationFn: (v: { noteId: number; input: NewNoteItem }) => getApi().addNoteItem(v.noteId, v.input),
+    ...optimistic(addNoteItemTo, 'That item did not save. It has been removed.'),
+  })
+  const updateNoteItem = useMutation({
+    mutationFn: (v: { id: number; patch: NoteItemPatch }) => getApi().updateNoteItem(v.id, v.patch),
+    ...optimistic(applyNoteItemPatch, 'That change did not save. It is back as it was.'),
+  })
+  const deleteNoteItem = useMutation({
+    mutationFn: (id: number) => getApi().deleteNoteItem(id),
+    ...optimistic(removeNoteItem, 'That item could not be deleted. It has been restored.'),
+  })
+
   const setCurrency = useMutation({
     mutationFn: (c: Currency) => getApi().setCurrency(c),
     // Settings renders its own failure line, so this one stays off the toasts.
@@ -325,5 +360,11 @@ export function useFinanceMutations() {
     updateTask,
     deleteTask,
     completeTask,
+    addNote,
+    updateNote,
+    deleteNote,
+    addNoteItem,
+    updateNoteItem,
+    deleteNoteItem,
   }
 }

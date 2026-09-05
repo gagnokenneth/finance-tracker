@@ -11,6 +11,8 @@ import type {
   SavingsMovementKind,
   SavingsRefType,
   Task,
+  Note,
+  NoteItem,
 } from '../types.ts'
 import type {
   BillPatch,
@@ -31,6 +33,10 @@ import type {
   NewTask,
   TaskPatch,
   CompleteTaskInput,
+  NewNote,
+  NotePatch,
+  NewNoteItem,
+  NoteItemPatch,
 } from '../api/FinanceApi.ts'
 import { tempId } from './tempId.ts'
 import { signedAmount } from './savings.ts'
@@ -571,4 +577,62 @@ export function completeTaskIn(
     note_id: task.note_id,
   }
   return { ...data, tasks: [...completed, next] }
+}
+
+/** See NotePatch — the wire's null becomes the model's undefined. */
+function clearedNoteFields(patch: NotePatch): Partial<Note> {
+  return clearNulls(patch, ['body', 'linked_type', 'linked_id']) as Partial<Note>
+}
+
+export function addNoteTo(data: FinanceData, vars: NewNote): FinanceData {
+  const note: Note = { id: tempId(), ...vars }
+  return { ...data, notes: [...data.notes, note] }
+}
+
+export function applyNotePatch(
+  data: FinanceData,
+  vars: { id: number; patch: NotePatch },
+): FinanceData {
+  return {
+    ...data,
+    notes: data.notes.map((n) => (n.id === vars.id ? { ...n, ...clearedNoteFields(vars.patch) } : n)),
+  }
+}
+
+export function removeNote(data: FinanceData, id: number): FinanceData {
+  return {
+    ...data,
+    notes: data.notes.filter((n) => n.id !== id),
+    note_items: data.note_items.filter((i) => i.note_id !== id),
+  }
+}
+
+export function addNoteItemTo(
+  data: FinanceData,
+  vars: { noteId: number; input: NewNoteItem },
+): FinanceData {
+  const sortOrder =
+    Math.max(-1, ...data.note_items.filter((i) => i.note_id === vars.noteId).map((i) => i.sort_order)) + 1
+  const item: NoteItem = {
+    id: tempId(),
+    note_id: vars.noteId,
+    text: vars.input.text,
+    done: false,
+    sort_order: sortOrder,
+  }
+  return { ...data, note_items: [...data.note_items, item] }
+}
+
+export function applyNoteItemPatch(
+  data: FinanceData,
+  vars: { id: number; patch: NoteItemPatch },
+): FinanceData {
+  return {
+    ...data,
+    note_items: data.note_items.map((i) => (i.id === vars.id ? { ...i, ...vars.patch } : i)),
+  }
+}
+
+export function removeNoteItem(data: FinanceData, id: number): FinanceData {
+  return { ...data, note_items: data.note_items.filter((i) => i.id !== id) }
 }

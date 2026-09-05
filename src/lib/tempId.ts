@@ -28,3 +28,16 @@ export function isTemp(id: number): boolean {
 export function anyTempIdsMinted(): boolean {
   return last < 0
 }
+
+/**
+ * The rows a foreign key may point at.
+ *
+ * A pending row's id is negative and no backend can resolve it, so a write
+ * that references one is certain to fail — with a confusing "that row was
+ * not found", because the id is real as far as the client is concerned.
+ * Notes' linked-item picker is exactly this hazard: it must exclude a
+ * pending Bill/Debt/Task from being offered as a link target.
+ */
+export function referenceable<T extends { id: number }>(rows: T[]): T[] {
+  return rows.filter((row) => !isTemp(row.id))
+}
