@@ -102,6 +102,17 @@ export function AppShell() {
         </nav>
         <div className="border-t border-edge px-5 py-4">
           <div className="truncate text-sm font-medium text-ink">{user?.username}</div>
+          <NavLink
+            to="/calendar"
+            onClick={() => setOpen(false)}
+            className={({ isActive }) =>
+              `mt-2 block text-sm font-medium transition-colors ${
+                isActive ? 'text-brand' : 'text-ink-soft hover:text-ink'
+              }`
+            }
+          >
+            Calendar
+          </NavLink>
           <div className="mt-2">
             <RefreshButton />
           </div>
