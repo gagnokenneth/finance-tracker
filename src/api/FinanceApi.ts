@@ -8,6 +8,7 @@ import type {
   IncomeEntry,
   IncomeSource,
   SavingsMovementKind,
+  Task,
 } from '../types.ts'
 
 /** The keys of T that may be absent — the ones a Patch has to rule on. */
@@ -84,6 +85,25 @@ export interface NewSavingsEntry {
   notes?: string
 }
 export type SavingsEntryPatch = Patch<NewSavingsEntry, 'notes'>
+
+export type NewTask = Omit<Task, 'id' | 'completed' | 'completed_date'>
+/**
+ * completed is a plain optional boolean, not run through Clearable: it only
+ * ever takes true or false, never a third "unset" state, so it needs no
+ * null-to-clear convention. completed_date is excluded entirely — it is
+ * server-managed, set by completeTask and cleared as a side effect of
+ * patching completed to false, never client-supplied directly.
+ */
+export type TaskPatch = Patch<
+  Omit<Task, 'id' | 'completed_date'>,
+  'notes' | 'start_time' | 'end_time' | 'recurrence' | 'goal_id' | 'note_id'
+>
+
+export interface CompleteTaskInput {
+  completed_date: string
+  /** Only when the task recurs — computed by nextTaskDate in lib/tasks.ts. */
+  next_date?: string
+}
 
 export interface AuthResult {
   token: string
@@ -177,4 +197,13 @@ export interface FinanceApi {
   updateSavingsEntry(id: number, patch: SavingsEntryPatch): Promise<FinanceData>
   /** Refused when it would take the balance below zero, or on a payment row. */
   deleteSavingsEntry(id: number): Promise<FinanceData>
+
+  /* Task writes return the whole updated dataset, for the same reasons above. */
+
+  addTask(input: NewTask): Promise<FinanceData>
+  /** completed can only be set to false here — see completeTask. */
+  updateTask(id: number, patch: TaskPatch): Promise<FinanceData>
+  deleteTask(id: number): Promise<FinanceData>
+  /** Marks done and mints the next occurrence when the task recurs. */
+  completeTask(id: number, input: CompleteTaskInput): Promise<FinanceData>
 }

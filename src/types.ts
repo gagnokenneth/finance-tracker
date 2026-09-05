@@ -109,6 +109,33 @@ export interface SavingsLedgerEntry {
   notes?: string
 }
 
+export type TaskRecurrence = 'daily' | 'weekly' | 'monthly'
+
+/**
+ * A scheduled item — one-off or recurring, optionally time-blocked. Unlike
+ * Bills, a recurring task has no separate template row: each occurrence is
+ * its own independent row, chained only by completing one minting the next
+ * (see completeTask in FinanceApi.ts) — there is no stable id grouping a
+ * series the way bill_id groups a bill's payables.
+ */
+export interface Task {
+  id: number
+  title: string
+  notes?: string
+  date: string
+  /** HH:MM, both unset for an all-day task. */
+  start_time?: string
+  end_time?: string
+  /** Unset for a one-off task. */
+  recurrence?: TaskRecurrence
+  completed: boolean
+  completed_date?: string
+  /** At most one goal per task. Written now, read starting with Goals. */
+  goal_id?: number
+  /** Written now, read starting with Notes. */
+  note_id?: number
+}
+
 export interface Settings {
   /** Per-user: comes from the caller's own row, not a global setting. */
   currency: Currency
@@ -124,5 +151,6 @@ export interface FinanceData {
   income: IncomeEntry[]
   income_sources: IncomeSource[]
   savings_ledger: SavingsLedgerEntry[]
+  tasks: Task[]
   settings: Settings
 }

@@ -18,6 +18,9 @@ import type {
   IncomeSourcePatch,
   NewSavingsEntry,
   SavingsEntryPatch,
+  NewTask,
+  TaskPatch,
+  CompleteTaskInput,
 } from '../FinanceApi.ts'
 import type { FinanceData, Currency } from '../../types.ts'
 import { readToken, clearToken } from '../../auth/session.ts'
@@ -220,5 +223,18 @@ export class AppsScriptApi implements FinanceApi {
 
   deleteSavingsEntry(id: number): Promise<FinanceData> {
     return this.call<FinanceData>('deleteSavingsEntry', { id })
+  }
+
+  addTask(input: NewTask): Promise<FinanceData> {
+    return this.call<FinanceData>('addTask', { input })
+  }
+  updateTask(id: number, patch: TaskPatch): Promise<FinanceData> {
+    return this.call<FinanceData>('updateTask', { id, patch })
+  }
+  deleteTask(id: number): Promise<FinanceData> {
+    return this.call<FinanceData>('deleteTask', { id })
+  }
+  completeTask(id: number, input: CompleteTaskInput): Promise<FinanceData> {
+    return this.call<FinanceData>('completeTask', { id, input })
   }
 }

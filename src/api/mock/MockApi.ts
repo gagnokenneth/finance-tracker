@@ -18,6 +18,9 @@ import type {
   IncomeSourcePatch,
   NewSavingsEntry,
   SavingsEntryPatch,
+  NewTask,
+  TaskPatch,
+  CompleteTaskInput,
 } from '../FinanceApi.ts'
 import type {
   FinanceData,
@@ -31,6 +34,7 @@ import type {
   SavingsLedgerKind,
   SavingsMovementKind,
   SavingsRefType,
+  Task,
 } from '../../types.ts'
 import { createSeed } from './seed.ts'
 import { backfillArrays } from '../../lib/financeShape.ts'
@@ -902,6 +906,75 @@ export class MockApi implements FinanceApi {
     assertNotPaymentRow(row)
     assertNotBelowZero(savingsBalanceAfter(data.savings_ledger, id, null))
     data.savings_ledger = data.savings_ledger.filter((r) => r.id !== id)
+    this.save(data)
+    return this.delay(data)
+  }
+
+  private ownedTask(data: FinanceData, id: number): Task {
+    const task = data.tasks.find((t) => t.id === id)
+    if (!task) throw new Error(`Task ${id} not found`)
+    return task
+  }
+
+  async addTask(input: NewTask): Promise<FinanceData> {
+    const data = this.load()
+    if (!input.title.trim()) throw new Error('A task needs a title')
+    if (!input.date) throw new Error('A task needs a date')
+    const task: Task = { id: nextId(data.tasks), ...input, completed: false }
+    data.tasks.push(task)
+    this.save(data)
+    return this.delay(data)
+  }
+
+  async updateTask(id: number, patch: TaskPatch): Promise<FinanceData> {
+    const data = this.load()
+    const task = this.ownedTask(data, id)
+    if (Object.prototype.hasOwnProperty.call(patch, 'title') && !(patch.title ?? '').trim()) {
+      throw new Error('A task needs a title')
+    }
+    if (Object.prototype.hasOwnProperty.call(patch, 'date') && !patch.date) {
+      throw new Error('A task needs a date')
+    }
+    Object.assign(task, patch)
+    // completed is only ever cleared here — see the FinanceApi.ts doc comment
+    // on TaskPatch and Code.gs's updateTask for why.
+    if (patch.completed === false) task.completed_date = undefined
+    // null is the wire's "clear this"; the stored model uses undefined.
+    for (const key of ['notes', 'start_time', 'end_time', 'recurrence', 'goal_id', 'note_id'] as const) {
+      if (patch[key] === null) task[key] = undefined
+    }
+    this.save(data)
+    return this.delay(data)
+  }
+
+  async deleteTask(id: number): Promise<FinanceData> {
+    const data = this.load()
+    this.ownedTask(data, id)
+    data.tasks = data.tasks.filter((t) => t.id !== id)
+    this.save(data)
+    return this.delay(data)
+  }
+
+  async completeTask(id: number, input: CompleteTaskInput): Promise<FinanceData> {
+    const data = this.load()
+    const task = this.ownedTask(data, id)
+    if (task.completed) throw new Error('That task is already done.')
+    task.completed = true
+    task.completed_date = input.completed_date
+    if (task.recurrence && input.next_date) {
+      data.tasks.push({
+        id: nextId(data.tasks),
+        title: task.title,
+        notes: task.notes,
+        date: input.next_date,
+        start_time: task.start_time,
+        end_time: task.end_time,
+        recurrence: task.recurrence,
+        completed: false,
+        goal_id: task.goal_id,
+        note_id: task.note_id,
+      })
+    }
     this.save(data)
     return this.delay(data)
   }
