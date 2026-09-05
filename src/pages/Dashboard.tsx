@@ -55,8 +55,10 @@ export function Dashboard() {
         </div>
       )}
 
-      {upcoming.length > 0 && (
-        <Card title="Upcoming">
+      <Card title="Upcoming">
+        {upcoming.length === 0 ? (
+          <p className="text-sm text-ink-soft">Nothing in the next 7 days.</p>
+        ) : (
           <div className="space-y-1">
             {upcoming.map((e) => (
               <Link
@@ -73,8 +75,8 @@ export function Dashboard() {
               </Link>
             ))}
           </div>
-        </Card>
-      )}
+        )}
+      </Card>
     </div>
   )
 }
