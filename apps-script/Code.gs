@@ -16,6 +16,7 @@ var SHEETS = {
   income: ['id', 'user_id', 'source_id', 'amount', 'date', 'notes'],
   income_sources: ['id', 'user_id', 'name', 'archived'],
   savings_ledger: ['id', 'user_id', 'date', 'amount', 'kind', 'ref_type', 'ref_id', 'notes'],
+  tasks: ['id', 'user_id', 'title', 'notes', 'date', 'start_time', 'end_time', 'recurrence', 'completed', 'completed_date', 'goal_id', 'note_id'],
   invites: ['code', 'used_by', 'used_at']
 };
 
@@ -24,7 +25,7 @@ var SHEETS = {
  * so the new shape is applied on the very next request after a deployment,
  * instead of up to an hour later.
  */
-var SCHEMA_VERSION = 9;
+var SCHEMA_VERSION = 10;
 
 /*
  * Tabs whose stale shape may be DISCARDED and recreated. Deliberately excludes
@@ -32,9 +33,9 @@ var SCHEMA_VERSION = 9;
  * and password hash on the next request, re-seed fresh codes, and lock everyone
  * out with no recovery path.
  */
-var REBUILDABLE_SHEETS = ['debts', 'debt_schedule', 'debt_statements', 'bills', 'bill_payables', 'income', 'income_sources', 'savings_ledger'];
+var REBUILDABLE_SHEETS = ['debts', 'debt_schedule', 'debt_statements', 'bills', 'bill_payables', 'income', 'income_sources', 'savings_ledger', 'tasks'];
 
-var DATA_SHEETS = ['bills', 'bill_payables', 'debts', 'debt_schedule', 'debt_statements', 'income', 'income_sources', 'savings_ledger'];
+var DATA_SHEETS = ['bills', 'bill_payables', 'debts', 'debt_schedule', 'debt_statements', 'income', 'income_sources', 'savings_ledger', 'tasks'];
 
 /**
  * Sheets getAll actually reads. Every sheet read is a separate round trip, so
@@ -44,7 +45,7 @@ var DATA_SHEETS = ['bills', 'bill_payables', 'debts', 'debt_schedule', 'debt_sta
  * the same change. A sheet in DATA_SHEETS but not here is reported as an empty
  * array, so its page renders blank even though the rows exist.
  */
-var ACTIVE_SHEETS = ['debts', 'debt_schedule', 'debt_statements', 'bills', 'bill_payables', 'income', 'income_sources', 'savings_ledger'];
+var ACTIVE_SHEETS = ['debts', 'debt_schedule', 'debt_statements', 'bills', 'bill_payables', 'income', 'income_sources', 'savings_ledger', 'tasks'];
 
 /** Actions that return the full dataset instead of the affected row. */
 var RETURNS_DATA = {
@@ -56,7 +57,8 @@ var RETURNS_DATA = {
   addIncome: true, updateIncome: true, deleteIncome: true,
   addIncomeSource: true, updateIncomeSource: true, deleteIncomeSource: true,
   setCurrency: true,
-  addSavingsEntry: true, updateSavingsEntry: true, deleteSavingsEntry: true
+  addSavingsEntry: true, updateSavingsEntry: true, deleteSavingsEntry: true,
+  addTask: true, updateTask: true, deleteTask: true, completeTask: true
 };
 
 function doGet() {
@@ -484,6 +486,12 @@ function coerce(name, r) {
     id: num(r.id), date: fmtDate(r.date), amount: num(r.amount), kind: String(r.kind),
     ref_type: optStr(r.ref_type), ref_id: optNum(r.ref_id), notes: optStr(r.notes)
   };
+  if (name === 'tasks') return {
+    id: num(r.id), title: String(r.title), notes: optStr(r.notes), date: fmtDate(r.date),
+    start_time: optStr(r.start_time), end_time: optStr(r.end_time), recurrence: optStr(r.recurrence),
+    completed: bool(r.completed), completed_date: optDate(r.completed_date),
+    goal_id: optNum(r.goal_id), note_id: optNum(r.note_id)
+  };
   return r;
 }
 
@@ -688,6 +696,10 @@ function dispatch(action, p, uid) {
     case 'addSavingsEntry': return addSavingsEntry(p, uid);
     case 'updateSavingsEntry': return updateSavingsEntry(p, uid);
     case 'deleteSavingsEntry': return deleteSavingsEntry(p, uid);
+    case 'addTask': return addTask(p, uid);
+    case 'updateTask': return updateTask(p, uid);
+    case 'deleteTask': return deleteTask(p, uid);
+    case 'completeTask': return completeTask(p, uid);
     default: throw new Error('Unknown action: ' + action);
   }
 }
@@ -1574,6 +1586,99 @@ function deleteSavingsEntry(p, uid) {
   assertNotPaymentRow(row);
   assertNotBelowZero(savingsBalanceAfter(rows, p.id, null));
   sheet('savings_ledger').deleteRow(rowIndex);
+  return null;
+}
+
+function addTask(p, uid) {
+  var input = p.input || {};
+  if (blank(input.title)) throw new Error('A task needs a title');
+  if (blank(input.date)) throw new Error('A task needs a date');
+  appendRow('tasks', {
+    id: nextId('tasks'),
+    user_id: uid,
+    title: input.title,
+    notes: input.notes,
+    date: input.date,
+    start_time: input.start_time,
+    end_time: input.end_time,
+    recurrence: input.recurrence,
+    completed: false,
+    completed_date: '',
+    goal_id: input.goal_id,
+    note_id: input.note_id
+  });
+  return null; // RETURNS_DATA action — doPost reads the dataset back
+}
+
+function updateTask(p, uid) {
+  var rowIndex = ownedRowIndex('tasks', p.id, uid);
+  var given = p.patch || {};
+  var patch = {};
+  if (Object.prototype.hasOwnProperty.call(given, 'title')) {
+    if (blank(given.title)) throw new Error('A task needs a title');
+    patch.title = given.title;
+  }
+  if (Object.prototype.hasOwnProperty.call(given, 'notes')) patch.notes = given.notes;
+  if (Object.prototype.hasOwnProperty.call(given, 'date')) {
+    if (blank(given.date)) throw new Error('A task needs a date');
+    patch.date = given.date;
+  }
+  if (Object.prototype.hasOwnProperty.call(given, 'start_time')) patch.start_time = given.start_time;
+  if (Object.prototype.hasOwnProperty.call(given, 'end_time')) patch.end_time = given.end_time;
+  if (Object.prototype.hasOwnProperty.call(given, 'recurrence')) patch.recurrence = given.recurrence;
+  if (Object.prototype.hasOwnProperty.call(given, 'goal_id')) patch.goal_id = given.goal_id;
+  if (Object.prototype.hasOwnProperty.call(given, 'note_id')) patch.note_id = given.note_id;
+  /*
+   * completed is only ever CLEARED here, never set — completing a task goes
+   * through completeTask, which also mints the next occurrence when the task
+   * recurs. Mirrors normalizePaidPatch's exact rule for bill payables: an
+   * unpay clears paid_date/paid_amount as a side effect, never as a client-
+   * supplied value for them.
+   */
+  if (Object.prototype.hasOwnProperty.call(given, 'completed') && !bool(given.completed)) {
+    patch.completed = false;
+    patch.completed_date = '';
+  }
+  return patchRowAt('tasks', rowIndex, patch);
+}
+
+function deleteTask(p, uid) {
+  var rowIndex = ownedRowIndex('tasks', p.id, uid);
+  sheet('tasks').deleteRow(rowIndex);
+  return null;
+}
+
+/**
+ * Marks a task done and, when it recurs, mints the next occurrence — the same
+ * split payBillPayable makes for bills: the CLIENT computes the next date
+ * (there is no recurrence math in this file, matching how next_due_date works
+ * for bills) and this just stores whatever it is given. Refuses a task
+ * already completed, so a double-submitted Complete cannot mint two
+ * successors.
+ */
+function completeTask(p, uid) {
+  var rowIndex = ownedRowIndex('tasks', p.id, uid);
+  var current = getById('tasks', p.id);
+  if (bool(current.completed)) throw new Error('That task is already done.');
+  var input = p.input || {};
+  if (blank(input.completed_date)) throw new Error('A completed task needs a date');
+  patchRowAt('tasks', rowIndex, { completed: true, completed_date: input.completed_date });
+  if (!blank(current.recurrence) && !blank(input.next_date)) {
+    appendRow('tasks', {
+      id: nextId('tasks'),
+      user_id: uid,
+      title: current.title,
+      notes: current.notes,
+      date: input.next_date,
+      start_time: current.start_time,
+      end_time: current.end_time,
+      recurrence: current.recurrence,
+      completed: false,
+      completed_date: '',
+      goal_id: current.goal_id,
+      note_id: current.note_id
+    });
+  }
   return null;
 }
 
