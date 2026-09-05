@@ -35,7 +35,7 @@ export function NoteDetail() {
     const trimmed = newItemText.trim()
     if (!trimmed) return
     setNewItemText('')
-    addNoteItem.mutate({ noteId: note.id, input: { note_id: note.id, text: trimmed } })
+    addNoteItem.mutate({ noteId: note.id, input: { text: trimmed } })
   }
 
   return (

@@ -111,7 +111,7 @@ export type NewNote = Omit<Note, 'id'>
 /** kind is never in the patch — see Note's own doc comment. */
 export type NotePatch = Patch<Omit<Note, 'id' | 'kind'>, 'body' | 'linked_type' | 'linked_id'>
 
-export type NewNoteItem = Omit<NoteItem, 'id' | 'done' | 'sort_order'>
+export type NewNoteItem = Omit<NoteItem, 'id' | 'note_id' | 'done' | 'sort_order'>
 /** Neither field is ever cleared to null — text is always required,
  *  done is a plain boolean like Task's own completed field. */
 export type NoteItemPatch = Patch<Omit<NoteItem, 'id' | 'note_id' | 'sort_order'>>
