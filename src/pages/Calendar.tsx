@@ -148,7 +148,7 @@ export function Calendar() {
       </div>
 
       {addingTaskOn && (
-        <AddTaskModal open initialDate={addingTaskOn} onClose={() => setAddingTaskOn(null)} />
+        <AddTaskModal open data={data} initialDate={addingTaskOn} onClose={() => setAddingTaskOn(null)} />
       )}
     </div>
   )

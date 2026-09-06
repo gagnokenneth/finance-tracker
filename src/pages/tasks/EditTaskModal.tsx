@@ -1,22 +1,27 @@
 import type { FormEvent } from 'react'
 import { useFinanceMutations } from '../../hooks/useFinanceMutations.ts'
 import { useTaskForm } from '../../hooks/useTaskForm.ts'
+import { referenceable } from '../../lib/tempId.ts'
 import { Modal } from '../../components/Modal.tsx'
 import { Field, TextInput, SelectInput, Button, SecondaryButton } from '../../components/ui.tsx'
 import { RECURRENCES, RECURRENCE_LABEL } from '../../lib/tasks.ts'
-import type { Task, TaskRecurrence } from '../../types.ts'
+import type { FinanceData, Task, TaskRecurrence } from '../../types.ts'
 
+/** `data` is a prop from the parent page — see AddTaskModal's own note on this. */
 export function EditTaskModal({
   open,
   task,
+  data,
   onClose,
 }: {
   open: boolean
   task: Task
+  data: FinanceData
   onClose: () => void
 }) {
   const { updateTask } = useFinanceMutations()
   const form = useTaskForm(task)
+  const goals = referenceable(data.goals)
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
@@ -34,6 +39,7 @@ export function EditTaskModal({
         start_time: form.values.start_time ?? null,
         end_time: form.values.end_time ?? null,
         recurrence: form.values.recurrence ?? null,
+        goal_id: form.values.goal_id ?? null,
       },
     })
   }
@@ -77,6 +83,19 @@ export function EditTaskModal({
             {RECURRENCES.map((r) => (
               <option key={r} value={r}>
                 {RECURRENCE_LABEL[r]}
+              </option>
+            ))}
+          </SelectInput>
+        </Field>
+        <Field label="Part of a goal (optional)">
+          <SelectInput
+            value={form.goalId}
+            onChange={(e) => form.setGoalId(e.target.value ? Number(e.target.value) : '')}
+          >
+            <option value="">Nothing</option>
+            {goals.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.title}
               </option>
             ))}
           </SelectInput>

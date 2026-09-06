@@ -15,6 +15,8 @@ export interface TaskForm {
   setEndTime: (v: string) => void
   recurrence: TaskRecurrence | ''
   setRecurrence: (v: TaskRecurrence | '') => void
+  goalId: number | ''
+  setGoalId: (v: number | '') => void
   /** The write payload, or null while the form is incomplete. */
   values: NewTask | null
 }
@@ -31,6 +33,7 @@ export function useTaskForm(task?: Task, initialDate?: string): TaskForm {
   const [startTime, setStartTime] = useState(task?.start_time ?? '')
   const [endTime, setEndTime] = useState(task?.end_time ?? '')
   const [recurrence, setRecurrence] = useState<TaskRecurrence | ''>(task?.recurrence ?? '')
+  const [goalId, setGoalId] = useState<number | ''>(task?.goal_id ?? '')
 
   const complete = title.trim() !== '' && date !== ''
   const values: NewTask | null = !complete
@@ -42,6 +45,7 @@ export function useTaskForm(task?: Task, initialDate?: string): TaskForm {
         start_time: startTime || undefined,
         end_time: endTime || undefined,
         recurrence: recurrence || undefined,
+        goal_id: goalId === '' ? undefined : goalId,
       }
 
   return {
@@ -57,6 +61,8 @@ export function useTaskForm(task?: Task, initialDate?: string): TaskForm {
     setEndTime,
     recurrence,
     setRecurrence,
+    goalId,
+    setGoalId,
     values,
   }
 }

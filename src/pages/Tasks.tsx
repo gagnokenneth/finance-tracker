@@ -127,9 +127,9 @@ export function Tasks() {
         </div>
       )}
 
-      {adding && <AddTaskModal open onClose={() => setAdding(false)} />}
+      {adding && <AddTaskModal open data={data} onClose={() => setAdding(false)} />}
       {editing && (
-        <EditTaskModal open task={editing} onClose={() => setEditing(null)} />
+        <EditTaskModal open task={editing} data={data} onClose={() => setEditing(null)} />
       )}
 
       <ConfirmDialog

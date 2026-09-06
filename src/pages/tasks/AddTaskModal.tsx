@@ -1,23 +1,31 @@
 import type { FormEvent } from 'react'
 import { useFinanceMutations } from '../../hooks/useFinanceMutations.ts'
 import { useTaskForm } from '../../hooks/useTaskForm.ts'
+import { referenceable } from '../../lib/tempId.ts'
 import { Modal } from '../../components/Modal.tsx'
 import { Field, TextInput, SelectInput, Button, SecondaryButton } from '../../components/ui.tsx'
 import { RECURRENCES, RECURRENCE_LABEL } from '../../lib/tasks.ts'
-import type { TaskRecurrence } from '../../types.ts'
+import type { FinanceData, TaskRecurrence } from '../../types.ts'
 
-/** `initialDate` lets the Calendar page open this pre-filled to the clicked day. */
+/**
+ * `initialDate` lets the Calendar page open this pre-filled to the clicked
+ * day. `data` is passed down from the parent page rather than fetched here
+ * — no modal in this app calls useFinanceData() itself.
+ */
 export function AddTaskModal({
   open,
+  data,
   initialDate,
   onClose,
 }: {
   open: boolean
+  data: FinanceData
   initialDate?: string
   onClose: () => void
 }) {
   const { addTask } = useFinanceMutations()
   const form = useTaskForm(undefined, initialDate)
+  const goals = referenceable(data.goals)
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
@@ -65,6 +73,19 @@ export function AddTaskModal({
             {RECURRENCES.map((r) => (
               <option key={r} value={r}>
                 {RECURRENCE_LABEL[r]}
+              </option>
+            ))}
+          </SelectInput>
+        </Field>
+        <Field label="Part of a goal (optional)">
+          <SelectInput
+            value={form.goalId}
+            onChange={(e) => form.setGoalId(e.target.value ? Number(e.target.value) : '')}
+          >
+            <option value="">Nothing</option>
+            {goals.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.title}
               </option>
             ))}
           </SelectInput>
