@@ -143,6 +143,7 @@ function taskEvents(data: FinanceData, start: string, end: string): CalendarEven
 function goalEvents(data: FinanceData, start: string, end: string): CalendarEvent[] {
   return data.goals
     .filter((g): g is Goal & { target_date: string } => g.target_date !== undefined)
+    .filter((g) => g.status !== 'abandoned')
     .filter((g) => inRange(g.target_date, start, end))
     .map((g) => ({
       id: g.id,
@@ -151,7 +152,7 @@ function goalEvents(data: FinanceData, start: string, end: string): CalendarEven
       date: g.target_date,
       to: '/goals',
       editable: false,
-      status: g.status === 'achieved' ? ('paid' as const) : undefined,
+      status: g.status === 'achieved' ? ('paid' as const) : g.status === 'not_achieved' ? ('late' as const) : undefined,
     }))
 }
 

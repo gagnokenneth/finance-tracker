@@ -19,14 +19,19 @@ export function EditGoalModal({
   onClose: () => void
 }) {
   const { updateGoal } = useFinanceMutations()
+  const bills = referenceable(data.bills)
+  const debts = referenceable(data.debts)
+
   const [title, setTitle] = useState(goal.title)
   const [targetDate, setTargetDate] = useState(goal.target_date ?? '')
   const [linkedType, setLinkedType] = useState<GoalLinkType | ''>(goal.linked_type ?? '')
-  const [linkedId, setLinkedId] = useState<number | ''>(goal.linked_id ?? '')
+  const [linkedId, setLinkedId] = useState<number | ''>(() => {
+    if (goal.linked_id === undefined) return ''
+    const pool = goal.linked_type === 'bill' ? bills : goal.linked_type === 'debt' ? debts : []
+    return pool.some((r) => r.id === goal.linked_id) ? goal.linked_id : ''
+  })
   const [notes, setNotes] = useState(goal.notes ?? '')
 
-  const bills = referenceable(data.bills)
-  const debts = referenceable(data.debts)
   const linkOptions = linkedType === 'bill' ? bills : linkedType === 'debt' ? debts : []
   const needsTarget = linkedType !== '' && linkedType !== 'savings'
 

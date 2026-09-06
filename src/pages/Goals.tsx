@@ -1,7 +1,14 @@
 import { useState } from 'react'
 import { useFinanceData } from '../hooks/useFinanceData.ts'
 import { useFinanceMutations } from '../hooks/useFinanceMutations.ts'
-import { topLevelGoals, subgoalsOf, GOAL_LINK_LABEL, GOAL_STATUS_LABEL, GOAL_STATUSES } from '../lib/goals.ts'
+import {
+  topLevelGoals,
+  subgoalsOf,
+  resolveGoalLinkName,
+  GOAL_LINK_LABEL,
+  GOAL_STATUS_LABEL,
+  GOAL_STATUSES,
+} from '../lib/goals.ts'
 import { isTemp } from '../lib/tempId.ts'
 import { Card } from '../components/Card.tsx'
 import { RowButton, SelectInput, Button } from '../components/ui.tsx'
@@ -12,9 +19,9 @@ import { LoadError } from '../components/LoadError.tsx'
 import { LoadingScreen } from '../components/LoadingScreen.tsx'
 import { AddGoalModal } from './goals/AddGoalModal.tsx'
 import { EditGoalModal } from './goals/EditGoalModal.tsx'
-import type { Goal } from '../types.ts'
+import type { FinanceData, Goal } from '../types.ts'
 
-function GoalRow({ goal, indented }: { goal: Goal; indented: boolean }) {
+function GoalRow({ goal, indented, data }: { goal: Goal; indented: boolean; data: FinanceData }) {
   const { updateGoal } = useFinanceMutations()
   const pending = isTemp(goal.id)
   return (
@@ -26,7 +33,14 @@ function GoalRow({ goal, indented }: { goal: Goal; indented: boolean }) {
         </div>
         <p className="mt-0.5 text-xs text-ink-faint">
           {goal.target_date ?? 'Someday'}
-          {goal.linked_type && ` · Linked to ${GOAL_LINK_LABEL[goal.linked_type]}`}
+          {goal.linked_type &&
+            ` · Linked to ${GOAL_LINK_LABEL[goal.linked_type]}${
+              goal.linked_type === 'savings'
+                ? ''
+                : resolveGoalLinkName(goal, data)
+                  ? `: ${resolveGoalLinkName(goal, data)}`
+                  : ' (deleted)'
+            }`}
         </p>
       </div>
       <SelectInput
@@ -79,12 +93,12 @@ export function Goals() {
             return (
               <Card key={goal.id}>
                 <div className="flex items-start justify-between gap-4">
-                  <GoalRow goal={goal} indented={false} />
+                  <GoalRow goal={goal} indented={false} data={data} />
                 </div>
                 {subgoals.length > 0 && (
                   <div className="mt-1 divide-y divide-edge border-t border-edge">
                     {subgoals.map((sub) => (
-                      <GoalRow key={sub.id} goal={sub} indented />
+                      <GoalRow key={sub.id} goal={sub} indented data={data} />
                     ))}
                   </div>
                 )}

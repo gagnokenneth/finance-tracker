@@ -21,7 +21,7 @@ export function EditTaskModal({
 }) {
   const { updateTask } = useFinanceMutations()
   const form = useTaskForm(task)
-  const goals = referenceable(data.goals)
+  const goals = referenceable(data.goals.filter((g) => g.status === 'active' || g.id === task.goal_id))
 
   const submit = (e: FormEvent) => {
     e.preventDefault()

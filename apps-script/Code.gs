@@ -1958,13 +1958,14 @@ function detachTasksFromGoals(uid, goalIds) {
 }
 
 function deleteGoal(p, uid) {
-  var rowIndex = ownedRowIndex('goals', p.id, uid);
+  ownedRowIndex('goals', p.id, uid); // ownership check
   var subgoalIds = ownedIdsWhere('goals', uid, 'parent_goal_id', p.id);
   var allIds = subgoalIds.concat([num(p.id)]);
   // Detach before the cascade deletes the rows themselves, so a failure here
   // cannot leave a task pointing at a goal id that no longer exists.
   detachTasksFromGoals(uid, allIds);
   deleteRowsWhere('goals', 'parent_goal_id', p.id);
+  var rowIndex = ownedRowIndex('goals', p.id, uid);
   sheet('goals').deleteRow(rowIndex);
   return null;
 }
