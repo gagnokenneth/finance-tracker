@@ -25,6 +25,8 @@ import type {
   NotePatch,
   NewNoteItem,
   NoteItemPatch,
+  NewGoal,
+  GoalPatch,
 } from '../FinanceApi.ts'
 import type {
   FinanceData,
@@ -42,6 +44,7 @@ import type {
   Note,
   NoteItem,
   NoteLinkType,
+  Goal,
 } from '../../types.ts'
 import { createSeed } from './seed.ts'
 import { backfillArrays } from '../../lib/financeShape.ts'
@@ -1090,6 +1093,91 @@ export class MockApi implements FinanceApi {
     const data = this.load()
     this.ownedNoteItem(data, id)
     data.note_items = data.note_items.filter((i) => i.id !== id)
+    this.save(data)
+    return this.delay(data)
+  }
+
+  private ownedGoal(data: FinanceData, id: number): Goal {
+    const goal = data.goals.find((g) => g.id === id)
+    if (!goal) throw new Error(`Goal ${id} not found`)
+    return goal
+  }
+
+  /** Mirrors assertOwnedGoalLink in Code.gs — NOT the same helper Notes uses. */
+  private assertOwnedGoalLink(
+    data: FinanceData,
+    linkedType: Goal['linked_type'],
+    linkedId: number | undefined,
+  ): void {
+    if (!linkedType) {
+      if (linkedId !== undefined) throw new Error('A link needs a type.')
+      return
+    }
+    if (linkedType === 'savings') {
+      if (linkedId !== undefined) throw new Error('A savings link has no target.')
+      return
+    }
+    if (linkedId === undefined) throw new Error('A link needs a target.')
+    const rows = linkedType === 'bill' ? data.bills : data.debts
+    if (!rows.some((r) => r.id === linkedId)) throw new Error(`${linkedType} ${linkedId} not found`)
+  }
+
+  /** Mirrors assertGoalDepth in Code.gs. */
+  private assertGoalDepth(data: FinanceData, parentGoalId: number | undefined): void {
+    if (parentGoalId === undefined) return
+    const parent = this.ownedGoal(data, parentGoalId)
+    if (parent.parent_goal_id !== undefined) {
+      throw new Error('A subgoal cannot itself have subgoals.')
+    }
+  }
+
+  async addGoal(input: NewGoal): Promise<FinanceData> {
+    const data = this.load()
+    if (!input.title.trim()) throw new Error('A goal needs a title')
+    this.assertGoalDepth(data, input.parent_goal_id)
+    this.assertOwnedGoalLink(data, input.linked_type, input.linked_id)
+    const goal: Goal = { id: nextId(data.goals), ...input, status: 'active' }
+    data.goals.push(goal)
+    this.save(data)
+    return this.delay(data)
+  }
+
+  async updateGoal(id: number, patch: GoalPatch): Promise<FinanceData> {
+    const data = this.load()
+    const goal = this.ownedGoal(data, id)
+    if (Object.prototype.hasOwnProperty.call(patch, 'title') && !(patch.title ?? '').trim()) {
+      throw new Error('A goal needs a title')
+    }
+    if (
+      Object.prototype.hasOwnProperty.call(patch, 'linked_type') ||
+      Object.prototype.hasOwnProperty.call(patch, 'linked_id')
+    ) {
+      const linkedType = Object.prototype.hasOwnProperty.call(patch, 'linked_type')
+        ? (patch.linked_type ?? undefined)
+        : goal.linked_type
+      const linkedId = Object.prototype.hasOwnProperty.call(patch, 'linked_id')
+        ? (patch.linked_id ?? undefined)
+        : goal.linked_id
+      this.assertOwnedGoalLink(data, linkedType, linkedId)
+    }
+    Object.assign(goal, patch)
+    // null is the wire's "clear this"; the stored model uses undefined.
+    for (const key of ['target_date', 'linked_type', 'linked_id', 'notes'] as const) {
+      if (patch[key] === null) goal[key] = undefined
+    }
+    this.save(data)
+    return this.delay(data)
+  }
+
+  async deleteGoal(id: number): Promise<FinanceData> {
+    const data = this.load()
+    this.ownedGoal(data, id)
+    const subgoalIds = data.goals.filter((g) => g.parent_goal_id === id).map((g) => g.id)
+    const allIds = new Set([...subgoalIds, id])
+    data.tasks = data.tasks.map((t) =>
+      t.goal_id !== undefined && allIds.has(t.goal_id) ? { ...t, goal_id: undefined } : t,
+    )
+    data.goals = data.goals.filter((g) => g.id !== id && g.parent_goal_id !== id)
     this.save(data)
     return this.delay(data)
   }

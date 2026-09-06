@@ -29,7 +29,7 @@ const PERSIST_THROTTLE = 1000
  * buster is thrown away instead of rehydrated, which is what stops an old shape
  * from reaching code that expects the new one.
  */
-const CACHE_VERSION = 'v9'
+const CACHE_VERSION = 'v10'
 
 function cacheKey(userId: number): string {
   return `${CACHE_PREFIX}${userId}`

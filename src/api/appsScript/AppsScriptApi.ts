@@ -25,6 +25,8 @@ import type {
   NotePatch,
   NewNoteItem,
   NoteItemPatch,
+  NewGoal,
+  GoalPatch,
 } from '../FinanceApi.ts'
 import type { FinanceData, Currency } from '../../types.ts'
 import { readToken, clearToken } from '../../auth/session.ts'
@@ -259,5 +261,15 @@ export class AppsScriptApi implements FinanceApi {
   }
   deleteNoteItem(id: number): Promise<FinanceData> {
     return this.call<FinanceData>('deleteNoteItem', { id })
+  }
+
+  addGoal(input: NewGoal): Promise<FinanceData> {
+    return this.call<FinanceData>('addGoal', { input })
+  }
+  updateGoal(id: number, patch: GoalPatch): Promise<FinanceData> {
+    return this.call<FinanceData>('updateGoal', { id, patch })
+  }
+  deleteGoal(id: number): Promise<FinanceData> {
+    return this.call<FinanceData>('deleteGoal', { id })
   }
 }

@@ -11,6 +11,7 @@ import type {
   Task,
   Note,
   NoteItem,
+  Goal,
 } from '../types.ts'
 
 /** The keys of T that may be absent — the ones a Patch has to rule on. */
@@ -115,6 +116,17 @@ export type NewNoteItem = Omit<NoteItem, 'id' | 'note_id' | 'done' | 'sort_order
 /** Neither field is ever cleared to null — text is always required,
  *  done is a plain boolean like Task's own completed field. */
 export type NoteItemPatch = Patch<Omit<NoteItem, 'id' | 'note_id' | 'sort_order'>>
+
+export type NewGoal = Omit<Goal, 'id' | 'status'>
+/**
+ * parent_goal_id is excluded entirely — never patchable, see Goal's own
+ * doc comment. status is a plain optional (not Clearable): it always holds
+ * one of four values, never an "unset" third state.
+ */
+export type GoalPatch = Patch<
+  Omit<Goal, 'id' | 'parent_goal_id'>,
+  'target_date' | 'linked_type' | 'linked_id' | 'notes'
+>
 
 export interface AuthResult {
   token: string
@@ -230,4 +242,12 @@ export interface FinanceApi {
   addNoteItem(noteId: number, input: NewNoteItem): Promise<FinanceData>
   updateNoteItem(id: number, patch: NoteItemPatch): Promise<FinanceData>
   deleteNoteItem(id: number): Promise<FinanceData>
+
+  /* Goal writes return the whole updated dataset, for the same reasons above. */
+
+  addGoal(input: NewGoal): Promise<FinanceData>
+  /** parent_goal_id can never be patched — see GoalPatch. */
+  updateGoal(id: number, patch: GoalPatch): Promise<FinanceData>
+  /** Cascades subgoals; detaches (does not delete) any task pointing at this goal or its subgoals. */
+  deleteGoal(id: number): Promise<FinanceData>
 }

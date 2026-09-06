@@ -24,6 +24,7 @@ const REQUIRED_ARRAYS: readonly (keyof FinanceData)[] = [
   'tasks',
   'notes',
   'note_items',
+  'goals',
 ]
 
 /**

@@ -20,6 +20,7 @@ export function createSeed(): FinanceData {
     tasks: [],
     notes: [],
     note_items: [],
+    goals: [],
     settings: {
       currency: 'PHP',
     },

@@ -167,6 +167,34 @@ export interface NoteItem {
   sort_order: number
 }
 
+export type GoalStatus = 'active' | 'achieved' | 'not_achieved' | 'abandoned'
+/** Deliberately not the same union Notes uses — a goal's financial subject
+ *  is a thing to pay off or save toward, never a Task. */
+export type GoalLinkType = 'bill' | 'debt' | 'savings'
+
+/**
+ * An outcome tracked over time, with at most one level of subgoals.
+ * Progress is a manual check-in (status), never computed from linked_id's
+ * own live balance — see the design spec's financial-goals decision.
+ */
+export interface Goal {
+  id: number
+  title: string
+  /** Unset is a valid, open-ended "someday" goal. */
+  target_date?: string
+  /**
+   * Fixed depth of 2: a row with this set may never itself be pointed at by
+   * another row's parent_goal_id. Set only at creation — never patchable,
+   * see GoalPatch.
+   */
+  parent_goal_id?: number
+  linked_type?: GoalLinkType
+  /** Unused (blank) when linked_type is 'savings' — one balance per user. */
+  linked_id?: number
+  status: GoalStatus
+  notes?: string
+}
+
 export interface Settings {
   /** Per-user: comes from the caller's own row, not a global setting. */
   currency: Currency
@@ -185,5 +213,6 @@ export interface FinanceData {
   tasks: Task[]
   notes: Note[]
   note_items: NoteItem[]
+  goals: Goal[]
   settings: Settings
 }
