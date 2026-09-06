@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useFinanceMutations } from '../../hooks/useFinanceMutations.ts'
-import { referenceable } from '../../lib/tempId.ts'
+import { referenceable, safeLinkedId } from '../../lib/tempId.ts'
 import { GOAL_LINK_LABEL } from '../../lib/goals.ts'
 import { Modal } from '../../components/Modal.tsx'
 import { Field, TextInput, Button, SecondaryButton } from '../../components/ui.tsx'
@@ -26,11 +26,9 @@ export function EditGoalModal({
   const [title, setTitle] = useState(goal.title)
   const [targetDate, setTargetDate] = useState(goal.target_date ?? '')
   const [linkedType, setLinkedType] = useState<GoalLinkType | ''>(goal.linked_type ?? '')
-  const [linkedId, setLinkedId] = useState<number | ''>(() => {
-    if (goal.linked_id === undefined) return ''
-    const pool = goal.linked_type === 'bill' ? bills : goal.linked_type === 'debt' ? debts : []
-    return pool.some((r) => r.id === goal.linked_id) ? goal.linked_id : ''
-  })
+  const [linkedId, setLinkedId] = useState<number | ''>(() =>
+    safeLinkedId(goal.linked_id, goal.linked_type === 'bill' ? bills : goal.linked_type === 'debt' ? debts : []),
+  )
   const [notes, setNotes] = useState(goal.notes ?? '')
 
   const linkOptions = linkedType === 'bill' ? bills : linkedType === 'debt' ? debts : []

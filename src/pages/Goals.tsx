@@ -21,40 +21,66 @@ import { AddGoalModal } from './goals/AddGoalModal.tsx'
 import { EditGoalModal } from './goals/EditGoalModal.tsx'
 import type { FinanceData, Goal } from '../types.ts'
 
-function GoalRow({ goal, indented, data }: { goal: Goal; indented: boolean; data: FinanceData }) {
+function GoalRow({
+  goal,
+  indented,
+  data,
+  onEdit,
+  onDelete,
+}: {
+  goal: Goal
+  indented: boolean
+  data: FinanceData
+  onEdit: () => void
+  onDelete: () => void
+}) {
   const { updateGoal } = useFinanceMutations()
   const pending = isTemp(goal.id)
   return (
-    <div className={`flex items-center justify-between gap-3 py-2 ${indented ? 'pl-6' : ''}`}>
-      <div className="min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="truncate font-medium text-ink">{goal.title}</span>
-          {pending && <PendingBadge />}
+    <div className={`py-2 ${indented ? 'pl-6' : ''}`}>
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="truncate font-medium text-ink">{goal.title}</span>
+            {pending && <PendingBadge />}
+          </div>
+          <p className="mt-0.5 text-xs text-ink-faint">
+            {goal.target_date ?? 'Someday'}
+            {goal.linked_type &&
+              ` · Linked to ${GOAL_LINK_LABEL[goal.linked_type]}${
+                goal.linked_type === 'savings'
+                  ? ''
+                  : resolveGoalLinkName(goal, data)
+                    ? `: ${resolveGoalLinkName(goal, data)}`
+                    : ' (deleted)'
+              }`}
+          </p>
         </div>
-        <p className="mt-0.5 text-xs text-ink-faint">
-          {goal.target_date ?? 'Someday'}
-          {goal.linked_type &&
-            ` · Linked to ${GOAL_LINK_LABEL[goal.linked_type]}${
-              goal.linked_type === 'savings'
-                ? ''
-                : resolveGoalLinkName(goal, data)
-                  ? `: ${resolveGoalLinkName(goal, data)}`
-                  : ' (deleted)'
-            }`}
-        </p>
+        <div className="w-36 shrink-0">
+          <SelectInput
+            value={goal.status}
+            disabled={pending}
+            onChange={(e) => updateGoal.mutate({ id: goal.id, patch: { status: e.target.value as Goal['status'] } })}
+          >
+            {GOAL_STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {GOAL_STATUS_LABEL[s]}
+              </option>
+            ))}
+          </SelectInput>
+        </div>
       </div>
-      <div className="w-36 shrink-0">
-        <SelectInput
-          value={goal.status}
-          disabled={pending}
-          onChange={(e) => updateGoal.mutate({ id: goal.id, patch: { status: e.target.value as Goal['status'] } })}
-        >
-          {GOAL_STATUSES.map((s) => (
-            <option key={s} value={s}>
-              {GOAL_STATUS_LABEL[s]}
-            </option>
-          ))}
-        </SelectInput>
+      <div className="mt-2 flex items-center gap-2">
+        {pending ? (
+          <PendingBadge />
+        ) : (
+          <>
+            <RowButton onClick={onEdit}>Edit</RowButton>
+            <RowButton tone="danger" onClick={onDelete}>
+              Delete
+            </RowButton>
+          </>
+        )}
       </div>
     </div>
   )
@@ -93,29 +119,32 @@ export function Goals() {
             const pending = isTemp(goal.id)
             return (
               <Card key={goal.id}>
-                <div className="flex items-start justify-between gap-4">
-                  <GoalRow goal={goal} indented={false} data={data} />
-                </div>
+                <GoalRow
+                  goal={goal}
+                  indented={false}
+                  data={data}
+                  onEdit={() => setEditing(goal)}
+                  onDelete={() => setDeleting(goal)}
+                />
                 {subgoals.length > 0 && (
-                  <div className="mt-1 divide-y divide-edge border-t border-edge">
+                  <div className="divide-y divide-edge border-t border-edge">
                     {subgoals.map((sub) => (
-                      <GoalRow key={sub.id} goal={sub} indented data={data} />
+                      <GoalRow
+                        key={sub.id}
+                        goal={sub}
+                        indented
+                        data={data}
+                        onEdit={() => setEditing(sub)}
+                        onDelete={() => setDeleting(sub)}
+                      />
                     ))}
                   </div>
                 )}
-                <div className="mt-3 flex items-center gap-2">
-                  {pending ? (
-                    <PendingBadge />
-                  ) : (
-                    <>
-                      <RowButton onClick={() => setAddingSubgoalTo(goal.id)}>Add subgoal</RowButton>
-                      <RowButton onClick={() => setEditing(goal)}>Edit</RowButton>
-                      <RowButton tone="danger" onClick={() => setDeleting(goal)}>
-                        Delete
-                      </RowButton>
-                    </>
-                  )}
-                </div>
+                {!pending && (
+                  <div className="mt-2 border-t border-edge pt-2">
+                    <RowButton onClick={() => setAddingSubgoalTo(goal.id)}>Add subgoal</RowButton>
+                  </div>
+                )}
               </Card>
             )
           })}
@@ -138,7 +167,9 @@ export function Goals() {
         title="Delete goal"
         message={
           deleting
-            ? `Delete "${deleting.title}"? Its subgoals go with it, and any task attached to it is unlinked, not deleted. This cannot be undone.`
+            ? deleting.parent_goal_id === undefined
+              ? `Delete "${deleting.title}"? Its subgoals go with it, and any task attached to it or them is unlinked, not deleted. This cannot be undone.`
+              : `Delete "${deleting.title}"? Any task attached to it is unlinked, not deleted. This cannot be undone.`
             : ''
         }
         confirmLabel="Delete goal"

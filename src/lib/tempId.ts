@@ -41,3 +41,22 @@ export function anyTempIdsMinted(): boolean {
 export function referenceable<T extends { id: number }>(rows: T[]): T[] {
   return rows.filter((row) => !isTemp(row.id))
 }
+
+/**
+ * A link-picker's initial value, downgraded to unset if the row it names is
+ * gone from `existsIn`. Seeding the raw id back in unchanged is the bug this
+ * guards: a dangling id gets silently resent on the next unrelated save,
+ * which the picker's own owning-side validation then rejects — blocking
+ * even a plain title edit with no clue why.
+ *
+ * `existsIn` is deliberately the caller's choice, not `referenceable()`'s
+ * own pool: an edit form's *fresh-pick* list may exclude rows a currently-
+ * linked one should still count as existing (e.g. Notes' picker excludes a
+ * completed task from new selections, but a note already linked to one
+ * shouldn't have that real link silently dropped on save) — only the
+ * caller knows which set answers "does this still exist" for its own link.
+ */
+export function safeLinkedId(linkedId: number | undefined, existsIn: { id: number }[]): number | '' {
+  if (linkedId === undefined) return ''
+  return existsIn.some((r) => r.id === linkedId) ? linkedId : ''
+}

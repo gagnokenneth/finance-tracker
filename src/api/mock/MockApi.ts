@@ -549,6 +549,23 @@ export class MockApi implements FinanceApi {
     return this.delay(data)
   }
 
+  /**
+   * Blanks linked_type/linked_id on every note pointing at (linkedType, id) —
+   * called before a bill/debt/task row is deleted, so a note never keeps a
+   * link to a row that no longer exists. Mirrors Code.gs's
+   * detachNotesLinkedTo; deleting the row it points at is the only way a
+   * note's link can go stale, since assertOwnedLink already refuses to
+   * create or edit a link with a bad id in the first place.
+   */
+  private detachNotesLinkedTo(data: FinanceData, linkedType: NoteLinkType, id: number): void {
+    for (const note of data.notes) {
+      if (note.linked_type === linkedType && note.linked_id === id) {
+        note.linked_type = undefined
+        note.linked_id = undefined
+      }
+    }
+  }
+
   async deleteBill(id: number): Promise<FinanceData> {
     const data = this.load()
     // Unsettle every payable's ledger entry BEFORE the cascade deletes the
@@ -561,6 +578,7 @@ export class MockApi implements FinanceApi {
     )
     data.bills = data.bills.filter((b) => b.id !== id)
     data.bill_payables = data.bill_payables.filter((r) => r.bill_id !== id)
+    this.detachNotesLinkedTo(data, 'bill', id)
     this.save(data)
     return this.delay(data)
   }
@@ -693,6 +711,7 @@ export class MockApi implements FinanceApi {
     data.debts = data.debts.filter((d) => d.id !== id)
     data.debt_schedule = data.debt_schedule.filter((r) => r.debt_id !== id)
     data.debt_statements = data.debt_statements.filter((r) => r.debt_id !== id)
+    this.detachNotesLinkedTo(data, 'debt', id)
     this.save(data)
     return this.delay(data)
   }
@@ -931,6 +950,8 @@ export class MockApi implements FinanceApi {
     const data = this.load()
     if (!input.title.trim()) throw new Error('A task needs a title')
     if (!input.date) throw new Error('A task needs a date')
+    if (input.goal_id !== undefined) this.ownedGoal(data, input.goal_id)
+    if (input.note_id !== undefined) this.ownedNote(data, input.note_id)
     const task: Task = { id: nextId(data.tasks), ...input, completed: false }
     data.tasks.push(task)
     this.save(data)
@@ -946,10 +967,24 @@ export class MockApi implements FinanceApi {
     if (Object.prototype.hasOwnProperty.call(patch, 'date') && !patch.date) {
       throw new Error('A task needs a date')
     }
-    Object.assign(task, patch)
-    // completed is only ever cleared here — see the FinanceApi.ts doc comment
-    // on TaskPatch and Code.gs's updateTask for why.
-    if (patch.completed === false) task.completed_date = undefined
+    if (Object.prototype.hasOwnProperty.call(patch, 'goal_id') && patch.goal_id != null) {
+      this.ownedGoal(data, patch.goal_id)
+    }
+    if (Object.prototype.hasOwnProperty.call(patch, 'note_id') && patch.note_id != null) {
+      this.ownedNote(data, patch.note_id)
+    }
+    // completed is excluded from the blind assign below and handled on its
+    // own: it is only ever cleared here, never set — see the FinanceApi.ts
+    // doc comment on TaskPatch and Code.gs's updateTask for why. Object.assign
+    // would otherwise apply it unconditionally like every other field, which
+    // let `{completed: true}` through here even though the type no longer
+    // allows constructing that patch.
+    const { completed, ...rest } = patch
+    Object.assign(task, rest)
+    if (completed === false) {
+      task.completed = false
+      task.completed_date = undefined
+    }
     // null is the wire's "clear this"; the stored model uses undefined.
     for (const key of ['notes', 'start_time', 'end_time', 'recurrence', 'goal_id', 'note_id'] as const) {
       if (patch[key] === null) task[key] = undefined
@@ -962,6 +997,7 @@ export class MockApi implements FinanceApi {
     const data = this.load()
     this.ownedTask(data, id)
     data.tasks = data.tasks.filter((t) => t.id !== id)
+    this.detachNotesLinkedTo(data, 'task', id)
     this.save(data)
     return this.delay(data)
   }

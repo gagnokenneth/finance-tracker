@@ -563,7 +563,11 @@ export function completeTaskIn(
   vars: { id: number; input: CompleteTaskInput },
 ): FinanceData {
   const task = data.tasks.find((t) => t.id === vars.id)
-  if (!task) return data
+  // Already completed — both backends refuse this as "already done", so
+  // predicting it here too stops a double-click from minting two "next
+  // occurrence" rows before the second server call's rejection rolls one
+  // back (a visible flash of a duplicate that never actually gets created).
+  if (!task || task.completed) return data
   const completed = data.tasks.map((t) =>
     t.id === vars.id ? { ...t, completed: true, completed_date: vars.input.completed_date } : t,
   )

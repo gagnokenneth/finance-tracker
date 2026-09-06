@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useFinanceMutations } from '../../hooks/useFinanceMutations.ts'
-import { referenceable } from '../../lib/tempId.ts'
+import { referenceable, safeLinkedId } from '../../lib/tempId.ts'
 import { LINK_LABEL } from '../../lib/notes.ts'
 import { Modal } from '../../components/Modal.tsx'
 import { Field, TextInput, Button, SecondaryButton } from '../../components/ui.tsx'
@@ -24,13 +24,24 @@ export function EditNoteModal({
   const [title, setTitle] = useState(note.title)
   const [body, setBody] = useState(note.body ?? '')
   const [linkedType, setLinkedType] = useState<NoteLinkType | ''>(note.linked_type ?? '')
-  const [linkedId, setLinkedId] = useState<number | ''>(note.linked_id ?? '')
 
   const bills = referenceable(data.bills)
   const debts = referenceable(data.debts)
   const tasks = referenceable(data.tasks.filter((t) => !t.completed))
   const linkOptions =
     linkedType === 'bill' ? bills : linkedType === 'debt' ? debts : linkedType === 'task' ? tasks : []
+
+  // Checked against the full data.tasks (not the `tasks` pool above, which
+  // filters out completed ones for a *new* selection) — a note linked to a
+  // task that's since been completed, not deleted, still has a real link to
+  // keep, even though a completed task can no longer be picked fresh. See
+  // safeLinkedId's own doc comment for why this must be the caller's choice.
+  const [linkedId, setLinkedId] = useState<number | ''>(() =>
+    safeLinkedId(
+      note.linked_id,
+      note.linked_type === 'bill' ? data.bills : note.linked_type === 'debt' ? data.debts : data.tasks,
+    ),
+  )
 
   const submit = (e: FormEvent) => {
     e.preventDefault()

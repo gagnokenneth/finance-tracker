@@ -34,7 +34,12 @@ export function Tasks() {
   if (isError || !data) return <LoadError error={error} />
 
   const open = tasksSorted(data.tasks.filter((t) => !t.completed))
-  const done = tasksSorted(data.tasks.filter((t) => t.completed)).reverse()
+  // Most-recently-completed first — tasksSorted's date is the task's
+  // originally *scheduled* day, which for a completed task no longer means
+  // anything; completed_date is what actually orders "done".
+  const done = data.tasks
+    .filter((t) => t.completed)
+    .sort((a, b) => (b.completed_date ?? '').localeCompare(a.completed_date ?? ''))
 
   const complete = (task: Task) => {
     const today = isoDate()

@@ -777,6 +777,7 @@ function deleteDebt(p, uid) {
   unsettleManyFromSavings(uid, 'debt_statement', ownedIdsWhere('debt_statements', uid, 'debt_id', p.id));
   deleteRowsWhere('debt_schedule', 'debt_id', p.id);
   deleteRowsWhere('debt_statements', 'debt_id', p.id);
+  detachNotesLinkedTo(uid, 'debt', p.id);
   sheet('debts').deleteRow(rowIndex);
   return null;
 }
@@ -1025,6 +1026,7 @@ function deleteBill(p, uid) {
   // with the ledger rows still present.
   unsettleManyFromSavings(uid, 'bill_payable', ownedIdsWhere('bill_payables', uid, 'bill_id', p.id));
   deleteRowsWhere('bill_payables', 'bill_id', p.id);
+  detachNotesLinkedTo(uid, 'bill', p.id);
   sheet('bills').deleteRow(rowIndex);
   return null;
 }
@@ -1621,6 +1623,8 @@ function addTask(p, uid) {
   var input = p.input || {};
   if (blank(input.title)) throw new Error('A task needs a title');
   if (blank(input.date)) throw new Error('A task needs a date');
+  if (!blank(input.goal_id)) assertOwned('goals', input.goal_id, uid);
+  if (!blank(input.note_id)) assertOwned('notes', input.note_id, uid);
   appendRow('tasks', {
     id: nextId('tasks'),
     user_id: uid,
@@ -1654,8 +1658,14 @@ function updateTask(p, uid) {
   if (Object.prototype.hasOwnProperty.call(given, 'start_time')) patch.start_time = given.start_time;
   if (Object.prototype.hasOwnProperty.call(given, 'end_time')) patch.end_time = given.end_time;
   if (Object.prototype.hasOwnProperty.call(given, 'recurrence')) patch.recurrence = given.recurrence;
-  if (Object.prototype.hasOwnProperty.call(given, 'goal_id')) patch.goal_id = given.goal_id;
-  if (Object.prototype.hasOwnProperty.call(given, 'note_id')) patch.note_id = given.note_id;
+  if (Object.prototype.hasOwnProperty.call(given, 'goal_id')) {
+    if (!blank(given.goal_id)) assertOwned('goals', given.goal_id, uid);
+    patch.goal_id = given.goal_id;
+  }
+  if (Object.prototype.hasOwnProperty.call(given, 'note_id')) {
+    if (!blank(given.note_id)) assertOwned('notes', given.note_id, uid);
+    patch.note_id = given.note_id;
+  }
   /*
    * completed is only ever CLEARED here, never set — completing a task goes
    * through completeTask, which also mints the next occurrence when the task
@@ -1672,6 +1682,7 @@ function updateTask(p, uid) {
 
 function deleteTask(p, uid) {
   var rowIndex = ownedRowIndex('tasks', p.id, uid);
+  detachNotesLinkedTo(uid, 'task', p.id);
   sheet('tasks').deleteRow(rowIndex);
   return null;
 }
@@ -1740,6 +1751,31 @@ function assertOwnedLinkedPair(kindLabel, sheetName, noTarget, linkedType, linke
 
 function assertOwnedLink(linkedType, linkedId, uid) {
   assertOwnedLinkedPair('note', NOTE_LINK_SHEETS[linkedType], false, linkedType, linkedId, uid);
+}
+
+/**
+ * Blanks linked_type/linked_id on every note pointing at (linkedType, id) —
+ * called before a bill/debt/task row is deleted, so a note never keeps a
+ * link to a row that no longer exists. Deleting the row it points at is the
+ * only way a note's link can go stale, since assertOwnedLink already refuses
+ * to create or edit a link with a bad id in the first place. Single read of
+ * the notes sheet, mirroring detachTasksFromGoals's own batching.
+ */
+function detachNotesLinkedTo(uid, linkedType, id) {
+  var sh = sheet('notes');
+  var last = sh.getLastRow();
+  if (last < 2) return;
+  var headers = SHEETS.notes;
+  var values = sh.getRange(2, 1, last - 1, headers.length).getValues();
+  var userCol = headers.indexOf('user_id');
+  var typeCol = headers.indexOf('linked_type');
+  var idCol = headers.indexOf('linked_id');
+  for (var r = 0; r < values.length; r++) {
+    if (num(values[r][userCol]) !== num(uid)) continue;
+    if (values[r][typeCol] !== linkedType) continue;
+    if (num(values[r][idCol]) !== num(id)) continue;
+    sh.getRange(r + 2, typeCol + 1, 1, 2).setValues([['', '']]);
+  }
 }
 
 function addNote(p, uid) {

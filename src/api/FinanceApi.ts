@@ -91,16 +91,23 @@ export type SavingsEntryPatch = Patch<NewSavingsEntry, 'notes'>
 
 export type NewTask = Omit<Task, 'id' | 'completed' | 'completed_date'>
 /**
- * completed is a plain optional boolean, not run through Clearable: it only
- * ever takes true or false, never a third "unset" state, so it needs no
- * null-to-clear convention. completed_date is excluded entirely — it is
- * server-managed, set by completeTask and cleared as a side effect of
- * patching completed to false, never client-supplied directly.
+ * completed can only ever be patched to false here — completing a task goes
+ * through completeTask instead, which also mints the next occurrence when
+ * the task recurs. Both backends already enforced this at runtime (Code.gs's
+ * updateTask silently drops a patch.completed of true; MockApi's did not,
+ * which let `{completed: true}` through as a real, recurrence-skipping
+ * completion the two backends disagreed about). Typing it as the `false`
+ * literal turns that gap into a compile error instead of a silent backend
+ * divergence. completed_date is excluded entirely — it is server-managed,
+ * set by completeTask and cleared as a side effect of patching completed to
+ * false, never client-supplied directly.
  */
 export type TaskPatch = Patch<
-  Omit<Task, 'id' | 'completed_date'>,
+  Omit<Task, 'id' | 'completed' | 'completed_date'>,
   'notes' | 'start_time' | 'end_time' | 'recurrence' | 'goal_id' | 'note_id'
->
+> & {
+  completed?: false
+}
 
 export interface CompleteTaskInput {
   completed_date: string
