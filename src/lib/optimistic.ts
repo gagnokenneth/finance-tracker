@@ -43,6 +43,7 @@ import type {
 } from '../api/FinanceApi.ts'
 import { tempId } from './tempId.ts'
 import { signedAmount } from './savings.ts'
+import { nextSortOrder } from './notes.ts'
 
 /**
  * Client-side predictions of what a write does to the dataset, used to show the
@@ -614,8 +615,7 @@ export function addNoteItemTo(
   data: FinanceData,
   vars: { noteId: number; input: NewNoteItem },
 ): FinanceData {
-  const sortOrder =
-    Math.max(-1, ...data.note_items.filter((i) => i.note_id === vars.noteId).map((i) => i.sort_order)) + 1
+  const sortOrder = nextSortOrder(data.note_items, vars.noteId)
   const item: NoteItem = {
     id: tempId(),
     note_id: vars.noteId,

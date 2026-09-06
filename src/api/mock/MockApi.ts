@@ -52,6 +52,7 @@ import { readToken, decodeSession } from '../../auth/session.ts'
 import { normalizeUsername, isValidUsername, USERNAME_RULE } from '../../auth/password.ts'
 import { signedAmount, isPaymentKind } from '../../lib/savings.ts'
 import { isoDate } from '../../lib/currentMonth.ts'
+import { nextSortOrder } from '../../lib/notes.ts'
 
 const KEY = 'finance-mock-db'
 
@@ -1001,20 +1002,39 @@ export class MockApi implements FinanceApi {
     return item
   }
 
-  /** Mirrors assertOwnedLink in Code.gs. */
-  private assertOwnedLink(
-    data: FinanceData,
-    linkedType: NoteLinkType | undefined,
+  /**
+   * linked_type and linked_id ride together: both unset (no link), or both
+   * present and owned in `rows` — except a "no target" type (Goals'
+   * 'savings'), which must have linkedId unset since the type itself is the
+   * whole target. Mirrors Code.gs's assertOwnedLinkedPair; shared by Notes'
+   * and Goals' own thin wrappers below, which resolve `rows`/`noTarget`
+   * from their own link-type union before delegating here.
+   */
+  private assertOwnedLinkedPair(
+    linkedType: string | undefined,
     linkedId: number | undefined,
+    noTarget: boolean,
+    rows: { id: number }[],
   ): void {
     if (!linkedType) {
       if (linkedId !== undefined) throw new Error('A link needs a type.')
       return
     }
+    if (noTarget) {
+      if (linkedId !== undefined) throw new Error(`A ${linkedType} link has no target.`)
+      return
+    }
     if (linkedId === undefined) throw new Error('A link needs a target.')
-    const rows: { id: number }[] =
-      linkedType === 'bill' ? data.bills : linkedType === 'debt' ? data.debts : data.tasks
     if (!rows.some((r) => r.id === linkedId)) throw new Error(`${linkedType} ${linkedId} not found`)
+  }
+
+  private assertOwnedLink(
+    data: FinanceData,
+    linkedType: NoteLinkType | undefined,
+    linkedId: number | undefined,
+  ): void {
+    const rows = linkedType === 'bill' ? data.bills : linkedType === 'debt' ? data.debts : data.tasks
+    this.assertOwnedLinkedPair(linkedType, linkedId, false, rows)
   }
 
   async addNote(input: NewNote): Promise<FinanceData> {
@@ -1072,7 +1092,7 @@ export class MockApi implements FinanceApi {
     const note = this.ownedNote(data, noteId)
     if (note.kind !== 'checklist') throw new Error('Only a checklist note can have items.')
     if (!input.text.trim()) throw new Error('A checklist item needs text')
-    const sortOrder = Math.max(-1, ...data.note_items.filter((i) => i.note_id === noteId).map((i) => i.sort_order)) + 1
+    const sortOrder = nextSortOrder(data.note_items, noteId)
     data.note_items.push({ id: nextId(data.note_items), note_id: noteId, text: input.text, done: false, sort_order: sortOrder })
     this.save(data)
     return this.delay(data)
@@ -1103,23 +1123,13 @@ export class MockApi implements FinanceApi {
     return goal
   }
 
-  /** Mirrors assertOwnedGoalLink in Code.gs — NOT the same helper Notes uses. */
   private assertOwnedGoalLink(
     data: FinanceData,
     linkedType: Goal['linked_type'],
     linkedId: number | undefined,
   ): void {
-    if (!linkedType) {
-      if (linkedId !== undefined) throw new Error('A link needs a type.')
-      return
-    }
-    if (linkedType === 'savings') {
-      if (linkedId !== undefined) throw new Error('A savings link has no target.')
-      return
-    }
-    if (linkedId === undefined) throw new Error('A link needs a target.')
-    const rows = linkedType === 'bill' ? data.bills : data.debts
-    if (!rows.some((r) => r.id === linkedId)) throw new Error(`${linkedType} ${linkedId} not found`)
+    const rows = linkedType === 'bill' ? data.bills : linkedType === 'debt' ? data.debts : []
+    this.assertOwnedLinkedPair(linkedType, linkedId, linkedType === 'savings', rows)
   }
 
   /** Mirrors assertGoalDepth in Code.gs. */

@@ -4,7 +4,8 @@ import { useFinanceMutations } from '../../hooks/useFinanceMutations.ts'
 import { referenceable } from '../../lib/tempId.ts'
 import { GOAL_LINK_LABEL } from '../../lib/goals.ts'
 import { Modal } from '../../components/Modal.tsx'
-import { Field, TextInput, SelectInput, Button, SecondaryButton } from '../../components/ui.tsx'
+import { Field, TextInput, Button, SecondaryButton } from '../../components/ui.tsx'
+import { LinkPickerFields } from '../../components/LinkPickerFields.tsx'
 import type { FinanceData, GoalLinkType } from '../../types.ts'
 
 /** `parentGoalId` set means this creates a subgoal under that goal. */
@@ -56,38 +57,18 @@ export function AddGoalModal({
         <Field label="Target date (optional)">
           <TextInput type="date" value={targetDate} onChange={(e) => setTargetDate(e.target.value)} />
         </Field>
-        <Field label="Link to (optional)">
-          <SelectInput
-            value={linkedType}
-            onChange={(e) => {
-              setLinkedType(e.target.value as GoalLinkType | '')
-              setLinkedId('')
-            }}
-          >
-            <option value="">Nothing</option>
-            {(Object.keys(GOAL_LINK_LABEL) as GoalLinkType[]).map((t) => (
-              <option key={t} value={t}>
-                {GOAL_LINK_LABEL[t]}
-              </option>
-            ))}
-          </SelectInput>
-        </Field>
-        {needsTarget && (
-          <Field label={GOAL_LINK_LABEL[linkedType as GoalLinkType]}>
-            <SelectInput
-              required
-              value={linkedId}
-              onChange={(e) => setLinkedId(e.target.value ? Number(e.target.value) : '')}
-            >
-              <option value="">Select…</option>
-              {linkOptions.map((row) => (
-                <option key={row.id} value={row.id}>
-                  {row.name}
-                </option>
-              ))}
-            </SelectInput>
-          </Field>
-        )}
+        <LinkPickerFields
+          linkLabels={GOAL_LINK_LABEL}
+          linkedType={linkedType}
+          onTypeChange={(t) => {
+            setLinkedType(t)
+            setLinkedId('')
+          }}
+          linkedId={linkedId}
+          onIdChange={setLinkedId}
+          linkOptions={linkOptions}
+          needsTarget={needsTarget}
+        />
         <Field label="Notes">
           <TextInput value={notes} onChange={(e) => setNotes(e.target.value)} />
         </Field>

@@ -1715,20 +1715,31 @@ var NOTE_LINK_SHEETS = { bill: 'bills', debt: 'debts', task: 'tasks' };
 
 /*
  * linked_type and linked_id ride together: both blank (no link), or both
- * present and owned. Never validates one against the other's STALE value —
- * a patch that changes what kind of thing is linked must resolve the new
- * pair together, the same rule the (now-removed) AllocationLinePatch used
- * for target_type/target_id.
+ * present and owned — except a "no target" type (Goals' 'savings': a user
+ * has one balance, not many rows to pick from), which must have a blank
+ * linked_id since the type itself is the whole target. Never validates one
+ * against the other's STALE value — a patch that changes what kind of thing
+ * is linked must resolve the new pair together, the same rule the
+ * (now-removed) AllocationLinePatch used for target_type/target_id. Shared
+ * by Notes and Goals — sheetName/noTarget/kindLabel differ per caller, not
+ * the validation shape.
  */
-function assertOwnedLink(linkedType, linkedId, uid) {
+function assertOwnedLinkedPair(kindLabel, sheetName, noTarget, linkedType, linkedId, uid) {
   if (blank(linkedType)) {
     if (!blank(linkedId)) throw new Error('A link needs a type.');
     return;
   }
-  var sheetName = NOTE_LINK_SHEETS[linkedType];
-  if (!sheetName) throw new Error('That is not a kind of thing a note can link to.');
+  if (noTarget) {
+    if (!blank(linkedId)) throw new Error('A ' + linkedType + ' link has no target.');
+    return;
+  }
+  if (!sheetName) throw new Error('That is not a kind of thing a ' + kindLabel + ' can link to.');
   if (blank(linkedId)) throw new Error('A link needs a target.');
   assertOwned(sheetName, linkedId, uid);
+}
+
+function assertOwnedLink(linkedType, linkedId, uid) {
+  assertOwnedLinkedPair('note', NOTE_LINK_SHEETS[linkedType], false, linkedType, linkedId, uid);
 }
 
 function addNote(p, uid) {
@@ -1835,25 +1846,8 @@ function deleteNoteItem(p, uid) {
  *  has one balance, not many rows to pick from. */
 var GOAL_LINK_SHEETS = { bill: 'bills', debt: 'debts' };
 
-/*
- * linked_type and linked_id ride together, the same rule Notes' own
- * assertOwnedLink enforces — but this is NOT that function reused: Goals'
- * version has an extra branch Notes never needed, because 'savings' is a
- * valid linked_type with no sheet to validate linked_id against.
- */
 function assertOwnedGoalLink(linkedType, linkedId, uid) {
-  if (blank(linkedType)) {
-    if (!blank(linkedId)) throw new Error('A link needs a type.');
-    return;
-  }
-  if (linkedType === 'savings') {
-    if (!blank(linkedId)) throw new Error('A savings link has no target.');
-    return;
-  }
-  var sheetName = GOAL_LINK_SHEETS[linkedType];
-  if (!sheetName) throw new Error('That is not a kind of thing a goal can link to.');
-  if (blank(linkedId)) throw new Error('A link needs a target.');
-  assertOwned(sheetName, linkedId, uid);
+  assertOwnedLinkedPair('goal', GOAL_LINK_SHEETS[linkedType], linkedType === 'savings', linkedType, linkedId, uid);
 }
 
 /*
@@ -1958,14 +1952,17 @@ function detachTasksFromGoals(uid, goalIds) {
 }
 
 function deleteGoal(p, uid) {
-  ownedRowIndex('goals', p.id, uid); // ownership check
+  var rowIndex = ownedRowIndex('goals', p.id, uid);
   var subgoalIds = ownedIdsWhere('goals', uid, 'parent_goal_id', p.id);
   var allIds = subgoalIds.concat([num(p.id)]);
   // Detach before the cascade deletes the rows themselves, so a failure here
   // cannot leave a task pointing at a goal id that no longer exists.
   detachTasksFromGoals(uid, allIds);
-  deleteRowsWhere('goals', 'parent_goal_id', p.id);
-  var rowIndex = ownedRowIndex('goals', p.id, uid);
+  // Delete the parent row first, while rowIndex is still fresh, then let
+  // deleteRowsWhere re-read the sheet's current state for the subgoal
+  // cascade — avoids a second ownedRowIndex scan just to re-find a row
+  // whose position deleteRowsWhere's own cascade might have shifted.
   sheet('goals').deleteRow(rowIndex);
+  deleteRowsWhere('goals', 'parent_goal_id', p.id);
   return null;
 }

@@ -5,6 +5,7 @@ import { referenceable } from '../../lib/tempId.ts'
 import { LINK_LABEL } from '../../lib/notes.ts'
 import { Modal } from '../../components/Modal.tsx'
 import { Field, TextInput, SelectInput, Button, SecondaryButton } from '../../components/ui.tsx'
+import { LinkPickerFields } from '../../components/LinkPickerFields.tsx'
 import type { FinanceData, NoteKind, NoteLinkType } from '../../types.ts'
 
 /**
@@ -66,38 +67,18 @@ export function AddNoteModal({
             <TextInput value={body} onChange={(e) => setBody(e.target.value)} />
           </Field>
         )}
-        <Field label="Link to (optional)">
-          <SelectInput
-            value={linkedType}
-            onChange={(e) => {
-              setLinkedType(e.target.value as NoteLinkType | '')
-              setLinkedId('')
-            }}
-          >
-            <option value="">Nothing</option>
-            {(Object.keys(LINK_LABEL) as NoteLinkType[]).map((t) => (
-              <option key={t} value={t}>
-                {LINK_LABEL[t]}
-              </option>
-            ))}
-          </SelectInput>
-        </Field>
-        {linkedType && (
-          <Field label={LINK_LABEL[linkedType]}>
-            <SelectInput
-              required
-              value={linkedId}
-              onChange={(e) => setLinkedId(e.target.value ? Number(e.target.value) : '')}
-            >
-              <option value="">Select…</option>
-              {linkOptions.map((row) => (
-                <option key={row.id} value={row.id}>
-                  {'name' in row ? row.name : row.title}
-                </option>
-              ))}
-            </SelectInput>
-          </Field>
-        )}
+        <LinkPickerFields
+          linkLabels={LINK_LABEL}
+          linkedType={linkedType}
+          onTypeChange={(t) => {
+            setLinkedType(t)
+            setLinkedId('')
+          }}
+          linkedId={linkedId}
+          onIdChange={setLinkedId}
+          linkOptions={linkOptions}
+          needsTarget={linkedType !== ''}
+        />
 
         <div className="mt-1 flex justify-end gap-2">
           <SecondaryButton type="button" onClick={onClose}>

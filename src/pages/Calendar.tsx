@@ -83,14 +83,14 @@ export function Calendar() {
   const [month, setMonth] = useState(monthKey())
   const [addingTaskOn, setAddingTaskOn] = useState<string | null>(null)
 
-  if (isPending) return <LoadingScreen />
-  if (isError || !data) return <LoadError error={error} />
-
   const [year, monthNum] = month.split('-').map(Number)
   const grid = monthGrid(year, monthNum)
   const { start: monthStart, end: monthEnd } = monthWindow(month)
   const gridStart = grid[0]
   const gridEnd = grid[grid.length - 1]
+
+  if (isPending) return <LoadingScreen />
+  if (isError || !data) return <LoadError error={error} />
 
   const events = eventsInRange(data, gridStart, gridEnd)
   const byDate = new Map<string, CalendarEvent[]>()
