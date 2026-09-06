@@ -43,18 +43,19 @@ function GoalRow({ goal, indented, data }: { goal: Goal; indented: boolean; data
             }`}
         </p>
       </div>
-      <SelectInput
-        value={goal.status}
-        disabled={pending}
-        onChange={(e) => updateGoal.mutate({ id: goal.id, patch: { status: e.target.value as Goal['status'] } })}
-        className="w-36 shrink-0"
-      >
-        {GOAL_STATUSES.map((s) => (
-          <option key={s} value={s}>
-            {GOAL_STATUS_LABEL[s]}
-          </option>
-        ))}
-      </SelectInput>
+      <div className="w-36 shrink-0">
+        <SelectInput
+          value={goal.status}
+          disabled={pending}
+          onChange={(e) => updateGoal.mutate({ id: goal.id, patch: { status: e.target.value as Goal['status'] } })}
+        >
+          {GOAL_STATUSES.map((s) => (
+            <option key={s} value={s}>
+              {GOAL_STATUS_LABEL[s]}
+            </option>
+          ))}
+        </SelectInput>
+      </div>
     </div>
   )
 }

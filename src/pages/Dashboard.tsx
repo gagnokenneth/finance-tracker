@@ -1,11 +1,9 @@
-import { Link } from 'react-router-dom'
 import { useFinanceData } from '../hooks/useFinanceData.ts'
 import { duePages } from '../lib/dashboard.ts'
 import type { DueItem } from '../lib/dashboard.ts'
-import { eventsInRange, STATUS_DOT } from '../lib/calendar.ts'
-import { isoDate, shiftDays } from '../lib/currentMonth.ts'
 import { Card } from '../components/Card.tsx'
 import { DueCard } from '../components/DueCard.tsx'
+import { MonthCalendar } from '../components/MonthCalendar.tsx'
 import { EmptyState } from '../components/EmptyState.tsx'
 import { LoadError } from '../components/LoadError.tsx'
 import { LoadingScreen } from '../components/LoadingScreen.tsx'
@@ -30,19 +28,15 @@ export function Dashboard() {
   if (isError || !data) return <LoadError error={error} />
 
   const { late, dueSoon } = duePages(data)
-  // Today through a week out — see Calendar.tsx for the full, unrestricted
-  // browsable view. This window is intentionally short: Dashboard's job is
-  // "what's coming up", not a second calendar.
-  const today = isoDate()
-  const weekOut = shiftDays(today, 7)
-  const upcoming = eventsInRange(data, today, weekOut).sort((a, b) => a.date.localeCompare(b.date))
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight text-ink">Dashboard</h1>
         <p className="mt-1 text-sm text-ink-soft">What needs attention, and what's coming up.</p>
       </div>
+
+      <MonthCalendar data={data} />
 
       {late.length === 0 && dueSoon.length === 0 ? (
         <EmptyState title="Nothing due soon or late">
@@ -54,29 +48,6 @@ export function Dashboard() {
           <Section title="Due soon" items={dueSoon} />
         </div>
       )}
-
-      <Card title="Upcoming">
-        {upcoming.length === 0 ? (
-          <p className="text-sm text-ink-soft">Nothing in the next 7 days.</p>
-        ) : (
-          <div className="space-y-1">
-            {upcoming.map((e) => (
-              <Link
-                key={`${e.source}-${e.to}-${e.id}`}
-                to={e.to}
-                className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-paper"
-              >
-                <span
-                  aria-hidden
-                  className={`size-1.5 shrink-0 rounded-full ${e.status ? STATUS_DOT[e.status] : 'bg-ink-faint'}`}
-                />
-                <span className="tnum font-mono text-xs text-ink-faint">{e.date}</span>
-                <span className="truncate text-ink">{e.label}</span>
-              </Link>
-            ))}
-          </div>
-        )}
-      </Card>
     </div>
   )
 }

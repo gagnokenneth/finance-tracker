@@ -8,7 +8,6 @@ import { makeQueryClient, persistOptionsFor } from './lib/queryClient.ts'
 import { AppShell } from './components/AppShell.tsx'
 import { ToastProvider } from './components/ToastProvider.tsx'
 import { Dashboard } from './pages/Dashboard.tsx'
-import { Calendar } from './pages/Calendar.tsx'
 import { Tasks } from './pages/Tasks.tsx'
 import { Notes } from './pages/Notes.tsx'
 import { NoteDetail } from './pages/NoteDetail.tsx'
@@ -25,16 +24,16 @@ import { SignIn } from './pages/SignIn.tsx'
 function AuthedApp() {
   const { user } = useAuth()
   if (!user) return <SignIn />
-  // Dashboard, Calendar, Tasks, Notes, Goals, Debts, Bills, Income,
-  // Savings and Settings are exposed. The other module pages still exist
-  // in src/pages/ but are deliberately unregistered; unknown paths land
-  // on the Dashboard.
+  // Dashboard, Tasks, Notes, Goals, Debts, Bills, Income, Savings and
+  // Settings are exposed. The other module pages still exist in
+  // src/pages/ but are deliberately unregistered; unknown paths land on
+  // the Dashboard. Calendar has no route of its own — it's embedded
+  // directly in Dashboard as <MonthCalendar>, not a separate page.
   return (
     <Routes>
       <Route element={<AppShell />}>
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<Dashboard />} />
-        <Route path="calendar" element={<Calendar />} />
         <Route path="tasks" element={<Tasks />} />
         <Route path="notes" element={<Notes />} />
         <Route path="notes/:id" element={<NoteDetail />} />

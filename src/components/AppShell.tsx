@@ -4,17 +4,28 @@ import { useIsFetching, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../auth/useAuth.ts'
 import { financeKey } from '../hooks/useFinanceData.ts'
 import { Strip } from './Strip.tsx'
+import {
+  DashboardIcon,
+  TasksIcon,
+  NotesIcon,
+  GoalsIcon,
+  DebtsIcon,
+  BillsIcon,
+  IncomeIcon,
+  SavingsIcon,
+  SettingsIcon,
+} from './icons.tsx'
 
 const NAV_ITEMS = [
-  { to: '/dashboard', label: 'Dashboard' },
-  { to: '/tasks', label: 'Tasks' },
-  { to: '/notes', label: 'Notes' },
-  { to: '/goals', label: 'Goals' },
-  { to: '/debts', label: 'Debts' },
-  { to: '/bills', label: 'Bills' },
-  { to: '/income', label: 'Income' },
-  { to: '/savings', label: 'Savings' },
-  { to: '/settings', label: 'Settings' },
+  { to: '/dashboard', label: 'Dashboard', icon: DashboardIcon },
+  { to: '/tasks', label: 'Tasks', icon: TasksIcon },
+  { to: '/notes', label: 'Notes', icon: NotesIcon },
+  { to: '/goals', label: 'Goals', icon: GoalsIcon },
+  { to: '/debts', label: 'Debts', icon: DebtsIcon },
+  { to: '/bills', label: 'Bills', icon: BillsIcon },
+  { to: '/income', label: 'Income', icon: IncomeIcon },
+  { to: '/savings', label: 'Savings', icon: SavingsIcon },
+  { to: '/settings', label: 'Settings', icon: SettingsIcon },
 ]
 
 /** The bare underline-on-hover affordance shared by the sidebar's footer actions. */
@@ -46,7 +57,7 @@ export function AppShell() {
   const [open, setOpen] = useState(false)
 
   const linkClass = ({ isActive }: { isActive: boolean }) =>
-    `rounded-r-lg border-l-2 px-3 py-2 text-sm font-medium transition-colors ${
+    `flex items-center gap-2.5 rounded-r-lg border-l-2 px-3 py-2 text-sm font-medium transition-colors ${
       isActive
         ? 'border-brand bg-brand/8 text-brand'
         : 'border-transparent text-ink-soft hover:border-edge hover:bg-paper hover:text-ink'
@@ -99,23 +110,13 @@ export function AppShell() {
               className={linkClass}
               onClick={() => setOpen(false)}
             >
+              <item.icon />
               {item.label}
             </NavLink>
           ))}
         </nav>
         <div className="border-t border-edge px-5 py-4">
           <div className="truncate text-sm font-medium text-ink">{user?.username}</div>
-          <NavLink
-            to="/calendar"
-            onClick={() => setOpen(false)}
-            className={({ isActive }) =>
-              `mt-2 block text-sm font-medium transition-colors ${
-                isActive ? 'text-brand' : 'text-ink-soft hover:text-ink'
-              }`
-            }
-          >
-            Calendar
-          </NavLink>
           <div className="mt-2">
             <RefreshButton />
           </div>

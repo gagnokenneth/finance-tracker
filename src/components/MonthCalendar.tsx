@@ -1,13 +1,11 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useFinanceData } from '../hooks/useFinanceData.ts'
 import { eventsInRange, STATUS_DOT } from '../lib/calendar.ts'
 import type { CalendarEvent } from '../lib/calendar.ts'
 import { monthKey, addMonths, monthWindow, dateOn, daysInMonth, isoDate, shiftDays } from '../lib/currentMonth.ts'
-import { SecondaryButton } from '../components/ui.tsx'
-import { LoadError } from '../components/LoadError.tsx'
-import { LoadingScreen } from '../components/LoadingScreen.tsx'
-import { AddTaskModal } from './tasks/AddTaskModal.tsx'
+import { SecondaryButton } from './ui.tsx'
+import { AddTaskModal } from '../pages/tasks/AddTaskModal.tsx'
+import type { FinanceData } from '../types.ts'
 
 const WEEKDAY_LABEL = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -42,19 +40,25 @@ function CalendarDay({
   const day = Number(date.slice(8, 10))
   return (
     <div
-      className={`group min-h-24 rounded-lg border p-1.5 ${
+      className={`group min-h-16 rounded-lg border p-1 sm:min-h-24 sm:p-1.5 ${
         isToday ? 'border-brand bg-brand/5' : 'border-edge'
       } ${inMonth ? 'bg-white' : 'bg-paper/60'}`}
     >
       <div className="flex items-center justify-between">
-        <span className={`tnum font-mono text-xs ${inMonth ? 'text-ink-soft' : 'text-ink-faint'}`}>
+        <span
+          className={`tnum flex size-5 items-center justify-center rounded-full font-mono text-xs ${
+            isToday ? 'bg-brand text-white' : inMonth ? 'text-ink-soft' : 'text-ink-faint'
+          }`}
+        >
           {day}
         </span>
+        {/* Always present, not hover-revealed: a hover-only affordance is
+            unreachable on touch, where there is no hover state at all. */}
         <button
           type="button"
           aria-label={`Add task on ${date}`}
           onClick={() => onAddTask(date)}
-          className="rounded px-1 text-xs text-ink-faint opacity-0 hover:bg-paper hover:text-ink group-hover:opacity-100 focus-visible:opacity-100"
+          className="rounded px-1 text-xs text-ink-faint/70 hover:bg-paper hover:text-ink"
         >
           +
         </button>
@@ -78,8 +82,14 @@ function CalendarDay({
   )
 }
 
-export function Calendar() {
-  const { data, isPending, isError, error } = useFinanceData()
+/**
+ * The month-grid calendar, embedded directly on the Dashboard rather than
+ * behind its own route — one browsable view instead of a full page plus a
+ * separate compact widget duplicating the same data. `data` is a prop, not
+ * a useFinanceData() call of its own: the page that mounts this already
+ * holds it, the same convention every modal in this app already follows.
+ */
+export function MonthCalendar({ data }: { data: FinanceData }) {
   const [month, setMonth] = useState(monthKey())
   const [addingTaskOn, setAddingTaskOn] = useState<string | null>(null)
 
@@ -88,9 +98,6 @@ export function Calendar() {
   const { start: monthStart, end: monthEnd } = monthWindow(month)
   const gridStart = grid[0]
   const gridEnd = grid[grid.length - 1]
-
-  if (isPending) return <LoadingScreen />
-  if (isError || !data) return <LoadError error={error} />
 
   const events = eventsInRange(data, gridStart, gridEnd)
   const byDate = new Map<string, CalendarEvent[]>()
@@ -110,29 +117,27 @@ export function Calendar() {
   })
 
   return (
-    <div className="space-y-6">
+    <div>
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-ink">Calendar</h1>
-          <p className="mt-1 text-sm text-ink-soft">{monthLabel}</p>
-        </div>
+        <h2 className="text-lg font-semibold tracking-tight text-ink">{monthLabel}</h2>
         <div className="flex items-center gap-2">
-          <SecondaryButton type="button" onClick={() => setMonth(addMonths(month, -1))}>
+          <SecondaryButton type="button" aria-label="Previous month" onClick={() => setMonth(addMonths(month, -1))}>
             ←
           </SecondaryButton>
           <SecondaryButton type="button" onClick={() => setMonth(monthKey())}>
             Today
           </SecondaryButton>
-          <SecondaryButton type="button" onClick={() => setMonth(addMonths(month, 1))}>
+          <SecondaryButton type="button" aria-label="Next month" onClick={() => setMonth(addMonths(month, 1))}>
             →
           </SecondaryButton>
         </div>
       </div>
 
-      <div className="grid grid-cols-7 gap-2">
+      <div className="mt-4 grid grid-cols-7 gap-1 sm:gap-2">
         {WEEKDAY_LABEL.map((label) => (
-          <div key={label} className="text-center text-xs font-semibold text-ink-faint uppercase">
-            {label}
+          <div key={label} className="text-center text-[11px] font-semibold text-ink-faint uppercase sm:text-xs">
+            <span className="sm:hidden">{label.slice(0, 1)}</span>
+            <span className="hidden sm:inline">{label}</span>
           </div>
         ))}
         {grid.map((date) => (
