@@ -1,15 +1,15 @@
 import { useState } from 'react'
 import { useFinanceData } from '../hooks/useFinanceData.ts'
 import { useFinanceMutations } from '../hooks/useFinanceMutations.ts'
-import { nextTaskDate, backlogTasks, tasksInWeek, groupByColumn } from '../lib/tasks.ts'
-import { sortedColumns, doneColumn } from '../lib/taskColumns.ts'
+import { backlogTasks, tasksInWeek, groupByColumn } from '../lib/tasks.ts'
+import { sortedColumns } from '../lib/taskColumns.ts'
 import { isoDate, startOfWeek, addWeeks, weekWindow } from '../lib/currentMonth.ts'
-import { ConfirmDialog } from '../components/ConfirmDialog.tsx'
 import { EmptyState } from '../components/EmptyState.tsx'
 import { Button, RowButton, SecondaryButton } from '../components/ui.tsx'
 import { LoadError } from '../components/LoadError.tsx'
 import { LoadingScreen } from '../components/LoadingScreen.tsx'
 import { AddTaskModal } from './tasks/AddTaskModal.tsx'
+import { TaskDetailModal } from './tasks/TaskDetailModal.tsx'
 import { TaskColumnLane } from './tasks/TaskColumnLane.tsx'
 import { AddColumnForm } from './tasks/AddColumnForm.tsx'
 import type { Task, TaskColumn } from '../types.ts'
@@ -18,9 +18,9 @@ type Scope = 'backlog' | 'week'
 
 export function Tasks() {
   const { data, isPending, isError, error } = useFinanceData()
-  const { moveTask, deleteTask, updateTaskColumn, deleteTaskColumn } = useFinanceMutations()
+  const { updateTaskColumn, deleteTaskColumn } = useFinanceMutations()
   const [adding, setAdding] = useState(false)
-  const [deleting, setDeleting] = useState<Task | null>(null)
+  const [opened, setOpened] = useState<Task | null>(null)
   const [scope, setScope] = useState<Scope>('week')
   const [weekStart, setWeekStart] = useState(() => startOfWeek(isoDate()))
 
@@ -28,31 +28,9 @@ export function Tasks() {
   if (isError || !data) return <LoadError error={error} />
 
   const columns = sortedColumns(data.task_columns)
-  const done = doneColumn(data.task_columns)
 
   const scoped = scope === 'backlog' ? backlogTasks(data.tasks) : tasksInWeek(data.tasks, weekStart)
   const grouped = groupByColumn(scoped, columns)
-
-  const move = (taskId: number, columnId: number) => {
-    const task = data.tasks.find((t) => t.id === taskId)
-    if (!task) return
-    if (columnId === done.id) {
-      moveTask.mutate({
-        id: taskId,
-        input: {
-          column_id: columnId,
-          completed_date: isoDate(),
-          next_date: task.recurrence && task.date ? nextTaskDate(task.date, task.recurrence) : undefined,
-        },
-      })
-    } else {
-      moveTask.mutate({ id: taskId, input: { column_id: columnId } })
-    }
-  }
-
-  // Task 4 replaces this with the real detail popup; for now clicking a
-  // card does nothing extra beyond what its own Move control already offers.
-  const openTask = () => {}
 
   const swap = (a: TaskColumn, b: TaskColumn) => {
     updateTaskColumn.mutate({ id: a.id, patch: { sort_order: b.sort_order } })
@@ -105,10 +83,8 @@ export function Tasks() {
               key={column.id}
               column={column}
               tasks={grouped.get(column.id) ?? []}
-              columns={columns}
               dayGrouped={scope === 'week'}
-              onMove={move}
-              onOpenTask={openTask}
+              onOpenTask={setOpened}
               onRename={(name) => updateTaskColumn.mutate({ id: column.id, patch: { name } })}
               onDelete={() => deleteTaskColumn.mutate(column.id)}
               canDelete={!column.is_done && !data.tasks.some((t) => t.column_id === column.id)}
@@ -122,17 +98,7 @@ export function Tasks() {
 
       {adding && <AddTaskModal open data={data} onClose={() => setAdding(false)} initialDate={scope === 'week' ? weekStart : undefined} />}
 
-      <ConfirmDialog
-        open={deleting !== null}
-        title="Delete task"
-        message={deleting ? `Delete "${deleting.title}"? This cannot be undone.` : ''}
-        confirmLabel="Delete task"
-        onConfirm={() => {
-          if (deleting) deleteTask.mutate(deleting.id)
-          setDeleting(null)
-        }}
-        onClose={() => setDeleting(null)}
-      />
+      {opened && <TaskDetailModal open task={opened} data={data} onClose={() => setOpened(null)} />}
     </div>
   )
 }

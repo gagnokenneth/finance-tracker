@@ -12,9 +12,7 @@ import type { Task, TaskColumn } from '../../types.ts'
 export function TaskColumnLane({
   column,
   tasks,
-  columns,
   dayGrouped,
-  onMove,
   onOpenTask,
   onRename,
   onDelete,
@@ -24,9 +22,7 @@ export function TaskColumnLane({
 }: {
   column: TaskColumn
   tasks: Task[]
-  columns: TaskColumn[]
   dayGrouped: boolean
-  onMove: (taskId: number, columnId: number) => void
   onOpenTask: (task: Task) => void
   onRename: (name: string) => void
   onDelete: () => void
@@ -52,15 +48,7 @@ export function TaskColumnLane({
     }
   }
 
-  const card = (task: Task) => (
-    <TaskCard
-      key={task.id}
-      task={task}
-      columns={columns}
-      onMove={(columnId) => onMove(task.id, columnId)}
-      onClick={() => onOpenTask(task)}
-    />
-  )
+  const card = (task: Task) => <TaskCard key={task.id} task={task} onClick={() => onOpenTask(task)} />
 
   return (
     <div className="flex w-64 shrink-0 flex-col gap-2 rounded-xl bg-paper p-3">
