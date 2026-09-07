@@ -561,6 +561,9 @@ export function moveTaskIn(
   const task = data.tasks.find((t) => t.id === vars.id)
   const target = data.task_columns.find((c) => c.id === vars.input.column_id)
   if (!task || !target) return data
+  // Already there — a no-op, matching both backends' moveTask (a duplicate/
+  // retried move must never predict a second minted next occurrence).
+  if (task.column_id === target.id) return data
   const moved = data.tasks.map((t) =>
     t.id === vars.id
       ? { ...t, column_id: target.id, completed_date: target.is_done ? vars.input.completed_date : undefined }

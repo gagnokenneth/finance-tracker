@@ -1729,6 +1729,11 @@ function moveTask(p, uid) {
   assertOwned('task_columns', input.column_id, uid);
   var column = getById('task_columns', input.column_id);
   if (!column) throw new Error('That column was not found. It may have been deleted.');
+  // Already there — a no-op, not a re-completion. Without this, a
+  // duplicate/retried move into the done column would mint a second next
+  // occurrence for a recurring task (the old completeTask refused a repeat
+  // call outright; this is the equivalent guard for moveTask).
+  if (num(current.column_id) === num(input.column_id)) return null;
   if (bool(column.is_done)) {
     if (blank(input.completed_date)) throw new Error('A completed task needs a date');
     patchRowAt('tasks', rowIndex, { column_id: input.column_id, completed_date: input.completed_date });

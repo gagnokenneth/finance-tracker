@@ -43,6 +43,7 @@ import type {
   SavingsMovementKind,
   SavingsRefType,
   Task,
+  TaskColumn,
   Note,
   NoteItem,
   Goal,
@@ -943,6 +944,12 @@ export class MockApi implements FinanceApi {
     return task
   }
 
+  private ownedTaskColumn(data: FinanceData, id: number): TaskColumn {
+    const column = data.task_columns.find((c) => c.id === id)
+    if (!column) throw new Error('That column was not found. It may have been deleted.')
+    return column
+  }
+
   async addTask(input: NewTask): Promise<FinanceData> {
     const data = this.load()
     if (!input.title.trim()) throw new Error('A task needs a title')
@@ -994,8 +1001,12 @@ export class MockApi implements FinanceApi {
     const data = this.load()
     const task = this.ownedTask(data, id)
     const columns = data.task_columns
-    const target = columns.find((c) => c.id === input.column_id)
-    if (!target) throw new Error('That column was not found. It may have been deleted.')
+    const target = this.ownedTaskColumn(data, input.column_id)
+    // Already there — a no-op, not a re-completion. Without this, a
+    // duplicate/retried move into the done column would mint a second next
+    // occurrence for a recurring task (the old completeTask refused a
+    // repeat call outright; this is the equivalent guard for moveTask).
+    if (task.column_id === target.id) return this.delay(data)
     if (target.is_done) {
       if (!input.completed_date) throw new Error('A completed task needs a date')
       task.column_id = target.id
@@ -1034,20 +1045,19 @@ export class MockApi implements FinanceApi {
 
   async updateTaskColumn(id: number, patch: TaskColumnPatch): Promise<FinanceData> {
     const data = this.load()
-    const column = data.task_columns.find((c) => c.id === id)
-    if (!column) throw new Error('That column was not found. It may have been deleted.')
-    if (Object.prototype.hasOwnProperty.call(patch, 'name') && !(patch.name ?? '').trim()) {
-      throw new Error('A column needs a name')
+    const column = this.ownedTaskColumn(data, id)
+    if (Object.prototype.hasOwnProperty.call(patch, 'name')) {
+      if (!(patch.name ?? '').trim()) throw new Error('A column needs a name')
+      patch = { ...patch, name: patch.name!.trim() }
     }
-    Object.assign(column, { ...patch, name: patch.name !== undefined ? patch.name.trim() : patch.name })
+    Object.assign(column, patch)
     this.save(data)
     return this.delay(data)
   }
 
   async deleteTaskColumn(id: number): Promise<FinanceData> {
     const data = this.load()
-    const column = data.task_columns.find((c) => c.id === id)
-    if (!column) throw new Error('That column was not found. It may have been deleted.')
+    const column = this.ownedTaskColumn(data, id)
     if (column.is_done) throw new Error('The Done column cannot be deleted.')
     if (data.tasks.some((t) => t.column_id === id)) {
       throw new Error('Move or delete this column’s tasks first.')
