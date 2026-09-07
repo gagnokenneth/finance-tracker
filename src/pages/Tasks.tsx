@@ -1,145 +1,114 @@
 import { useState } from 'react'
 import { useFinanceData } from '../hooks/useFinanceData.ts'
 import { useFinanceMutations } from '../hooks/useFinanceMutations.ts'
-import { tasksSorted, nextTaskDate } from '../lib/tasks.ts'
-import { isoDate } from '../lib/currentMonth.ts'
-import { isTemp } from '../lib/tempId.ts'
-import { PendingBadge } from '../components/PendingBadge.tsx'
+import { nextTaskDate, backlogTasks, tasksInWeek, groupByColumn } from '../lib/tasks.ts'
+import { sortedColumns, doneColumn } from '../lib/taskColumns.ts'
+import { isoDate, startOfWeek, addWeeks, weekWindow } from '../lib/currentMonth.ts'
 import { ConfirmDialog } from '../components/ConfirmDialog.tsx'
 import { EmptyState } from '../components/EmptyState.tsx'
-import { Button, RowButton, EditRowButton, DeleteRowButton } from '../components/ui.tsx'
+import { Button, RowButton, SecondaryButton } from '../components/ui.tsx'
 import { LoadError } from '../components/LoadError.tsx'
 import { LoadingScreen } from '../components/LoadingScreen.tsx'
 import { AddTaskModal } from './tasks/AddTaskModal.tsx'
-import { EditTaskModal } from './tasks/EditTaskModal.tsx'
-import { doneColumn, firstColumn } from '../lib/taskColumns.ts'
+import { TaskColumnLane } from './tasks/TaskColumnLane.tsx'
 import type { Task } from '../types.ts'
 
-// Tasks has no detail route, so a row is never a link — unlike CardRow (which
-// exists for the other modules' "card links to its detail page" rows), this
-// reuses only its shell classes on a plain div. A CardRow with to="#" would
-// still render as a real, focusable, hover-lifted anchor for every completed
-// or non-pending open row, implying a destination that does not exist and
-// leaving `#` clickable as a dead link. A row here is either the target of
-// its own inline buttons or, for a completed task, not interactive at all.
-const ROW = 'block rounded-xl border border-edge bg-white p-5'
+type Scope = 'backlog' | 'week'
 
 export function Tasks() {
   const { data, isPending, isError, error } = useFinanceData()
   const { moveTask, deleteTask } = useFinanceMutations()
   const [adding, setAdding] = useState(false)
-  const [editing, setEditing] = useState<Task | null>(null)
   const [deleting, setDeleting] = useState<Task | null>(null)
+  const [scope, setScope] = useState<Scope>('week')
+  const [weekStart, setWeekStart] = useState(() => startOfWeek(isoDate()))
 
   if (isPending) return <LoadingScreen />
   if (isError || !data) return <LoadError error={error} />
 
-  const doneColId = doneColumn(data.task_columns).id
-  const open = tasksSorted(data.tasks.filter((t) => t.column_id !== doneColId))
-  // Most-recently-completed first — tasksSorted's date is the task's
-  // originally *scheduled* day, which for a completed task no longer means
-  // anything; completed_date is what actually orders "done".
-  const done = data.tasks
-    .filter((t) => t.column_id === doneColId)
-    .sort((a, b) => (b.completed_date ?? '').localeCompare(a.completed_date ?? ''))
+  const columns = sortedColumns(data.task_columns)
+  const done = doneColumn(data.task_columns)
 
-  const complete = (task: Task) => {
-    const today = isoDate()
-    moveTask.mutate({
-      id: task.id,
-      input: {
-        column_id: doneColId,
-        completed_date: today,
-        next_date: task.recurrence && task.date ? nextTaskDate(task.date, task.recurrence) : undefined,
-      },
-    })
+  const scoped = scope === 'backlog' ? backlogTasks(data.tasks) : tasksInWeek(data.tasks, weekStart)
+  const grouped = groupByColumn(scoped, columns)
+
+  const move = (taskId: number, columnId: number) => {
+    const task = data.tasks.find((t) => t.id === taskId)
+    if (!task) return
+    if (columnId === done.id) {
+      moveTask.mutate({
+        id: taskId,
+        input: {
+          column_id: columnId,
+          completed_date: isoDate(),
+          next_date: task.recurrence && task.date ? nextTaskDate(task.date, task.recurrence) : undefined,
+        },
+      })
+    } else {
+      moveTask.mutate({ id: taskId, input: { column_id: columnId } })
+    }
   }
+
+  // Task 4 replaces this with the real detail popup; for now clicking a
+  // card does nothing extra beyond what its own Move control already offers.
+  const openTask = () => {}
+
+  const { start, end } = weekWindow(weekStart)
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-ink">Tasks</h1>
-          {open.length > 0 && (
-            <p className="mt-1 text-sm text-ink-soft">
-              <span className="tnum font-mono">{open.length}</span>{' '}
-              {open.length === 1 ? 'task' : 'tasks'} open
-            </p>
-          )}
-        </div>
+        <h1 className="text-2xl font-semibold tracking-tight text-ink">Tasks</h1>
         <Button type="button" onClick={() => setAdding(true)}>
           Add task
         </Button>
       </div>
 
-      {open.length === 0 && done.length === 0 ? (
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <RowButton tone={scope === 'backlog' ? 'primary' : 'neutral'} onClick={() => setScope('backlog')}>
+            Backlog
+          </RowButton>
+          <RowButton tone={scope === 'week' ? 'primary' : 'neutral'} onClick={() => setScope('week')}>
+            This week
+          </RowButton>
+        </div>
+        {scope === 'week' && (
+          <div className="flex items-center gap-2">
+            <SecondaryButton type="button" onClick={() => setWeekStart((w) => addWeeks(w, -1))}>
+              ← Prev
+            </SecondaryButton>
+            <span className="tnum font-mono text-sm text-ink-soft">
+              {start} – {end}
+            </span>
+            <SecondaryButton type="button" onClick={() => setWeekStart((w) => addWeeks(w, 1))}>
+              Next →
+            </SecondaryButton>
+          </div>
+        )}
+      </div>
+
+      {data.tasks.length === 0 ? (
         <EmptyState title="Nothing tracked yet">
           Add a one-off errand, or something you want to repeat.
         </EmptyState>
       ) : (
-        <div className="space-y-3">
-          {open.map((task) => {
-            const pending = isTemp(task.id)
-            return (
-              <div key={task.id} className={ROW}>
-                <div className="flex items-start justify-between gap-4">
-                  <span className="font-semibold tracking-tight text-ink">{task.title}</span>
-                  <span className="tnum font-mono text-sm text-ink-soft">{task.date}</span>
-                </div>
-                {task.notes && <p className="mt-1 text-sm text-ink-soft">{task.notes}</p>}
-                <div className="mt-4 flex items-center gap-2">
-                  {pending ? (
-                    <PendingBadge />
-                  ) : (
-                    <>
-                      <RowButton tone="primary" onClick={() => complete(task)}>
-                        Complete
-                      </RowButton>
-                      <EditRowButton onClick={() => setEditing(task)} />
-                      <DeleteRowButton onClick={() => setDeleting(task)} />
-                    </>
-                  )}
-                </div>
-              </div>
-            )
-          })}
-          {done.map((task) => {
-            const pending = isTemp(task.id)
-            return (
-              <div key={task.id} className={ROW}>
-                <div className="flex items-start justify-between gap-4">
-                  <span className="font-medium text-ink-soft line-through">{task.title}</span>
-                  <span className="tnum font-mono text-sm text-ink-faint">{task.completed_date}</span>
-                </div>
-                <div className="mt-4 flex items-center gap-2">
-                  {pending ? (
-                    <PendingBadge />
-                  ) : (
-                    <>
-                      <RowButton
-                        onClick={() =>
-                          moveTask.mutate({
-                            id: task.id,
-                            input: { column_id: firstColumn(data.task_columns).id },
-                          })
-                        }
-                      >
-                        Undo
-                      </RowButton>
-                      <DeleteRowButton onClick={() => setDeleting(task)} />
-                    </>
-                  )}
-                </div>
-              </div>
-            )
-          })}
+        <div className="flex gap-3 overflow-x-auto pb-2">
+          {columns.map((column) => (
+            <TaskColumnLane
+              key={column.id}
+              column={column}
+              tasks={grouped.get(column.id) ?? []}
+              columns={columns}
+              dayGrouped={scope === 'week'}
+              onMove={move}
+              onOpenTask={openTask}
+            />
+          ))}
         </div>
       )}
 
-      {adding && <AddTaskModal open data={data} onClose={() => setAdding(false)} />}
-      {editing && (
-        <EditTaskModal open task={editing} data={data} onClose={() => setEditing(null)} />
-      )}
+      {adding && <AddTaskModal open data={data} onClose={() => setAdding(false)} initialDate={scope === 'week' ? weekStart : undefined} />}
 
       <ConfirmDialog
         open={deleting !== null}
