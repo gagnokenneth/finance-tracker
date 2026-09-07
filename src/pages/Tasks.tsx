@@ -50,7 +50,7 @@ export function Tasks() {
       input: {
         column_id: doneColId,
         completed_date: today,
-        next_date: task.recurrence ? nextTaskDate(task.date!, task.recurrence) : undefined,
+        next_date: task.recurrence && task.date ? nextTaskDate(task.date, task.recurrence) : undefined,
       },
     })
   }

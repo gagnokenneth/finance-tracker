@@ -39,7 +39,7 @@ export function EditTaskModal({
       patch: {
         title: form.values.title,
         notes: form.values.notes ?? null,
-        date: form.values.date,
+        date: form.values.date ?? null,
         start_time: form.values.start_time ?? null,
         end_time: form.values.end_time ?? null,
         recurrence: form.values.recurrence ?? null,
