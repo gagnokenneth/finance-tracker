@@ -76,7 +76,7 @@ export function Tasks() {
             </SecondaryButton>
           </div>
 
-          <div className="overflow-x-auto rounded-2xl border border-edge bg-white p-3">
+          <div className="w-fit max-w-full overflow-x-auto rounded-2xl border border-edge bg-white p-3">
             <div className="flex gap-3">
               {columns.map((column) => (
                 <TaskColumnLane
