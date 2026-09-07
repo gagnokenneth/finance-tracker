@@ -34,3 +34,4 @@ docs/
 
 # Subagent-driven-development scratch (ledger, briefs, reports) — not project output
 .superpowers/
+.worktrees/
