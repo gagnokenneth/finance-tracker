@@ -16,7 +16,8 @@ var SHEETS = {
   income: ['id', 'user_id', 'source_id', 'amount', 'date', 'notes'],
   income_sources: ['id', 'user_id', 'name', 'archived'],
   savings_ledger: ['id', 'user_id', 'date', 'amount', 'kind', 'ref_type', 'ref_id', 'notes'],
-  tasks: ['id', 'user_id', 'title', 'notes', 'date', 'start_time', 'end_time', 'recurrence', 'completed', 'completed_date', 'goal_id', 'note_id'],
+  tasks: ['id', 'user_id', 'title', 'notes', 'date', 'start_time', 'end_time', 'recurrence', 'column_id', 'completed_date', 'goal_id', 'note_id'],
+  task_columns: ['id', 'user_id', 'name', 'sort_order', 'is_done'],
   notes: ['id', 'user_id', 'title', 'body'],
   note_items: ['id', 'user_id', 'note_id', 'text', 'done', 'sort_order'],
   goals: ['id', 'user_id', 'title', 'target_date', 'parent_goal_id', 'status', 'notes'],
@@ -28,7 +29,7 @@ var SHEETS = {
  * so the new shape is applied on the very next request after a deployment,
  * instead of up to an hour later.
  */
-var SCHEMA_VERSION = 13;
+var SCHEMA_VERSION = 14;
 
 /*
  * Tabs whose stale shape may be DISCARDED and recreated. Deliberately excludes
@@ -36,9 +37,9 @@ var SCHEMA_VERSION = 13;
  * and password hash on the next request, re-seed fresh codes, and lock everyone
  * out with no recovery path.
  */
-var REBUILDABLE_SHEETS = ['debts', 'debt_schedule', 'debt_statements', 'bills', 'bill_payables', 'income', 'income_sources', 'savings_ledger', 'tasks', 'notes', 'note_items', 'goals'];
+var REBUILDABLE_SHEETS = ['debts', 'debt_schedule', 'debt_statements', 'bills', 'bill_payables', 'income', 'income_sources', 'savings_ledger', 'tasks', 'task_columns', 'notes', 'note_items', 'goals'];
 
-var DATA_SHEETS = ['bills', 'bill_payables', 'debts', 'debt_schedule', 'debt_statements', 'income', 'income_sources', 'savings_ledger', 'tasks', 'notes', 'note_items', 'goals'];
+var DATA_SHEETS = ['bills', 'bill_payables', 'debts', 'debt_schedule', 'debt_statements', 'income', 'income_sources', 'savings_ledger', 'tasks', 'task_columns', 'notes', 'note_items', 'goals'];
 
 /**
  * Sheets getAll actually reads. Every sheet read is a separate round trip, so
@@ -48,7 +49,7 @@ var DATA_SHEETS = ['bills', 'bill_payables', 'debts', 'debt_schedule', 'debt_sta
  * the same change. A sheet in DATA_SHEETS but not here is reported as an empty
  * array, so its page renders blank even though the rows exist.
  */
-var ACTIVE_SHEETS = ['debts', 'debt_schedule', 'debt_statements', 'bills', 'bill_payables', 'income', 'income_sources', 'savings_ledger', 'tasks', 'notes', 'note_items', 'goals'];
+var ACTIVE_SHEETS = ['debts', 'debt_schedule', 'debt_statements', 'bills', 'bill_payables', 'income', 'income_sources', 'savings_ledger', 'tasks', 'task_columns', 'notes', 'note_items', 'goals'];
 
 /** Actions that return the full dataset instead of the affected row. */
 var RETURNS_DATA = {
@@ -61,7 +62,8 @@ var RETURNS_DATA = {
   addIncomeSource: true, updateIncomeSource: true, deleteIncomeSource: true,
   setCurrency: true,
   addSavingsEntry: true, updateSavingsEntry: true, deleteSavingsEntry: true,
-  addTask: true, updateTask: true, deleteTask: true, completeTask: true,
+  addTask: true, updateTask: true, deleteTask: true, moveTask: true,
+  addTaskColumn: true, updateTaskColumn: true, deleteTaskColumn: true,
   addNote: true, updateNote: true, deleteNote: true,
   addNoteItem: true, updateNoteItem: true, deleteNoteItem: true,
   addGoal: true, updateGoal: true, deleteGoal: true
@@ -493,10 +495,13 @@ function coerce(name, r) {
     ref_type: optStr(r.ref_type), ref_id: optNum(r.ref_id), notes: optStr(r.notes)
   };
   if (name === 'tasks') return {
-    id: num(r.id), title: String(r.title), notes: optStr(r.notes), date: fmtDate(r.date),
+    id: num(r.id), title: String(r.title), notes: optStr(r.notes), date: optDate(r.date),
     start_time: optStr(r.start_time), end_time: optStr(r.end_time), recurrence: optStr(r.recurrence),
-    completed: bool(r.completed), completed_date: optDate(r.completed_date),
+    column_id: num(r.column_id), completed_date: optDate(r.completed_date),
     goal_id: optNum(r.goal_id), note_id: optNum(r.note_id)
+  };
+  if (name === 'task_columns') return {
+    id: num(r.id), name: String(r.name), sort_order: num(r.sort_order), is_done: bool(r.is_done)
   };
   if (name === 'notes') return {
     id: num(r.id), title: String(r.title), body: optStr(r.body)
@@ -662,7 +667,33 @@ function assertOwned(name, id, uid) {
   ownedRowIndex(name, id, uid);
 }
 
+/**
+ * Mirrors MockApi.ts's load() self-heal step — every user gets the three
+ * default columns the first time their data is read. No signup hook exists
+ * to seed this at account creation, and every existing user needs it once
+ * too.
+ */
+function ensureDefaultTaskColumns(uid) {
+  var existing = readOwnedRows('task_columns', uid);
+  if (existing.length > 0) return;
+  var rows = [
+    { name: 'To Do', sort_order: 0, is_done: false },
+    { name: 'In Progress', sort_order: 1, is_done: false },
+    { name: 'Done', sort_order: 2, is_done: true }
+  ];
+  for (var i = 0; i < rows.length; i++) {
+    appendRow('task_columns', {
+      id: nextId('task_columns'),
+      user_id: uid,
+      name: rows[i].name,
+      sort_order: rows[i].sort_order,
+      is_done: rows[i].is_done
+    });
+  }
+}
+
 function getAll(uid) {
+  ensureDefaultTaskColumns(uid);
   var data = {};
   DATA_SHEETS.forEach(function (name) {
     // Inactive sheets are reported as empty rather than read — see ACTIVE_SHEETS.
@@ -716,7 +747,10 @@ function dispatch(action, p, uid) {
     case 'addTask': return addTask(p, uid);
     case 'updateTask': return updateTask(p, uid);
     case 'deleteTask': return deleteTask(p, uid);
-    case 'completeTask': return completeTask(p, uid);
+    case 'moveTask': return moveTask(p, uid);
+    case 'addTaskColumn': return addTaskColumn(p, uid);
+    case 'updateTaskColumn': return updateTaskColumn(p, uid);
+    case 'deleteTaskColumn': return deleteTaskColumn(p, uid);
     case 'addNote': return addNote(p, uid);
     case 'updateNote': return updateNote(p, uid);
     case 'deleteNote': return deleteNote(p, uid);
@@ -1618,7 +1652,7 @@ function deleteSavingsEntry(p, uid) {
 function addTask(p, uid) {
   var input = p.input || {};
   if (blank(input.title)) throw new Error('A task needs a title');
-  if (blank(input.date)) throw new Error('A task needs a date');
+  if (blank(input.column_id)) throw new Error('A task needs a column');
   if (!blank(input.goal_id)) assertOwned('goals', input.goal_id, uid);
   if (!blank(input.note_id)) assertOwned('notes', input.note_id, uid);
   appendRow('tasks', {
@@ -1630,12 +1664,12 @@ function addTask(p, uid) {
     start_time: input.start_time,
     end_time: input.end_time,
     recurrence: input.recurrence,
-    completed: false,
+    column_id: input.column_id,
     completed_date: '',
     goal_id: input.goal_id,
     note_id: input.note_id
   });
-  return null; // RETURNS_DATA action — doPost reads the dataset back
+  return null;
 }
 
 function updateTask(p, uid) {
@@ -1647,10 +1681,7 @@ function updateTask(p, uid) {
     patch.title = given.title;
   }
   if (Object.prototype.hasOwnProperty.call(given, 'notes')) patch.notes = given.notes;
-  if (Object.prototype.hasOwnProperty.call(given, 'date')) {
-    if (blank(given.date)) throw new Error('A task needs a date');
-    patch.date = given.date;
-  }
+  if (Object.prototype.hasOwnProperty.call(given, 'date')) patch.date = given.date;
   if (Object.prototype.hasOwnProperty.call(given, 'start_time')) patch.start_time = given.start_time;
   if (Object.prototype.hasOwnProperty.call(given, 'end_time')) patch.end_time = given.end_time;
   if (Object.prototype.hasOwnProperty.call(given, 'recurrence')) patch.recurrence = given.recurrence;
@@ -1662,17 +1693,6 @@ function updateTask(p, uid) {
     if (!blank(given.note_id)) assertOwned('notes', given.note_id, uid);
     patch.note_id = given.note_id;
   }
-  /*
-   * completed is only ever CLEARED here, never set — completing a task goes
-   * through completeTask, which also mints the next occurrence when the task
-   * recurs. Mirrors normalizePaidPatch's exact rule for bill payables: an
-   * unpay clears paid_date/paid_amount as a side effect, never as a client-
-   * supplied value for them.
-   */
-  if (Object.prototype.hasOwnProperty.call(given, 'completed') && !bool(given.completed)) {
-    patch.completed = false;
-    patch.completed_date = '';
-  }
   return patchRowAt('tasks', rowIndex, patch);
 }
 
@@ -1683,36 +1703,92 @@ function deleteTask(p, uid) {
 }
 
 /**
- * Marks a task done and, when it recurs, mints the next occurrence — the same
- * split payBillPayable makes for bills: the CLIENT computes the next date
- * (there is no recurrence math in this file, matching how next_due_date works
- * for bills) and this just stores whatever it is given. Refuses a task
- * already completed, so a double-submitted Complete cannot mint two
- * successors.
+ * The one action for every column change — drag or button, done or not.
+ * Moving into the done column sets completed_date and, when the task
+ * recurs, mints the next occurrence (the CLIENT computes both dates, same
+ * split payBillPayable already uses). Moving to any other column just
+ * updates column_id and clears completed_date.
  */
-function completeTask(p, uid) {
+function moveTask(p, uid) {
   var rowIndex = ownedRowIndex('tasks', p.id, uid);
   var current = getById('tasks', p.id);
-  if (bool(current.completed)) throw new Error('That task is already done.');
   var input = p.input || {};
-  if (blank(input.completed_date)) throw new Error('A completed task needs a date');
-  patchRowAt('tasks', rowIndex, { completed: true, completed_date: input.completed_date });
-  if (!blank(current.recurrence) && !blank(input.next_date)) {
-    appendRow('tasks', {
-      id: nextId('tasks'),
-      user_id: uid,
-      title: current.title,
-      notes: current.notes,
-      date: input.next_date,
-      start_time: current.start_time,
-      end_time: current.end_time,
-      recurrence: current.recurrence,
-      completed: false,
-      completed_date: '',
-      goal_id: current.goal_id,
-      note_id: current.note_id
-    });
+  if (blank(input.column_id)) throw new Error('A column is required');
+  var column = getById('task_columns', input.column_id);
+  if (!column) throw new Error('That column was not found. It may have been deleted.');
+  if (bool(column.is_done)) {
+    if (blank(input.completed_date)) throw new Error('A completed task needs a date');
+    patchRowAt('tasks', rowIndex, { column_id: input.column_id, completed_date: input.completed_date });
+    if (!blank(current.recurrence) && !blank(input.next_date)) {
+      var firstCol = firstTaskColumn(uid);
+      appendRow('tasks', {
+        id: nextId('tasks'),
+        user_id: uid,
+        title: current.title,
+        notes: current.notes,
+        date: input.next_date,
+        start_time: current.start_time,
+        end_time: current.end_time,
+        recurrence: current.recurrence,
+        column_id: firstCol.id,
+        completed_date: '',
+        goal_id: current.goal_id,
+        note_id: current.note_id
+      });
+    }
+  } else {
+    patchRowAt('tasks', rowIndex, { column_id: input.column_id, completed_date: '' });
   }
+  return null;
+}
+
+/** Whichever of this user's columns sorts first — where a new/minted task lands. */
+function firstTaskColumn(uid) {
+  var rows = readOwnedRows('task_columns', uid).map(function (r) { return coerce('task_columns', r); });
+  rows.sort(function (a, b) { return a.sort_order - b.sort_order; });
+  if (rows.length === 0) throw new Error('No columns — task_columns is empty.');
+  return rows[0];
+}
+
+function addTaskColumn(p, uid) {
+  var input = p.input || {};
+  if (blank(input.name)) throw new Error('A column needs a name');
+  var rows = readOwnedRows('task_columns', uid).map(function (r) { return coerce('task_columns', r); });
+  var maxSort = -1;
+  for (var i = 0; i < rows.length; i++) if (rows[i].sort_order > maxSort) maxSort = rows[i].sort_order;
+  appendRow('task_columns', {
+    id: nextId('task_columns'),
+    user_id: uid,
+    name: input.name,
+    sort_order: maxSort + 1,
+    is_done: false
+  });
+  return null;
+}
+
+function updateTaskColumn(p, uid) {
+  var rowIndex = ownedRowIndex('task_columns', p.id, uid);
+  var given = p.patch || {};
+  var patch = {};
+  if (Object.prototype.hasOwnProperty.call(given, 'name')) {
+    if (blank(given.name)) throw new Error('A column needs a name');
+    patch.name = given.name;
+  }
+  if (Object.prototype.hasOwnProperty.call(given, 'sort_order')) patch.sort_order = given.sort_order;
+  return patchRowAt('task_columns', rowIndex, patch);
+}
+
+function deleteTaskColumn(p, uid) {
+  var rowIndex = ownedRowIndex('task_columns', p.id, uid);
+  var column = getById('task_columns', p.id);
+  if (bool(column.is_done)) throw new Error('The Done column cannot be deleted.');
+  var tasks = readOwnedRows('tasks', uid).map(function (r) { return coerce('tasks', r); });
+  for (var i = 0; i < tasks.length; i++) {
+    if (num(tasks[i].column_id) === num(p.id)) {
+      throw new Error('Move or delete this column’s tasks first.');
+    }
+  }
+  sheet('task_columns').deleteRow(rowIndex);
   return null;
 }
 

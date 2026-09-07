@@ -22,6 +22,7 @@ const REQUIRED_ARRAYS: readonly (keyof FinanceData)[] = [
   'income_sources',
   'savings_ledger',
   'tasks',
+  'task_columns',
   'notes',
   'note_items',
   'goals',

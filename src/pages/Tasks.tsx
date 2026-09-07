@@ -12,6 +12,7 @@ import { LoadError } from '../components/LoadError.tsx'
 import { LoadingScreen } from '../components/LoadingScreen.tsx'
 import { AddTaskModal } from './tasks/AddTaskModal.tsx'
 import { EditTaskModal } from './tasks/EditTaskModal.tsx'
+import { doneColumn, firstColumn } from '../lib/taskColumns.ts'
 import type { Task } from '../types.ts'
 
 // Tasks has no detail route, so a row is never a link — unlike CardRow (which
@@ -25,7 +26,7 @@ const ROW = 'block rounded-xl border border-edge bg-white p-5'
 
 export function Tasks() {
   const { data, isPending, isError, error } = useFinanceData()
-  const { completeTask, updateTask, deleteTask } = useFinanceMutations()
+  const { moveTask, deleteTask } = useFinanceMutations()
   const [adding, setAdding] = useState(false)
   const [editing, setEditing] = useState<Task | null>(null)
   const [deleting, setDeleting] = useState<Task | null>(null)
@@ -33,21 +34,23 @@ export function Tasks() {
   if (isPending) return <LoadingScreen />
   if (isError || !data) return <LoadError error={error} />
 
-  const open = tasksSorted(data.tasks.filter((t) => !t.completed))
+  const doneColId = doneColumn(data.task_columns).id
+  const open = tasksSorted(data.tasks.filter((t) => t.column_id !== doneColId))
   // Most-recently-completed first — tasksSorted's date is the task's
   // originally *scheduled* day, which for a completed task no longer means
   // anything; completed_date is what actually orders "done".
   const done = data.tasks
-    .filter((t) => t.completed)
+    .filter((t) => t.column_id === doneColId)
     .sort((a, b) => (b.completed_date ?? '').localeCompare(a.completed_date ?? ''))
 
   const complete = (task: Task) => {
     const today = isoDate()
-    completeTask.mutate({
+    moveTask.mutate({
       id: task.id,
       input: {
+        column_id: doneColId,
         completed_date: today,
-        next_date: task.recurrence ? nextTaskDate(task.date, task.recurrence) : undefined,
+        next_date: task.recurrence ? nextTaskDate(task.date!, task.recurrence) : undefined,
       },
     })
   }
@@ -114,7 +117,12 @@ export function Tasks() {
                   ) : (
                     <>
                       <RowButton
-                        onClick={() => updateTask.mutate({ id: task.id, patch: { completed: false } })}
+                        onClick={() =>
+                          moveTask.mutate({
+                            id: task.id,
+                            input: { column_id: firstColumn(data.task_columns).id },
+                          })
+                        }
                       >
                         Undo
                       </RowButton>

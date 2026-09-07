@@ -18,6 +18,7 @@ export function createSeed(): FinanceData {
     income_sources: [],
     savings_ledger: [],
     tasks: [],
+    task_columns: [],
     notes: [],
     note_items: [],
     goals: [],

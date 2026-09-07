@@ -9,6 +9,7 @@ import type {
   IncomeSource,
   SavingsMovementKind,
   Task,
+  TaskColumn,
   Note,
   NoteItem,
   Goal,
@@ -89,31 +90,29 @@ export interface NewSavingsEntry {
 }
 export type SavingsEntryPatch = Patch<NewSavingsEntry, 'notes'>
 
-export type NewTask = Omit<Task, 'id' | 'completed' | 'completed_date'>
+export type NewTask = Omit<Task, 'id' | 'completed_date'>
 /**
- * completed can only ever be patched to false here — completing a task goes
- * through completeTask instead, which also mints the next occurrence when
- * the task recurs. Both backends already enforced this at runtime (Code.gs's
- * updateTask silently drops a patch.completed of true; MockApi's did not,
- * which let `{completed: true}` through as a real, recurrence-skipping
- * completion the two backends disagreed about). Typing it as the `false`
- * literal turns that gap into a compile error instead of a silent backend
- * divergence. completed_date is excluded entirely — it is server-managed,
- * set by completeTask and cleared as a side effect of patching completed to
- * false, never client-supplied directly.
+ * column_id and completed_date are excluded entirely — a column change
+ * (including into/out of done) only ever goes through moveTask, which also
+ * handles minting a recurring task's next occurrence. date is Clearable now
+ * that it's optional (unset = Backlog).
  */
 export type TaskPatch = Patch<
-  Omit<Task, 'id' | 'completed' | 'completed_date'>,
-  'notes' | 'start_time' | 'end_time' | 'recurrence' | 'goal_id' | 'note_id'
-> & {
-  completed?: false
-}
+  Omit<Task, 'id' | 'column_id' | 'completed_date'>,
+  'notes' | 'start_time' | 'end_time' | 'recurrence' | 'goal_id' | 'note_id' | 'date'
+>
 
-export interface CompleteTaskInput {
-  completed_date: string
-  /** Only when the task recurs — computed by nextTaskDate in lib/tasks.ts. */
+export interface MoveTaskInput {
+  column_id: number
+  /** Required only when column_id resolves to the user's is_done column. */
+  completed_date?: string
+  /** Only when moving into is_done AND the task recurs — computed by nextTaskDate in lib/tasks.ts. */
   next_date?: string
 }
+
+export type NewTaskColumn = Pick<TaskColumn, 'name'>
+/** is_done is never patchable — only ever true for the seeded Done column. */
+export type TaskColumnPatch = Patch<Pick<TaskColumn, 'name' | 'sort_order'>>
 
 export type NewNote = Omit<Note, 'id'>
 export type NotePatch = Patch<Omit<Note, 'id'>, 'body'>
@@ -227,11 +226,16 @@ export interface FinanceApi {
   /* Task writes return the whole updated dataset, for the same reasons above. */
 
   addTask(input: NewTask): Promise<FinanceData>
-  /** completed can only be set to false here — see completeTask. */
   updateTask(id: number, patch: TaskPatch): Promise<FinanceData>
   deleteTask(id: number): Promise<FinanceData>
-  /** Marks done and mints the next occurrence when the task recurs. */
-  completeTask(id: number, input: CompleteTaskInput): Promise<FinanceData>
+  /** The one mutation for every column change — drag or button, done or not. */
+  moveTask(id: number, input: MoveTaskInput): Promise<FinanceData>
+
+  addTaskColumn(input: NewTaskColumn): Promise<FinanceData>
+  /** is_done can never be patched — see TaskColumnPatch. */
+  updateTaskColumn(id: number, patch: TaskColumnPatch): Promise<FinanceData>
+  /** Refused if the column has any tasks, or is the is_done column. */
+  deleteTaskColumn(id: number): Promise<FinanceData>
 
   /* Note writes return the whole updated dataset, for the same reasons above. */
 

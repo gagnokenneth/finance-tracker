@@ -1,7 +1,8 @@
 import { dueStatus } from './debts.ts'
 import type { RowStatus } from './debts.ts'
 import { sourceName } from './income.ts'
-import type { FinanceData, Goal } from '../types.ts'
+import { doneColumn } from './taskColumns.ts'
+import type { FinanceData, Goal, Task } from '../types.ts'
 
 export type CalendarSource = 'bill' | 'debt' | 'income' | 'savings' | 'task' | 'goal'
 
@@ -123,6 +124,7 @@ function savingsEvents(data: FinanceData, start: string, end: string): CalendarE
  */
 function taskEvents(data: FinanceData, start: string, end: string): CalendarEvent[] {
   return data.tasks
+    .filter((row): row is Task & { date: string } => row.date !== undefined)
     .filter((row) => inRange(row.date, start, end))
     .map((row) => ({
       id: row.id,
@@ -131,7 +133,7 @@ function taskEvents(data: FinanceData, start: string, end: string): CalendarEven
       date: row.date,
       to: '/tasks',
       editable: true,
-      status: row.completed ? ('paid' as const) : dueStatus(row.date),
+      status: row.column_id === doneColumn(data.task_columns).id ? ('paid' as const) : dueStatus(row.date),
     }))
 }
 

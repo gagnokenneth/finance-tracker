@@ -111,28 +111,42 @@ export interface SavingsLedgerEntry {
 
 export type TaskRecurrence = 'daily' | 'weekly' | 'monthly'
 
+/** A column on the task board — its own row so a user can add/rename/reorder. */
+export interface TaskColumn {
+  id: number
+  name: string
+  sort_order: number
+  /** Exactly one column per user has this true, always — see isValidGoalTransition's
+   *  sibling check in lib/taskColumns.ts / Code.gs for the enforcement. */
+  is_done: boolean
+}
+
 /**
  * A scheduled item — one-off or recurring, optionally time-blocked. Unlike
  * Bills, a recurring task has no separate template row: each occurrence is
- * its own independent row, chained only by completing one minting the next
- * (see completeTask in FinanceApi.ts) — there is no stable id grouping a
- * series the way bill_id groups a bill's payables.
+ * its own independent row, chained only by moving one into the done column
+ * minting the next (see moveTask in FinanceApi.ts) — there is no stable id
+ * grouping a series the way bill_id groups a bill's payables.
+ *
+ * A task's status is its column, not a boolean: column_id points at a
+ * TaskColumn, and moving into whichever one is flagged is_done is what
+ * "done" means now.
  */
 export interface Task {
   id: number
   title: string
   notes?: string
-  date: string
+  /** Unset means the task is in the Backlog — no week, no calendar presence. */
+  date?: string
   /** HH:MM, both unset for an all-day task. */
   start_time?: string
   end_time?: string
   /** Unset for a one-off task. */
   recurrence?: TaskRecurrence
-  completed: boolean
+  column_id: number
   completed_date?: string
-  /** At most one goal per task. Written now, read starting with Goals. */
+  /** At most one goal per task. */
   goal_id?: number
-  /** Written now, read starting with Notes. */
   note_id?: number
 }
 
@@ -198,6 +212,7 @@ export interface FinanceData {
   income_sources: IncomeSource[]
   savings_ledger: SavingsLedgerEntry[]
   tasks: Task[]
+  task_columns: TaskColumn[]
   notes: Note[]
   note_items: NoteItem[]
   goals: Goal[]

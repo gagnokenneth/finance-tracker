@@ -79,3 +79,28 @@ export function addMonths(month: string, n: number): string {
   const [y, m] = month.split('-').map(Number)
   return monthKey(new Date(y, m - 1 + n, 1))
 }
+
+/**
+ * The Monday on/before `iso` — this app's one definition of "start of week",
+ * matching monthWindow's role for months. Used by the task board to group
+ * dated tasks into weeks without a stored sprint entity.
+ */
+export function startOfWeek(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  const date = new Date(y, m - 1, d)
+  // getDay(): 0=Sun..6=Sat. Distance back to Monday: Sunday is 6 days back,
+  // any other day is (day - 1) days back.
+  const day = date.getDay()
+  const back = day === 0 ? 6 : day - 1
+  return shiftDays(iso, -back)
+}
+
+/** Inclusive ISO bounds of the 7-day week starting at `weekStart` (a Monday). */
+export function weekWindow(weekStart: string): { start: string; end: string } {
+  return { start: weekStart, end: shiftDays(weekStart, 6) }
+}
+
+/** The Monday n weeks away from `weekStart`; n may be negative. */
+export function addWeeks(weekStart: string, n: number): string {
+  return shiftDays(weekStart, n * 7)
+}

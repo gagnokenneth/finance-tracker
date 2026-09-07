@@ -54,9 +54,8 @@ export function EditTaskModal({
         <Field label="Title" required>
           <TextInput required value={form.title} onChange={(e) => form.setTitle(e.target.value)} />
         </Field>
-        <Field label="Date" required>
+        <Field label="Date">
           <TextInput
-            required
             type="date"
             value={form.date}
             onChange={(e) => form.setDate(e.target.value)}

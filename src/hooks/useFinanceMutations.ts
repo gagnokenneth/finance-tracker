@@ -34,7 +34,10 @@ import {
   addTaskTo,
   applyTaskPatch,
   removeTask,
-  completeTaskIn,
+  moveTaskIn,
+  addTaskColumnTo,
+  applyTaskColumnPatch,
+  removeTaskColumn,
   addNoteTo,
   applyNotePatch,
   removeNote,
@@ -64,7 +67,9 @@ import type {
   SavingsEntryPatch,
   NewTask,
   TaskPatch,
-  CompleteTaskInput,
+  MoveTaskInput,
+  NewTaskColumn,
+  TaskColumnPatch,
   NewNote,
   NotePatch,
   NewNoteItem,
@@ -248,9 +253,21 @@ export function useFinanceMutations() {
     mutationFn: (id: number) => getApi().deleteTask(id),
     ...optimistic(removeTask, 'That task could not be deleted. It has been restored.'),
   })
-  const completeTask = useMutation({
-    mutationFn: (v: { id: number; input: CompleteTaskInput }) => getApi().completeTask(v.id, v.input),
-    ...optimistic(completeTaskIn, 'That task did not save as done. It is back as not done.'),
+  const moveTask = useMutation({
+    mutationFn: (v: { id: number; input: MoveTaskInput }) => getApi().moveTask(v.id, v.input),
+    ...optimistic(moveTaskIn, 'That move did not save. The task is back where it was.'),
+  })
+  const addTaskColumn = useMutation({
+    mutationFn: (i: NewTaskColumn) => getApi().addTaskColumn(i),
+    ...optimistic(addTaskColumnTo, 'That column did not save. It has been removed.'),
+  })
+  const updateTaskColumn = useMutation({
+    mutationFn: (v: { id: number; patch: TaskColumnPatch }) => getApi().updateTaskColumn(v.id, v.patch),
+    ...optimistic(applyTaskColumnPatch, 'That column did not save. It is back as it was.'),
+  })
+  const deleteTaskColumn = useMutation({
+    mutationFn: (id: number) => getApi().deleteTaskColumn(id),
+    ...optimistic(removeTaskColumn, 'That column could not be deleted. It has been restored.'),
   })
 
   const addNote = useMutation({
@@ -377,7 +394,10 @@ export function useFinanceMutations() {
     addTask,
     updateTask,
     deleteTask,
-    completeTask,
+    moveTask,
+    addTaskColumn,
+    updateTaskColumn,
+    deleteTaskColumn,
     addNote,
     updateNote,
     deleteNote,

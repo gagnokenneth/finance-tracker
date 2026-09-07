@@ -5,6 +5,7 @@ import { referenceable } from '../../lib/tempId.ts'
 import { Modal } from '../../components/Modal.tsx'
 import { Field, TextInput, SelectInput, Button, SecondaryButton } from '../../components/ui.tsx'
 import { RECURRENCES, RECURRENCE_LABEL } from '../../lib/tasks.ts'
+import { firstColumn } from '../../lib/taskColumns.ts'
 import type { FinanceData, TaskRecurrence } from '../../types.ts'
 
 /**
@@ -33,7 +34,7 @@ export function AddTaskModal({
     e.preventDefault()
     if (!form.values) return
     onClose()
-    addTask.mutate(form.values)
+    addTask.mutate({ ...form.values, column_id: firstColumn(data.task_columns).id })
   }
 
   return (
@@ -42,9 +43,8 @@ export function AddTaskModal({
         <Field label="Title" required>
           <TextInput required value={form.title} onChange={(e) => form.setTitle(e.target.value)} />
         </Field>
-        <Field label="Date" required>
+        <Field label="Date">
           <TextInput
-            required
             type="date"
             value={form.date}
             onChange={(e) => form.setDate(e.target.value)}

@@ -20,7 +20,9 @@ import type {
   SavingsEntryPatch,
   NewTask,
   TaskPatch,
-  CompleteTaskInput,
+  MoveTaskInput,
+  NewTaskColumn,
+  TaskColumnPatch,
   NewNote,
   NotePatch,
   NewNoteItem,
@@ -53,6 +55,7 @@ import { signedAmount, isPaymentKind } from '../../lib/savings.ts'
 import { isoDate } from '../../lib/currentMonth.ts'
 import { nextSortOrder } from '../../lib/notes.ts'
 import { isValidGoalTransition } from '../../lib/goals.ts'
+import { DEFAULT_TASK_COLUMNS, firstColumn } from '../../lib/taskColumns.ts'
 
 const KEY = 'finance-mock-db'
 
@@ -438,6 +441,19 @@ export class MockApi implements FinanceApi {
     // Driven by financeShape's own list rather than naming fields here, so a
     // schema change cannot be applied to the check and forgotten here.
     backfillArrays(data)
+    // Self-heal: every user gets the three default columns the first time
+    // their data is read, the same way Settings' currency falls back to a
+    // default rather than being seeded at signup — there is no signup hook
+    // to hang this off of, and every existing user needs it once too.
+    // A plain .map with nextId(data.task_columns) would hand every seeded
+    // row the same id — data.task_columns is still [] for the whole map
+    // call, since the reassignment only happens after it returns — so ids
+    // are assigned by hand, one higher than the last, instead.
+    if (data.task_columns.length === 0) {
+      const startId = nextId(data.task_columns)
+      data.task_columns = DEFAULT_TASK_COLUMNS.map((c, i) => ({ id: startId + i, ...c }))
+      this.save(data)
+    }
     return data
   }
 
@@ -930,10 +946,9 @@ export class MockApi implements FinanceApi {
   async addTask(input: NewTask): Promise<FinanceData> {
     const data = this.load()
     if (!input.title.trim()) throw new Error('A task needs a title')
-    if (!input.date) throw new Error('A task needs a date')
     if (input.goal_id !== undefined) this.ownedGoal(data, input.goal_id)
     if (input.note_id !== undefined) this.ownedNote(data, input.note_id)
-    const task: Task = { id: nextId(data.tasks), ...input, completed: false }
+    const task: Task = { id: nextId(data.tasks), ...input }
     data.tasks.push(task)
     this.save(data)
     return this.delay(data)
@@ -945,29 +960,15 @@ export class MockApi implements FinanceApi {
     if (Object.prototype.hasOwnProperty.call(patch, 'title') && !(patch.title ?? '').trim()) {
       throw new Error('A task needs a title')
     }
-    if (Object.prototype.hasOwnProperty.call(patch, 'date') && !patch.date) {
-      throw new Error('A task needs a date')
-    }
     if (Object.prototype.hasOwnProperty.call(patch, 'goal_id') && patch.goal_id != null) {
       this.ownedGoal(data, patch.goal_id)
     }
     if (Object.prototype.hasOwnProperty.call(patch, 'note_id') && patch.note_id != null) {
       this.ownedNote(data, patch.note_id)
     }
-    // completed is excluded from the blind assign below and handled on its
-    // own: it is only ever cleared here, never set — see the FinanceApi.ts
-    // doc comment on TaskPatch and Code.gs's updateTask for why. Object.assign
-    // would otherwise apply it unconditionally like every other field, which
-    // let `{completed: true}` through here even though the type no longer
-    // allows constructing that patch.
-    const { completed, ...rest } = patch
-    Object.assign(task, rest)
-    if (completed === false) {
-      task.completed = false
-      task.completed_date = undefined
-    }
+    Object.assign(task, patch)
     // null is the wire's "clear this"; the stored model uses undefined.
-    for (const key of ['notes', 'start_time', 'end_time', 'recurrence', 'goal_id', 'note_id'] as const) {
+    for (const key of ['notes', 'start_time', 'end_time', 'recurrence', 'goal_id', 'note_id', 'date'] as const) {
       if (patch[key] === null) task[key] = undefined
     }
     this.save(data)
@@ -982,26 +983,76 @@ export class MockApi implements FinanceApi {
     return this.delay(data)
   }
 
-  async completeTask(id: number, input: CompleteTaskInput): Promise<FinanceData> {
+  /**
+   * The one mutation for every column change. Moving into the done column
+   * sets completed_date and, when the task recurs, mints the next
+   * occurrence — exactly today's completeTask. Moving to any other column
+   * (including out of done) just updates column_id and clears
+   * completed_date, matching the old "Undo" (updateTask completed:false).
+   */
+  async moveTask(id: number, input: MoveTaskInput): Promise<FinanceData> {
     const data = this.load()
     const task = this.ownedTask(data, id)
-    if (task.completed) throw new Error('That task is already done.')
-    task.completed = true
-    task.completed_date = input.completed_date
-    if (task.recurrence && input.next_date) {
-      data.tasks.push({
-        id: nextId(data.tasks),
-        title: task.title,
-        notes: task.notes,
-        date: input.next_date,
-        start_time: task.start_time,
-        end_time: task.end_time,
-        recurrence: task.recurrence,
-        completed: false,
-        goal_id: task.goal_id,
-        note_id: task.note_id,
-      })
+    const columns = data.task_columns
+    const target = columns.find((c) => c.id === input.column_id)
+    if (!target) throw new Error('That column was not found. It may have been deleted.')
+    if (target.is_done) {
+      if (!input.completed_date) throw new Error('A completed task needs a date')
+      task.column_id = target.id
+      task.completed_date = input.completed_date
+      if (task.recurrence && input.next_date) {
+        const next: Task = {
+          id: nextId(data.tasks),
+          title: task.title,
+          notes: task.notes,
+          date: input.next_date,
+          start_time: task.start_time,
+          end_time: task.end_time,
+          recurrence: task.recurrence,
+          column_id: firstColumn(columns).id,
+          goal_id: task.goal_id,
+          note_id: task.note_id,
+        }
+        data.tasks.push(next)
+      }
+    } else {
+      task.column_id = target.id
+      task.completed_date = undefined
     }
+    this.save(data)
+    return this.delay(data)
+  }
+
+  async addTaskColumn(input: NewTaskColumn): Promise<FinanceData> {
+    const data = this.load()
+    if (!input.name.trim()) throw new Error('A column needs a name')
+    const sortOrder = Math.max(-1, ...data.task_columns.map((c) => c.sort_order)) + 1
+    data.task_columns.push({ id: nextId(data.task_columns), name: input.name.trim(), sort_order: sortOrder, is_done: false })
+    this.save(data)
+    return this.delay(data)
+  }
+
+  async updateTaskColumn(id: number, patch: TaskColumnPatch): Promise<FinanceData> {
+    const data = this.load()
+    const column = data.task_columns.find((c) => c.id === id)
+    if (!column) throw new Error('That column was not found. It may have been deleted.')
+    if (Object.prototype.hasOwnProperty.call(patch, 'name') && !(patch.name ?? '').trim()) {
+      throw new Error('A column needs a name')
+    }
+    Object.assign(column, patch)
+    this.save(data)
+    return this.delay(data)
+  }
+
+  async deleteTaskColumn(id: number): Promise<FinanceData> {
+    const data = this.load()
+    const column = data.task_columns.find((c) => c.id === id)
+    if (!column) throw new Error('That column was not found. It may have been deleted.')
+    if (column.is_done) throw new Error('The Done column cannot be deleted.')
+    if (data.tasks.some((t) => t.column_id === id)) {
+      throw new Error('Move or delete this column’s tasks first.')
+    }
+    data.task_columns = data.task_columns.filter((c) => c.id !== id)
     this.save(data)
     return this.delay(data)
   }

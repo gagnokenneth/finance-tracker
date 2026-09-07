@@ -17,8 +17,10 @@ export interface TaskForm {
   setRecurrence: (v: TaskRecurrence | '') => void
   goalId: number | ''
   setGoalId: (v: number | '') => void
-  /** The write payload, or null while the form is incomplete. */
-  values: NewTask | null
+  /** The write payload, or null while the form is incomplete. column_id is
+   *  not this hook's to know — the caller (AddTaskModal / Task 2's board)
+   *  supplies it. */
+  values: Omit<NewTask, 'column_id'> | null
 }
 
 /**
@@ -35,13 +37,13 @@ export function useTaskForm(task?: Task, initialDate?: string): TaskForm {
   const [recurrence, setRecurrence] = useState<TaskRecurrence | ''>(task?.recurrence ?? '')
   const [goalId, setGoalId] = useState<number | ''>(task?.goal_id ?? '')
 
-  const complete = title.trim() !== '' && date !== ''
-  const values: NewTask | null = !complete
+  const complete = title.trim() !== ''
+  const values: Omit<NewTask, 'column_id'> | null = !complete
     ? null
     : {
         title: title.trim(),
         notes: notes.trim() || undefined,
-        date,
+        date: date || undefined,
         start_time: startTime || undefined,
         end_time: endTime || undefined,
         recurrence: recurrence || undefined,

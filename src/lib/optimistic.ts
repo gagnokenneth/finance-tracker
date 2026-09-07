@@ -11,6 +11,7 @@ import type {
   SavingsMovementKind,
   SavingsRefType,
   Task,
+  TaskColumn,
   Note,
   NoteItem,
   Goal,
@@ -33,7 +34,9 @@ import type {
   SavingsEntryPatch,
   NewTask,
   TaskPatch,
-  CompleteTaskInput,
+  MoveTaskInput,
+  NewTaskColumn,
+  TaskColumnPatch,
   NewNote,
   NotePatch,
   NewNoteItem,
@@ -44,6 +47,7 @@ import type {
 import { tempId } from './tempId.ts'
 import { signedAmount } from './savings.ts'
 import { nextSortOrder } from './notes.ts'
+import { firstColumn } from './taskColumns.ts'
 
 /**
  * Client-side predictions of what a write does to the dataset, used to show the
@@ -522,28 +526,22 @@ export function removeSavingsEntry(data: FinanceData, id: number): FinanceData {
 }
 
 export function addTaskTo(data: FinanceData, vars: NewTask): FinanceData {
-  const task: Task = { id: tempId(), ...vars, completed: false }
+  const task: Task = { id: tempId(), ...vars }
   return { ...data, tasks: [...data.tasks, task] }
 }
 
 /** See TaskPatch — the wire's null becomes the model's undefined. */
 function clearedTaskFields(patch: TaskPatch): Partial<Task> {
-  return clearNulls(patch, ['notes', 'start_time', 'end_time', 'recurrence', 'goal_id', 'note_id']) as Partial<Task>
+  return clearNulls(patch, ['notes', 'start_time', 'end_time', 'recurrence', 'goal_id', 'note_id', 'date']) as Partial<Task>
 }
 
-/** See TaskPatch — completed is never cleared to anything but false here. */
 export function applyTaskPatch(
   data: FinanceData,
   vars: { id: number; patch: TaskPatch },
 ): FinanceData {
   return {
     ...data,
-    tasks: data.tasks.map((t) => {
-      if (t.id !== vars.id) return t
-      const patched = { ...t, ...clearedTaskFields(vars.patch) }
-      if (vars.patch.completed === false) patched.completed_date = undefined
-      return patched
-    }),
+    tasks: data.tasks.map((t) => (t.id === vars.id ? { ...t, ...clearedTaskFields(vars.patch) } : t)),
   }
 }
 
@@ -552,26 +550,23 @@ export function removeTask(data: FinanceData, id: number): FinanceData {
 }
 
 /**
- * Marks done and, when the task recurs, predicts the mint — mirrors
- * payBillPayableIn exactly: the next occurrence's fields come from the
- * ORIGINAL task, not the patched one, since the completed/completed_date
- * fields on a fresh occurrence must be false/absent regardless of what the
- * one just completed now holds.
+ * Predicts moveTask — mirrors payBillPayableIn/the old completeTaskIn: when
+ * the target column is done and the task recurs, predicts the minted next
+ * occurrence using the ORIGINAL task's fields, not the patched one.
  */
-export function completeTaskIn(
+export function moveTaskIn(
   data: FinanceData,
-  vars: { id: number; input: CompleteTaskInput },
+  vars: { id: number; input: MoveTaskInput },
 ): FinanceData {
   const task = data.tasks.find((t) => t.id === vars.id)
-  // Already completed — both backends refuse this as "already done", so
-  // predicting it here too stops a double-click from minting two "next
-  // occurrence" rows before the second server call's rejection rolls one
-  // back (a visible flash of a duplicate that never actually gets created).
-  if (!task || task.completed) return data
-  const completed = data.tasks.map((t) =>
-    t.id === vars.id ? { ...t, completed: true, completed_date: vars.input.completed_date } : t,
+  const target = data.task_columns.find((c) => c.id === vars.input.column_id)
+  if (!task || !target) return data
+  const moved = data.tasks.map((t) =>
+    t.id === vars.id
+      ? { ...t, column_id: target.id, completed_date: target.is_done ? vars.input.completed_date : undefined }
+      : t,
   )
-  if (!task.recurrence || !vars.input.next_date) return { ...data, tasks: completed }
+  if (!target.is_done || !task.recurrence || !vars.input.next_date) return { ...data, tasks: moved }
   const next: Task = {
     id: tempId(),
     title: task.title,
@@ -580,11 +575,31 @@ export function completeTaskIn(
     start_time: task.start_time,
     end_time: task.end_time,
     recurrence: task.recurrence,
-    completed: false,
+    column_id: firstColumn(data.task_columns).id,
     goal_id: task.goal_id,
     note_id: task.note_id,
   }
-  return { ...data, tasks: [...completed, next] }
+  return { ...data, tasks: [...moved, next] }
+}
+
+export function addTaskColumnTo(data: FinanceData, vars: NewTaskColumn): FinanceData {
+  const sortOrder = Math.max(-1, ...data.task_columns.map((c) => c.sort_order)) + 1
+  const column: TaskColumn = { id: tempId(), name: vars.name, sort_order: sortOrder, is_done: false }
+  return { ...data, task_columns: [...data.task_columns, column] }
+}
+
+export function applyTaskColumnPatch(
+  data: FinanceData,
+  vars: { id: number; patch: TaskColumnPatch },
+): FinanceData {
+  return {
+    ...data,
+    task_columns: data.task_columns.map((c) => (c.id === vars.id ? { ...c, ...vars.patch } : c)),
+  }
+}
+
+export function removeTaskColumn(data: FinanceData, id: number): FinanceData {
+  return { ...data, task_columns: data.task_columns.filter((c) => c.id !== id) }
 }
 
 /** See NotePatch — the wire's null becomes the model's undefined. */

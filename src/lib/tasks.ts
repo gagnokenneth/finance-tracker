@@ -3,7 +3,7 @@ import type { Task, TaskRecurrence } from '../types.ts'
 
 /**
  * The date a completed recurring task's successor should carry. Computed
- * client-side and sent as completeTask's next_date — Code.gs and MockApi
+ * client-side and sent as moveTask's next_date — Code.gs and MockApi
  * never run this arithmetic themselves, the same split Bills already use
  * for first_due_date/next_due_date.
  */
@@ -21,8 +21,7 @@ export const RECURRENCE_LABEL: Record<TaskRecurrence, string> = {
   monthly: 'Monthly',
 }
 
-/** Newest-scheduled-first is wrong for a todo list — soonest first is the
- *  actionable order, matching how Bills' schedule table already sorts. */
+/** Soonest-first; undated (Backlog) tasks sort after every dated one. */
 export function tasksSorted(tasks: Task[]): Task[] {
-  return [...tasks].sort((a, b) => a.date.localeCompare(b.date))
+  return [...tasks].sort((a, b) => (a.date ?? '9999-99-99').localeCompare(b.date ?? '9999-99-99'))
 }
