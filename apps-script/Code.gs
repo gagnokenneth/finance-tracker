@@ -1797,7 +1797,9 @@ function deleteTaskColumn(p, uid) {
   var rowIndex = ownedRowIndex('task_columns', p.id, uid);
   var column = getById('task_columns', p.id);
   if (bool(column.is_done)) throw new Error('The Done column cannot be deleted.');
-  var tasks = readOwnedRows('tasks', uid).map(function (r) { return coerce('tasks', r); });
+  // Raw rows, not coerce()'d — every other task field (dates, times,
+  // recurrence, notes...) goes unused here, only column_id matters.
+  var tasks = readOwnedRows('tasks', uid);
   for (var i = 0; i < tasks.length; i++) {
     if (num(tasks[i].column_id) === num(p.id)) {
       throw new Error('Move or delete this column’s tasks first.');

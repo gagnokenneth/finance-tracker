@@ -32,3 +32,9 @@ export function firstColumn(columns: TaskColumn[]): TaskColumn {
   if (sorted.length === 0) throw new Error('No columns — task_columns is empty.')
   return sorted[0]
 }
+
+/** One more than the highest sort_order already used — where a newly added
+ *  column is appended. Mirrors nextSortOrder in lib/notes.ts. */
+export function nextSortOrder(columns: TaskColumn[]): number {
+  return Math.max(-1, ...columns.map((c) => c.sort_order)) + 1
+}

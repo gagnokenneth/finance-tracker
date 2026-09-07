@@ -34,6 +34,11 @@ export function Tasks() {
 
   const scoped = scope === 'backlog' ? backlogTasks(data.tasks) : tasksInWeek(data.tasks, weekStart)
   const grouped = groupByColumn(scoped, columns)
+  // Columns with at least one task, across ALL of the user's tasks (not just
+  // the current Backlog/week scope) — a column is only safe to delete when
+  // no task anywhere points at it. One O(tasks) pass instead of an O(tasks)
+  // .some() scan repeated per column.
+  const columnsWithTasks = new Set(data.tasks.map((t) => t.column_id))
 
   const swap = (a: TaskColumn, b: TaskColumn) => {
     updateTaskColumn.mutate({ id: a.id, patch: { sort_order: b.sort_order } })
@@ -101,7 +106,7 @@ export function Tasks() {
                 onOpenTask={setOpened}
                 onRename={(name) => updateTaskColumn.mutate({ id: column.id, patch: { name } })}
                 onDelete={() => deleteTaskColumn.mutate(column.id)}
-                canDelete={!column.is_done && !data.tasks.some((t) => t.column_id === column.id)}
+                canDelete={!column.is_done && !columnsWithTasks.has(column.id)}
                 onMoveLeft={i > 0 ? () => swap(column, columns[i - 1]) : undefined}
                 onMoveRight={i < columns.length - 1 ? () => swap(column, columns[i + 1]) : undefined}
               />

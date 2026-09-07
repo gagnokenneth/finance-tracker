@@ -47,7 +47,7 @@ import type {
 import { tempId } from './tempId.ts'
 import { signedAmount } from './savings.ts'
 import { nextSortOrder } from './notes.ts'
-import { firstColumn } from './taskColumns.ts'
+import { firstColumn, nextSortOrder as nextColumnSortOrder } from './taskColumns.ts'
 
 /**
  * Client-side predictions of what a write does to the dataset, used to show the
@@ -583,7 +583,7 @@ export function moveTaskIn(
 }
 
 export function addTaskColumnTo(data: FinanceData, vars: NewTaskColumn): FinanceData {
-  const sortOrder = Math.max(-1, ...data.task_columns.map((c) => c.sort_order)) + 1
+  const sortOrder = nextColumnSortOrder(data.task_columns)
   const column: TaskColumn = { id: tempId(), name: vars.name, sort_order: sortOrder, is_done: false }
   return { ...data, task_columns: [...data.task_columns, column] }
 }

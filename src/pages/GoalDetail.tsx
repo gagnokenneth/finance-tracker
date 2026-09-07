@@ -5,7 +5,7 @@ import { useFinanceMutations } from '../hooks/useFinanceMutations.ts'
 import { subgoalsOf, GOAL_STATUS_LABEL, GOAL_STATUS_CLASS } from '../lib/goals.ts'
 import { isTemp } from '../lib/tempId.ts'
 import { Card } from '../components/Card.tsx'
-import { CardRow } from '../components/CardRow.tsx'
+import { CardRow, CARD_ROW_INTERACTIVE_CLASS } from '../components/CardRow.tsx'
 import { Pill } from '../components/StatusBadge.tsx'
 import { RowButton, EditButton, DeleteButton } from '../components/ui.tsx'
 import { PendingBadge } from '../components/PendingBadge.tsx'
@@ -136,7 +136,7 @@ export function GoalDetail() {
                 key={task.id}
                 type="button"
                 onClick={() => setOpenedTask(task)}
-                className="block w-full rounded-xl border border-edge bg-white p-5 text-left transition-[box-shadow,border-color] hover:border-brand/30 hover:shadow-md hover:shadow-ink/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+                className={`${CARD_ROW_INTERACTIVE_CLASS} w-full text-left`}
               >
                 <span className="font-medium text-ink">{task.title}</span>
                 {task.date && <p className="mt-0.5 text-xs text-ink-faint">{task.date}</p>}

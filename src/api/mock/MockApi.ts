@@ -55,7 +55,7 @@ import { signedAmount, isPaymentKind } from '../../lib/savings.ts'
 import { isoDate } from '../../lib/currentMonth.ts'
 import { nextSortOrder } from '../../lib/notes.ts'
 import { isValidGoalTransition } from '../../lib/goals.ts'
-import { DEFAULT_TASK_COLUMNS, firstColumn } from '../../lib/taskColumns.ts'
+import { DEFAULT_TASK_COLUMNS, firstColumn, nextSortOrder as nextColumnSortOrder } from '../../lib/taskColumns.ts'
 
 const KEY = 'finance-mock-db'
 
@@ -1026,7 +1026,7 @@ export class MockApi implements FinanceApi {
   async addTaskColumn(input: NewTaskColumn): Promise<FinanceData> {
     const data = this.load()
     if (!input.name.trim()) throw new Error('A column needs a name')
-    const sortOrder = Math.max(-1, ...data.task_columns.map((c) => c.sort_order)) + 1
+    const sortOrder = nextColumnSortOrder(data.task_columns)
     data.task_columns.push({ id: nextId(data.task_columns), name: input.name.trim(), sort_order: sortOrder, is_done: false })
     this.save(data)
     return this.delay(data)
