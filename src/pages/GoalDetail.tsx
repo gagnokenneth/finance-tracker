@@ -136,7 +136,7 @@ export function GoalDetail() {
                 key={task.id}
                 type="button"
                 onClick={() => setOpenedTask(task)}
-                className="block w-full rounded-xl border border-edge bg-white p-4 text-left transition-[box-shadow,border-color] hover:border-brand/30 hover:shadow-md hover:shadow-ink/5"
+                className="block w-full rounded-xl border border-edge bg-white p-5 text-left transition-[box-shadow,border-color] hover:border-brand/30 hover:shadow-md hover:shadow-ink/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
               >
                 <span className="font-medium text-ink">{task.title}</span>
                 {task.date && <p className="mt-0.5 text-xs text-ink-faint">{task.date}</p>}

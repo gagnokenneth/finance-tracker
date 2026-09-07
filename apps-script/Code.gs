@@ -676,19 +676,30 @@ function assertOwned(name, id, uid) {
 function ensureDefaultTaskColumns(uid) {
   var existing = readOwnedRows('task_columns', uid);
   if (existing.length > 0) return;
-  var rows = [
-    { name: 'To Do', sort_order: 0, is_done: false },
-    { name: 'In Progress', sort_order: 1, is_done: false },
-    { name: 'Done', sort_order: 2, is_done: true }
-  ];
-  for (var i = 0; i < rows.length; i++) {
-    appendRow('task_columns', {
-      id: nextId('task_columns'),
-      user_id: uid,
-      name: rows[i].name,
-      sort_order: rows[i].sort_order,
-      is_done: rows[i].is_done
-    });
+
+  // Two concurrent requests from the same user could both pass the check
+  // above before either insert commits, producing duplicate default columns
+  // (and more than one is_done column). Serialise, then re-check.
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    if (readOwnedRows('task_columns', uid).length > 0) return;
+    var rows = [
+      { name: 'To Do', sort_order: 0, is_done: false },
+      { name: 'In Progress', sort_order: 1, is_done: false },
+      { name: 'Done', sort_order: 2, is_done: true }
+    ];
+    for (var i = 0; i < rows.length; i++) {
+      appendRow('task_columns', {
+        id: nextId('task_columns'),
+        user_id: uid,
+        name: rows[i].name,
+        sort_order: rows[i].sort_order,
+        is_done: rows[i].is_done
+      });
+    }
+  } finally {
+    lock.releaseLock();
   }
 }
 
@@ -1653,6 +1664,7 @@ function addTask(p, uid) {
   var input = p.input || {};
   if (blank(input.title)) throw new Error('A task needs a title');
   if (blank(input.column_id)) throw new Error('A task needs a column');
+  assertOwned('task_columns', input.column_id, uid);
   if (!blank(input.goal_id)) assertOwned('goals', input.goal_id, uid);
   if (!blank(input.note_id)) assertOwned('notes', input.note_id, uid);
   appendRow('tasks', {
@@ -1714,6 +1726,7 @@ function moveTask(p, uid) {
   var current = getById('tasks', p.id);
   var input = p.input || {};
   if (blank(input.column_id)) throw new Error('A column is required');
+  assertOwned('task_columns', input.column_id, uid);
   var column = getById('task_columns', input.column_id);
   if (!column) throw new Error('That column was not found. It may have been deleted.');
   if (bool(column.is_done)) {
@@ -1752,14 +1765,15 @@ function firstTaskColumn(uid) {
 
 function addTaskColumn(p, uid) {
   var input = p.input || {};
-  if (blank(input.name)) throw new Error('A column needs a name');
+  var name = String(input.name || '').trim();
+  if (!name) throw new Error('A column needs a name');
   var rows = readOwnedRows('task_columns', uid).map(function (r) { return coerce('task_columns', r); });
   var maxSort = -1;
   for (var i = 0; i < rows.length; i++) if (rows[i].sort_order > maxSort) maxSort = rows[i].sort_order;
   appendRow('task_columns', {
     id: nextId('task_columns'),
     user_id: uid,
-    name: input.name,
+    name: name,
     sort_order: maxSort + 1,
     is_done: false
   });
@@ -1771,8 +1785,9 @@ function updateTaskColumn(p, uid) {
   var given = p.patch || {};
   var patch = {};
   if (Object.prototype.hasOwnProperty.call(given, 'name')) {
-    if (blank(given.name)) throw new Error('A column needs a name');
-    patch.name = given.name;
+    var name = String(given.name || '').trim();
+    if (!name) throw new Error('A column needs a name');
+    patch.name = name;
   }
   if (Object.prototype.hasOwnProperty.call(given, 'sort_order')) patch.sort_order = given.sort_order;
   return patchRowAt('task_columns', rowIndex, patch);

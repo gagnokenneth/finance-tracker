@@ -1039,7 +1039,7 @@ export class MockApi implements FinanceApi {
     if (Object.prototype.hasOwnProperty.call(patch, 'name') && !(patch.name ?? '').trim()) {
       throw new Error('A column needs a name')
     }
-    Object.assign(column, patch)
+    Object.assign(column, { ...patch, name: patch.name !== undefined ? patch.name.trim() : patch.name })
     this.save(data)
     return this.delay(data)
   }
