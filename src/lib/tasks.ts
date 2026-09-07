@@ -1,5 +1,6 @@
-import { shiftDays, nextMonthOn, weekWindow } from './currentMonth.ts'
+import { shiftDays, nextMonthOn, weekWindow, isoDate } from './currentMonth.ts'
 import type { Task, TaskRecurrence, TaskColumn } from '../types.ts'
+import type { MoveTaskInput } from '../api/FinanceApi.ts'
 
 /**
  * The date a completed recurring task's successor should carry. Computed
@@ -11,6 +12,23 @@ export function nextTaskDate(date: string, recurrence: TaskRecurrence): string {
   if (recurrence === 'daily') return shiftDays(date, 1)
   if (recurrence === 'weekly') return shiftDays(date, 7)
   return nextMonthOn(date) // 'monthly'
+}
+
+/**
+ * Builds the moveTask input for dropping/moving a task into `columnId`.
+ * Landing in the done column stamps completed_date and, for a dated
+ * recurring task, mints the next occurrence's date. Shared by the board's
+ * drag-and-drop handler and the detail popup's "Move to" buttons.
+ */
+export function buildMoveInput(task: Task, columnId: number, doneColumnId: number): MoveTaskInput {
+  if (columnId === doneColumnId) {
+    return {
+      column_id: columnId,
+      completed_date: isoDate(),
+      next_date: task.recurrence && task.date ? nextTaskDate(task.date, task.recurrence) : undefined,
+    }
+  }
+  return { column_id: columnId }
 }
 
 export const RECURRENCES: TaskRecurrence[] = ['daily', 'weekly', 'monthly']

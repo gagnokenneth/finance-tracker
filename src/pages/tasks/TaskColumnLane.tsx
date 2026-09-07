@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useDroppable } from '@dnd-kit/core'
 import { TaskCard } from './TaskCard.tsx'
 import { groupByDay } from '../../lib/tasks.ts'
 import { TextInput, RowButton, DeleteRowButton } from '../../components/ui.tsx'
@@ -32,6 +33,7 @@ export function TaskColumnLane({
 }) {
   const [renaming, setRenaming] = useState(false)
   const [nameDraft, setNameDraft] = useState('')
+  const { setNodeRef, isOver } = useDroppable({ id: column.id })
 
   const days = dayGrouped ? [...groupByDay(tasks).entries()].sort(([a], [b]) => a.localeCompare(b)) : null
 
@@ -51,7 +53,10 @@ export function TaskColumnLane({
   const card = (task: Task) => <TaskCard key={task.id} task={task} onClick={() => onOpenTask(task)} />
 
   return (
-    <div className="flex w-64 shrink-0 flex-col gap-2 rounded-xl bg-paper p-3">
+    <div
+      ref={setNodeRef}
+      className={`flex w-64 shrink-0 flex-col gap-2 rounded-xl bg-paper p-3 ${isOver ? 'ring-2 ring-brand/40' : ''}`}
+    >
       <div className="flex items-center justify-between gap-2">
         {renaming ? (
           <TextInput

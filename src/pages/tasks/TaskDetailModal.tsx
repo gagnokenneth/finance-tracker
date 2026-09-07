@@ -3,10 +3,8 @@ import type { FormEvent } from 'react'
 import { useFinanceMutations } from '../../hooks/useFinanceMutations.ts'
 import { useTaskForm } from '../../hooks/useTaskForm.ts'
 import { referenceable } from '../../lib/tempId.ts'
-import { nextTaskDate } from '../../lib/tasks.ts'
+import { buildMoveInput, RECURRENCES, RECURRENCE_LABEL } from '../../lib/tasks.ts'
 import { sortedColumns, doneColumn } from '../../lib/taskColumns.ts'
-import { isoDate } from '../../lib/currentMonth.ts'
-import { RECURRENCES, RECURRENCE_LABEL } from '../../lib/tasks.ts'
 import { Modal } from '../../components/Modal.tsx'
 import { ConfirmDialog } from '../../components/ConfirmDialog.tsx'
 import { Field, TextInput, SelectInput, Button, SecondaryButton, RowButton, DeleteButton } from '../../components/ui.tsx'
@@ -49,18 +47,7 @@ export function TaskDetailModal({
   }
 
   const move = (columnId: number) => {
-    if (columnId === done.id) {
-      moveTask.mutate({
-        id: task.id,
-        input: {
-          column_id: columnId,
-          completed_date: isoDate(),
-          next_date: task.recurrence && task.date ? nextTaskDate(task.date, task.recurrence) : undefined,
-        },
-      })
-    } else {
-      moveTask.mutate({ id: task.id, input: { column_id: columnId } })
-    }
+    moveTask.mutate({ id: task.id, input: buildMoveInput(task, columnId, done.id) })
     onClose()
   }
 
