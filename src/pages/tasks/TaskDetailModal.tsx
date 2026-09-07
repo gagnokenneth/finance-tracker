@@ -51,7 +51,7 @@ export function TaskDetailModal({
   }
 
   return (
-    <Modal open={open} title={task.title} onClose={onClose}>
+    <Modal open={open} title={task.title} onClose={onClose} wide>
       <div className="flex flex-wrap items-center gap-1.5">
         {columns
           .filter((c) => c.id !== task.column_id)
@@ -69,29 +69,31 @@ export function TaskDetailModal({
         <Field label="Description">
           <RichTextEditor value={form.notes} onChange={form.setNotes} />
         </Field>
-        <Field label="Date">
-          <TextInput type="date" value={form.date} onChange={(e) => form.setDate(e.target.value)} />
-        </Field>
-        <Field label="Repeats">
-          <SelectInput value={form.recurrence} onChange={(e) => form.setRecurrence(e.target.value as typeof form.recurrence)}>
-            <option value="">Does not repeat</option>
-            {RECURRENCES.map((r) => (
-              <option key={r} value={r}>
-                {RECURRENCE_LABEL[r]}
-              </option>
-            ))}
-          </SelectInput>
-        </Field>
-        <Field label="Part of a goal">
-          <SelectInput value={form.goalId} onChange={(e) => form.setGoalId(e.target.value ? Number(e.target.value) : '')}>
-            <option value="">Nothing</option>
-            {goals.map((g) => (
-              <option key={g.id} value={g.id}>
-                {g.title}
-              </option>
-            ))}
-          </SelectInput>
-        </Field>
+        <div className="grid grid-cols-3 gap-3">
+          <Field label="Date">
+            <TextInput type="date" value={form.date} onChange={(e) => form.setDate(e.target.value)} />
+          </Field>
+          <Field label="Repeats">
+            <SelectInput value={form.recurrence} onChange={(e) => form.setRecurrence(e.target.value as typeof form.recurrence)}>
+              <option value="">Does not repeat</option>
+              {RECURRENCES.map((r) => (
+                <option key={r} value={r}>
+                  {RECURRENCE_LABEL[r]}
+                </option>
+              ))}
+            </SelectInput>
+          </Field>
+          <Field label="Part of a goal">
+            <SelectInput value={form.goalId} onChange={(e) => form.setGoalId(e.target.value ? Number(e.target.value) : '')}>
+              <option value="">Nothing</option>
+              {goals.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.title}
+                </option>
+              ))}
+            </SelectInput>
+          </Field>
+        </div>
 
         <div className="mt-1 flex justify-between gap-2">
           <DeleteButton type="button" onClick={() => setDeleting(true)} />

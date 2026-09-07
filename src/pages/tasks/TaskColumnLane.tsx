@@ -51,51 +51,61 @@ export function TaskColumnLane({
   return (
     <div
       ref={setNodeRef}
-      className={`flex w-64 shrink-0 flex-col gap-2 rounded-xl bg-paper p-3 ${isOver ? 'ring-2 ring-brand/40' : ''}`}
+      className={`flex w-64 shrink-0 flex-col gap-3 rounded-xl bg-paper pb-3 ${isOver ? 'ring-2 ring-brand/40' : ''}`}
     >
-      <div className="flex items-center justify-between gap-2">
-        {renaming ? (
-          <TextInput
-            autoFocus
-            value={nameDraft}
-            onChange={(e) => setNameDraft(e.target.value)}
-            onBlur={saveRename}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') e.currentTarget.blur()
-              if (e.key === 'Escape') setRenaming(false)
-            }}
-            className="!w-auto text-sm font-semibold tracking-tight text-ink"
+      <div
+        className={`flex items-center justify-between gap-2 rounded-t-xl border-b-2 px-3 pt-3 pb-2.5 ${
+          column.is_done ? 'border-settled/50' : 'border-edge'
+        }`}
+      >
+        <div className="flex min-w-0 items-center gap-1.5">
+          {column.is_done && (
+            <span className="text-settled" aria-hidden>
+              ✓
+            </span>
+          )}
+          {renaming ? (
+            <TextInput
+              autoFocus
+              value={nameDraft}
+              onChange={(e) => setNameDraft(e.target.value)}
+              onBlur={saveRename}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') e.currentTarget.blur()
+                if (e.key === 'Escape') setRenaming(false)
+              }}
+              className="!w-auto text-sm font-semibold tracking-tight text-ink"
+            />
+          ) : (
+            <h3
+              className="cursor-text truncate text-sm font-semibold tracking-tight text-ink hover:underline"
+              onClick={startRename}
+            >
+              {column.name}
+            </h3>
+          )}
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="tnum font-mono text-xs text-ink-faint">{tasks.length}</span>
+          <DeleteRowButton
+            type="button"
+            disabled={!canDelete}
+            title={
+              canDelete
+                ? 'Delete'
+                : column.is_done
+                  ? "The Done column can't be deleted"
+                  : "Move or delete this column's tasks first"
+            }
+            onClick={onDelete}
           />
-        ) : (
-          <h3
-            className="cursor-text text-sm font-semibold tracking-tight text-ink hover:underline"
-            onClick={startRename}
-          >
-            {column.name}
-          </h3>
-        )}
-        <span className="tnum shrink-0 font-mono text-xs text-ink-faint">{tasks.length}</span>
-      </div>
-
-      <div className="flex items-center gap-1.5">
-        <DeleteRowButton
-          type="button"
-          disabled={!canDelete}
-          title={
-            canDelete
-              ? 'Delete'
-              : column.is_done
-                ? "The Done column can't be deleted"
-                : "Move or delete this column's tasks first"
-          }
-          onClick={onDelete}
-        />
+        </div>
       </div>
 
       {tasks.length === 0 ? (
-        <p className="text-xs text-ink-faint">No tasks.</p>
+        <p className="px-3 text-xs text-ink-faint">No tasks.</p>
       ) : days ? (
-        <div className="space-y-3">
+        <div className="space-y-3 px-3">
           {days.map(([date, dayTasks]) => (
             <div key={date} className="space-y-2">
               <p className="text-xs font-semibold tracking-wide text-ink-faint uppercase">{date}</p>
@@ -104,7 +114,7 @@ export function TaskColumnLane({
           ))}
         </div>
       ) : (
-        <div className="space-y-2">{tasks.map(card)}</div>
+        <div className="space-y-2 px-3">{tasks.map(card)}</div>
       )}
     </div>
   )

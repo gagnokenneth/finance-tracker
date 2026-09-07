@@ -7,7 +7,7 @@ import { backlogTasks, tasksInWeek, groupByColumn, buildMoveInput } from '../lib
 import { sortedColumns, doneColumn } from '../lib/taskColumns.ts'
 import { isoDate, startOfWeek, addWeeks, weekWindow } from '../lib/currentMonth.ts'
 import { isTemp } from '../lib/tempId.ts'
-import { CARD_ROW_INTERACTIVE_CLASS } from '../components/CardRow.tsx'
+import { Pill } from '../components/StatusBadge.tsx'
 import { PendingBadge } from '../components/PendingBadge.tsx'
 import { EmptyState } from '../components/EmptyState.tsx'
 import { Button, SecondaryButton } from '../components/ui.tsx'
@@ -104,11 +104,14 @@ export function Tasks() {
           </div>
 
           <div className="space-y-3">
-            <h2 className="text-sm font-semibold tracking-wide text-ink-faint uppercase">Backlog</h2>
+            <div className="flex items-baseline gap-2">
+              <h2 className="text-sm font-semibold tracking-wide text-ink-faint uppercase">Backlog</h2>
+              <span className="tnum font-mono text-xs text-ink-faint">{backlog.length}</span>
+            </div>
             {backlog.length === 0 ? (
               <p className="text-sm text-ink-faint">No backlog tasks.</p>
             ) : (
-              <div className="space-y-2">
+              <div className="divide-y divide-edge overflow-hidden rounded-xl border border-edge bg-white">
                 {backlog.map((task) => {
                   const column = data.task_columns.find((c) => c.id === task.column_id)
                   const pending = isTemp(task.id)
@@ -118,14 +121,21 @@ export function Tasks() {
                       type="button"
                       disabled={pending}
                       onClick={() => setOpened(task)}
-                      className={`${CARD_ROW_INTERACTIVE_CLASS} w-full text-left disabled:pointer-events-none disabled:opacity-60`}
+                      className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left transition-colors hover:bg-paper focus-visible:relative focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-brand disabled:pointer-events-none disabled:opacity-60"
                     >
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="font-medium text-ink">{task.title}</span>
-                        <div className="flex items-center gap-2">
-                          {pending && <PendingBadge />}
-                          {column && <span className="text-xs text-ink-faint">{column.name}</span>}
-                        </div>
+                      <span className="truncate text-sm font-medium text-ink">{task.title}</span>
+                      <div className="flex shrink-0 items-center gap-2">
+                        {pending && <PendingBadge />}
+                        {column && (
+                          <Pill
+                            label={column.name}
+                            className={
+                              column.is_done
+                                ? 'bg-settled-wash text-settled ring-settled/20'
+                                : 'bg-paper text-ink-soft ring-ink-faint/30'
+                            }
+                          />
+                        )}
                       </div>
                     </button>
                   )
