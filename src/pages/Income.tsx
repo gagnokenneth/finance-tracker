@@ -6,7 +6,7 @@ import { monthKey, addMonths, inMonth } from '../lib/currentMonth.ts'
 import { isTemp } from '../lib/tempId.ts'
 import { Money } from '../components/Money.tsx'
 import { Table } from '../components/Table.tsx'
-import { Button, SecondaryButton, RowButton } from '../components/ui.tsx'
+import { Button, SecondaryButton, EditRowButton, DeleteRowButton } from '../components/ui.tsx'
 import { ConfirmDialog } from '../components/ConfirmDialog.tsx'
 import { PendingBadge } from '../components/PendingBadge.tsx'
 import { EmptyState } from '../components/EmptyState.tsx'
@@ -77,12 +77,8 @@ export function Income() {
               <td className="px-4 py-3 text-ink-faint">{row.notes ?? ''}</td>
               <td className="px-4 py-3 text-right">
                 <span className="flex justify-end gap-2">
-                  <RowButton onClick={() => setEditing(row)} disabled={isTemp(row.id)}>
-                    Edit
-                  </RowButton>
-                  <RowButton tone="danger" onClick={() => setDeleting(row)} disabled={isTemp(row.id)}>
-                    Delete
-                  </RowButton>
+                  <EditRowButton onClick={() => setEditing(row)} disabled={isTemp(row.id)} />
+                  <DeleteRowButton onClick={() => setDeleting(row)} disabled={isTemp(row.id)} />
                 </span>
               </td>
             </tr>

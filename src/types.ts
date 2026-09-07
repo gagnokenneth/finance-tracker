@@ -136,25 +136,18 @@ export interface Task {
   note_id?: number
 }
 
-export type NoteKind = 'freeform' | 'checklist'
-/** PM-4 will add 'goal' here — a union member costs nothing to add later,
- *  unlike a sheet column, so there is no reason to add it before Goals exists. */
-export type NoteLinkType = 'bill' | 'debt' | 'task'
-
 /**
- * A freeform or checklist note, optionally linked to a Bill, Debt, or Task
- * for context. Deliberately dateless — the moment something needs a due
- * date it is a Task, not a Note (see the design spec's Notes/Goals/Task
- * boundary). kind never changes after creation.
+ * A note: a title plus an optional WYSIWYG body, and optionally a checklist
+ * (its items live in NoteItem — present only once "Add checklist" has been
+ * used on this note). Deliberately dateless — the moment something needs a
+ * due date it is a Task, not a Note (see the design spec's Notes/Goals/Task
+ * boundary).
  */
 export interface Note {
   id: number
-  kind: NoteKind
   title: string
-  /** Only meaningful when kind is 'freeform'. */
+  /** HTML from the WYSIWYG editor. */
   body?: string
-  linked_type?: NoteLinkType
-  linked_id?: number
 }
 
 /** One row of a checklist note. */
@@ -167,15 +160,12 @@ export interface NoteItem {
   sort_order: number
 }
 
-export type GoalStatus = 'active' | 'achieved' | 'not_achieved' | 'abandoned'
-/** Deliberately not the same union Notes uses — a goal's financial subject
- *  is a thing to pay off or save toward, never a Task. */
-export type GoalLinkType = 'bill' | 'debt' | 'savings'
+export type GoalStatus = 'planned' | 'active' | 'achieved' | 'not_achieved' | 'abandoned'
 
 /**
- * An outcome tracked over time, with at most one level of subgoals.
- * Progress is a manual check-in (status), never computed from linked_id's
- * own live balance — see the design spec's financial-goals decision.
+ * An outcome tracked over time, with at most one level of subgoals. Progress
+ * is a manual check-in (status): planned -> active (Start) -> achieved /
+ * not_achieved (the outcome), or abandoned at any point.
  */
 export interface Goal {
   id: number
@@ -188,9 +178,6 @@ export interface Goal {
    * see GoalPatch.
    */
   parent_goal_id?: number
-  linked_type?: GoalLinkType
-  /** Unused (blank) when linked_type is 'savings' — one balance per user. */
-  linked_id?: number
   status: GoalStatus
   notes?: string
 }

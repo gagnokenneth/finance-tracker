@@ -61,7 +61,7 @@ export function EditIncomeModal({
           onChange={setSourceId}
           includeId={entry.source_id}
         />
-        <Field label="Amount">
+        <Field label="Amount" required>
           <TextInput
             required
             type="number"
@@ -71,7 +71,7 @@ export function EditIncomeModal({
             onChange={(e) => setAmount(e.target.value)}
           />
         </Field>
-        <Field label="Date">
+        <Field label="Date" required>
           <TextInput
             required
             type="date"

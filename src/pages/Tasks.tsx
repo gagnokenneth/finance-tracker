@@ -7,7 +7,7 @@ import { isTemp } from '../lib/tempId.ts'
 import { PendingBadge } from '../components/PendingBadge.tsx'
 import { ConfirmDialog } from '../components/ConfirmDialog.tsx'
 import { EmptyState } from '../components/EmptyState.tsx'
-import { Button, RowButton } from '../components/ui.tsx'
+import { Button, RowButton, EditRowButton, DeleteRowButton } from '../components/ui.tsx'
 import { LoadError } from '../components/LoadError.tsx'
 import { LoadingScreen } from '../components/LoadingScreen.tsx'
 import { AddTaskModal } from './tasks/AddTaskModal.tsx'
@@ -92,10 +92,8 @@ export function Tasks() {
                       <RowButton tone="primary" onClick={() => complete(task)}>
                         Complete
                       </RowButton>
-                      <RowButton onClick={() => setEditing(task)}>Edit</RowButton>
-                      <RowButton tone="danger" onClick={() => setDeleting(task)}>
-                        Delete
-                      </RowButton>
+                      <EditRowButton onClick={() => setEditing(task)} />
+                      <DeleteRowButton onClick={() => setDeleting(task)} />
                     </>
                   )}
                 </div>
@@ -120,9 +118,7 @@ export function Tasks() {
                       >
                         Undo
                       </RowButton>
-                      <RowButton tone="danger" onClick={() => setDeleting(task)}>
-                        Delete
-                      </RowButton>
+                      <DeleteRowButton onClick={() => setDeleting(task)} />
                     </>
                   )}
                 </div>

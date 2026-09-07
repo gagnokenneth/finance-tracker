@@ -589,7 +589,7 @@ export function completeTaskIn(
 
 /** See NotePatch — the wire's null becomes the model's undefined. */
 function clearedNoteFields(patch: NotePatch): Partial<Note> {
-  return clearNulls(patch, ['body', 'linked_type', 'linked_id']) as Partial<Note>
+  return clearNulls(patch, ['body']) as Partial<Note>
 }
 
 export function addNoteTo(data: FinanceData, vars: NewNote): FinanceData {
@@ -646,11 +646,11 @@ export function removeNoteItem(data: FinanceData, id: number): FinanceData {
 
 /** See GoalPatch — the wire's null becomes the model's undefined. */
 function clearedGoalFields(patch: GoalPatch): Partial<Goal> {
-  return clearNulls(patch, ['target_date', 'linked_type', 'linked_id', 'notes']) as Partial<Goal>
+  return clearNulls(patch, ['target_date', 'notes']) as Partial<Goal>
 }
 
 export function addGoalTo(data: FinanceData, vars: NewGoal): FinanceData {
-  const goal: Goal = { id: tempId(), ...vars, status: 'active' }
+  const goal: Goal = { id: tempId(), ...vars, status: 'planned' }
   return { ...data, goals: [...data.goals, goal] }
 }
 

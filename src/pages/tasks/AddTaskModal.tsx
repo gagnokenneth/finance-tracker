@@ -25,7 +25,9 @@ export function AddTaskModal({
 }) {
   const { addTask } = useFinanceMutations()
   const form = useTaskForm(undefined, initialDate)
-  const goals = referenceable(data.goals.filter((g) => g.status === 'active'))
+  const goals = referenceable(
+    data.goals.filter((g) => g.status === 'planned' || g.status === 'active'),
+  )
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
@@ -37,10 +39,10 @@ export function AddTaskModal({
   return (
     <Modal open={open} title="Add task" onClose={onClose}>
       <form onSubmit={submit} className="flex flex-col gap-3">
-        <Field label="Title">
+        <Field label="Title" required>
           <TextInput required value={form.title} onChange={(e) => form.setTitle(e.target.value)} />
         </Field>
-        <Field label="Date">
+        <Field label="Date" required>
           <TextInput
             required
             type="date"
@@ -77,7 +79,7 @@ export function AddTaskModal({
             ))}
           </SelectInput>
         </Field>
-        <Field label="Part of a goal (optional)">
+        <Field label="Part of a goal">
           <SelectInput
             value={form.goalId}
             onChange={(e) => form.setGoalId(e.target.value ? Number(e.target.value) : '')}

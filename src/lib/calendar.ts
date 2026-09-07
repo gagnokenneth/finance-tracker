@@ -150,7 +150,7 @@ function goalEvents(data: FinanceData, start: string, end: string): CalendarEven
       source: 'goal' as const,
       label: g.title,
       date: g.target_date,
-      to: '/goals',
+      to: `/goals/${g.id}`,
       editable: false,
       status: g.status === 'achieved' ? ('paid' as const) : g.status === 'not_achieved' ? ('late' as const) : undefined,
     }))

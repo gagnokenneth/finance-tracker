@@ -81,7 +81,7 @@ export function AddDebtModal({ open, onClose }: { open: boolean; onClose: () => 
   return (
     <Modal open={open} title="Add debt" onClose={onClose}>
       <form onSubmit={submit} className="flex flex-col gap-3">
-        <Field label="Name">
+        <Field label="Name" required>
           <TextInput value={name} onChange={(e) => setName(e.target.value)} required />
         </Field>
         <Field label="Type">
@@ -93,7 +93,7 @@ export function AddDebtModal({ open, onClose }: { open: boolean; onClose: () => 
 
         {type === 'fixed' ? (
           <>
-            <Field label="First due date">
+            <Field label="First due date" required>
               <TextInput
                 type="date"
                 value={firstDue}
@@ -101,7 +101,7 @@ export function AddDebtModal({ open, onClose }: { open: boolean; onClose: () => 
                 required
               />
             </Field>
-            <Field label="Total balance">
+            <Field label="Total balance" required>
               <TextInput
                 type="number"
                 step="0.01"
@@ -111,7 +111,7 @@ export function AddDebtModal({ open, onClose }: { open: boolean; onClose: () => 
                 required
               />
             </Field>
-            <Field label="Number of months">
+            <Field label="Number of months" required>
               <TextInput
                 type="number"
                 step="1"
@@ -127,7 +127,7 @@ export function AddDebtModal({ open, onClose }: { open: boolean; onClose: () => 
           </>
         ) : (
           <>
-            <Field label="Payment due date">
+            <Field label="Payment due date" required>
               <TextInput
                 type="date"
                 value={dueDate}
@@ -135,7 +135,7 @@ export function AddDebtModal({ open, onClose }: { open: boolean; onClose: () => 
                 required
               />
             </Field>
-            <Field label="Minimum amount due">
+            <Field label="Minimum amount due" required>
               <TextInput
                 type="number"
                 step="0.01"
@@ -145,7 +145,7 @@ export function AddDebtModal({ open, onClose }: { open: boolean; onClose: () => 
                 required
               />
             </Field>
-            <Field label="Total amount due">
+            <Field label="Total amount due" required>
               <TextInput
                 type="number"
                 step="0.01"
@@ -155,7 +155,7 @@ export function AddDebtModal({ open, onClose }: { open: boolean; onClose: () => 
                 required
               />
             </Field>
-            <Field label="Outstanding balance">
+            <Field label="Outstanding balance" required>
               <TextInput
                 type="number"
                 step="0.01"

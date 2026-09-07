@@ -11,7 +11,7 @@ import type { BillFrequency, BillType } from '../../types.ts'
 export function BillFormFields({ form }: { form: BillForm }) {
   return (
     <>
-      <Field label="Name">
+      <Field label="Name" required>
         <TextInput value={form.name} onChange={(e) => form.setName(e.target.value)} required />
       </Field>
       <Field label="Type">
@@ -37,7 +37,7 @@ export function BillFormFields({ form }: { form: BillForm }) {
       </Field>
 
       {form.type === 'fixed' && (
-        <Field label="Amount">
+        <Field label="Amount" required>
           <TextInput
             type="number"
             step="0.01"
@@ -61,7 +61,10 @@ export function BillFormFields({ form }: { form: BillForm }) {
         </Field>
       )}
 
-      <Field label={form.frequency === 'bimonthly' ? 'First due day' : 'Due day of the month'}>
+      <Field
+        label={form.frequency === 'bimonthly' ? 'First due day' : 'Due day of the month'}
+        required
+      >
         <TextInput
           type="number"
           step="1"
@@ -74,7 +77,7 @@ export function BillFormFields({ form }: { form: BillForm }) {
       </Field>
 
       {form.frequency === 'bimonthly' && (
-        <Field label="Second due day">
+        <Field label="Second due day" required>
           <TextInput
             type="number"
             step="1"

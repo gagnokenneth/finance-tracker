@@ -88,7 +88,7 @@ export function RowFormModal({
   return (
     <Modal open={open} title={title ?? `${isEdit ? 'Edit' : 'Add'} ${noun}`} onClose={onClose}>
       <form onSubmit={submit} className="flex flex-col gap-3">
-        <Field label={kind === 'schedule' ? 'Due date' : 'Payment due date'}>
+        <Field label={kind === 'schedule' ? 'Due date' : 'Payment due date'} required>
           <TextInput
             type="date"
             value={dueDate}
@@ -98,7 +98,7 @@ export function RowFormModal({
         </Field>
 
         {kind === 'schedule' ? (
-          <Field label="Amount">
+          <Field label="Amount" required>
             <TextInput
               type="number"
               step="0.01"
@@ -147,7 +147,7 @@ export function RowFormModal({
 
         {paid && (
           <>
-            <Field label="Paid date">
+            <Field label="Paid date" required>
               <TextInput
                 type="date"
                 value={paidDate}
@@ -155,7 +155,7 @@ export function RowFormModal({
                 required
               />
             </Field>
-            <Field label="Paid amount">
+            <Field label="Paid amount" required>
               <TextInput
                 type="number"
                 step="0.01"

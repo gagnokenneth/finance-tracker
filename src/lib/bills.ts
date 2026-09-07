@@ -22,9 +22,9 @@ export function upcomingPayable(rows: BillPayable[], billId: number): BillPayabl
   return nextUnpaid(rows.filter((r) => r.bill_id === billId))
 }
 
-/** "Monthly · Fixed" — the caption under a bill's name. */
-export function billCaption(bill: Bill): string {
-  return `${FREQUENCY_LABEL[bill.frequency]} · ${bill.type === 'fixed' ? 'Fixed' : 'Variable'}`
+/** ["Monthly", "Fixed"] — the two badges under a bill's name. */
+export function billBadges(bill: Bill): [string, string] {
+  return [FREQUENCY_LABEL[bill.frequency], bill.type === 'fixed' ? 'Fixed' : 'Variable']
 }
 
 /** Total still owed across every unpaid payable. Unpriced rows count as nothing. */

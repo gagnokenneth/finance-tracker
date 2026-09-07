@@ -32,7 +32,7 @@ export function SourcePicker({
   const shown = current ? [...options, current] : options
 
   return (
-    <Field label="Source">
+    <Field label="Source" required>
       <SelectInput
         required
         value={value ?? ''}

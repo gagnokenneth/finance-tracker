@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useFinanceData } from '../hooks/useFinanceData.ts'
 import { useFinanceMutations } from '../hooks/useFinanceMutations.ts'
-import { billCaption, payablesFor, recurrenceOf, upcomingPayable } from '../lib/bills.ts'
+import { billBadges, payablesFor, recurrenceOf, upcomingPayable } from '../lib/bills.ts'
 import { nextDueDate } from '../lib/billSchedule.ts'
 import { dueStatus } from '../lib/debts.ts'
 import { isTemp } from '../lib/tempId.ts'
@@ -18,7 +18,15 @@ import { LoadError } from '../components/LoadError.tsx'
 import { LoadingScreen } from '../components/LoadingScreen.tsx'
 import { PayModal } from '../components/PayModal.tsx'
 import type { PayResult } from '../components/PayModal.tsx'
-import { SecondaryButton, RowButton } from '../components/ui.tsx'
+import {
+  SecondaryButton,
+  RowButton,
+  EditRowButton,
+  DeleteRowButton,
+  EditButton,
+  DeleteButton,
+} from '../components/ui.tsx'
+import { Badge } from '../components/Badge.tsx'
 import { EditBillModal } from './bills/EditBillModal.tsx'
 import { PayableFormModal } from './bills/PayableFormModal.tsx'
 import type { BillPayable } from '../types.ts'
@@ -132,12 +140,8 @@ export function BillDetail() {
             Pay
           </RowButton>
         )}
-        <RowButton type="button" onClick={() => setEditingRow(row)}>
-          Edit
-        </RowButton>
-        <RowButton tone="danger" type="button" onClick={() => setDeletingRow(row)}>
-          Delete
-        </RowButton>
+        <EditRowButton type="button" onClick={() => setEditingRow(row)} />
+        <DeleteRowButton type="button" onClick={() => setDeletingRow(row)} />
       </div>
     )
   }
@@ -155,29 +159,27 @@ export function BillDetail() {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-ink">{bill.name}</h1>
-            <p className="mt-1 text-xs font-semibold tracking-wide text-ink-faint uppercase">
-              {billCaption(bill)}
-              {bill.closed && ' · Closed'}
-            </p>
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {billBadges(bill).map((label) => (
+                <Badge key={label}>{label}</Badge>
+              ))}
+              {bill.closed && <Badge>Closed</Badge>}
+            </div>
           </div>
           <div className="flex gap-2">
             {!bill.closed && (
               <>
-                <SecondaryButton type="button" onClick={() => setEditingBill(true)}>
-                  Edit
-                </SecondaryButton>
+                <EditButton type="button" onClick={() => setEditingBill(true)} />
                 <SecondaryButton type="button" onClick={() => setClosingBill(true)}>
                   Close
                 </SecondaryButton>
               </>
             )}
-            <SecondaryButton
+            <DeleteButton
               type="button"
               onClick={() => setDeletingBill(true)}
               className="!text-overdue hover:!bg-overdue-wash"
-            >
-              Delete
-            </SecondaryButton>
+            />
           </div>
         </div>
 

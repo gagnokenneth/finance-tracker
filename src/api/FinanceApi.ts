@@ -116,8 +116,7 @@ export interface CompleteTaskInput {
 }
 
 export type NewNote = Omit<Note, 'id'>
-/** kind is never in the patch — see Note's own doc comment. */
-export type NotePatch = Patch<Omit<Note, 'id' | 'kind'>, 'body' | 'linked_type' | 'linked_id'>
+export type NotePatch = Patch<Omit<Note, 'id'>, 'body'>
 
 export type NewNoteItem = Omit<NoteItem, 'id' | 'note_id' | 'done' | 'sort_order'>
 /** Neither field is ever cleared to null — text is always required,
@@ -130,10 +129,7 @@ export type NewGoal = Omit<Goal, 'id' | 'status'>
  * doc comment. status is a plain optional (not Clearable): it always holds
  * one of four values, never an "unset" third state.
  */
-export type GoalPatch = Patch<
-  Omit<Goal, 'id' | 'parent_goal_id'>,
-  'target_date' | 'linked_type' | 'linked_id' | 'notes'
->
+export type GoalPatch = Patch<Omit<Goal, 'id' | 'parent_goal_id'>, 'target_date' | 'notes'>
 
 export interface AuthResult {
   token: string
@@ -240,12 +236,10 @@ export interface FinanceApi {
   /* Note writes return the whole updated dataset, for the same reasons above. */
 
   addNote(input: NewNote): Promise<FinanceData>
-  /** kind can never be patched — see NotePatch. */
   updateNote(id: number, patch: NotePatch): Promise<FinanceData>
   /** Cascades its items. */
   deleteNote(id: number): Promise<FinanceData>
 
-  /** Refused when the note is not a checklist. */
   addNoteItem(noteId: number, input: NewNoteItem): Promise<FinanceData>
   updateNoteItem(id: number, patch: NoteItemPatch): Promise<FinanceData>
   deleteNoteItem(id: number): Promise<FinanceData>

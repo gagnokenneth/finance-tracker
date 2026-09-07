@@ -24,7 +24,14 @@ import { ConfirmDialog } from '../components/ConfirmDialog.tsx'
 import { EmptyState } from '../components/EmptyState.tsx'
 import { LoadError } from '../components/LoadError.tsx'
 import { LoadingScreen } from '../components/LoadingScreen.tsx'
-import { Button, SecondaryButton, RowButton } from '../components/ui.tsx'
+import {
+  Button,
+  SecondaryButton,
+  RowButton,
+  EditRowButton,
+  DeleteRowButton,
+  DeleteButton,
+} from '../components/ui.tsx'
 import { EditDebtModal } from './debts/EditDebtModal.tsx'
 import { PayModal } from '../components/PayModal.tsx'
 import type { PayResult } from '../components/PayModal.tsx'
@@ -200,12 +207,8 @@ export function DebtDetail() {
             Pay
           </RowButton>
         )}
-        <RowButton type="button" onClick={() => setRowForm({ mode: 'edit', row })}>
-          Edit
-        </RowButton>
-        <RowButton tone="danger" type="button" onClick={() => setDeletingRow(row)}>
-          Delete
-        </RowButton>
+        <EditRowButton type="button" onClick={() => setRowForm({ mode: 'edit', row })} />
+        <DeleteRowButton type="button" onClick={() => setDeletingRow(row)} />
       </div>
     )
   }
@@ -235,13 +238,11 @@ export function DebtDetail() {
             <SecondaryButton type="button" onClick={() => setEditingDebt(true)}>
               Rename
             </SecondaryButton>
-            <SecondaryButton
+            <DeleteButton
               type="button"
               onClick={() => setDeletingDebt(true)}
               className="!text-overdue hover:!bg-overdue-wash"
-            >
-              Delete
-            </SecondaryButton>
+            />
           </div>
         </div>
 

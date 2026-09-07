@@ -28,7 +28,7 @@ export function EditDebtModal({
   return (
     <Modal open={open} title="Rename debt" onClose={onClose}>
       <form onSubmit={submit} className="flex flex-col gap-3">
-        <Field label="Name">
+        <Field label="Name" required>
           <TextInput value={name} onChange={(e) => setName(e.target.value)} required />
         </Field>
         <div className="mt-1 flex justify-end gap-2">

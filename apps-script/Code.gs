@@ -17,9 +17,9 @@ var SHEETS = {
   income_sources: ['id', 'user_id', 'name', 'archived'],
   savings_ledger: ['id', 'user_id', 'date', 'amount', 'kind', 'ref_type', 'ref_id', 'notes'],
   tasks: ['id', 'user_id', 'title', 'notes', 'date', 'start_time', 'end_time', 'recurrence', 'completed', 'completed_date', 'goal_id', 'note_id'],
-  notes: ['id', 'user_id', 'kind', 'title', 'body', 'linked_type', 'linked_id'],
+  notes: ['id', 'user_id', 'title', 'body'],
   note_items: ['id', 'user_id', 'note_id', 'text', 'done', 'sort_order'],
-  goals: ['id', 'user_id', 'title', 'target_date', 'parent_goal_id', 'linked_type', 'linked_id', 'status', 'notes'],
+  goals: ['id', 'user_id', 'title', 'target_date', 'parent_goal_id', 'status', 'notes'],
   invites: ['code', 'used_by', 'used_at']
 };
 
@@ -28,7 +28,7 @@ var SHEETS = {
  * so the new shape is applied on the very next request after a deployment,
  * instead of up to an hour later.
  */
-var SCHEMA_VERSION = 12;
+var SCHEMA_VERSION = 13;
 
 /*
  * Tabs whose stale shape may be DISCARDED and recreated. Deliberately excludes
@@ -499,8 +499,7 @@ function coerce(name, r) {
     goal_id: optNum(r.goal_id), note_id: optNum(r.note_id)
   };
   if (name === 'notes') return {
-    id: num(r.id), kind: String(r.kind), title: String(r.title), body: optStr(r.body),
-    linked_type: optStr(r.linked_type), linked_id: optNum(r.linked_id)
+    id: num(r.id), title: String(r.title), body: optStr(r.body)
   };
   if (name === 'note_items') return {
     id: num(r.id), note_id: num(r.note_id), text: String(r.text), done: bool(r.done),
@@ -508,8 +507,7 @@ function coerce(name, r) {
   };
   if (name === 'goals') return {
     id: num(r.id), title: String(r.title), target_date: optDate(r.target_date),
-    parent_goal_id: optNum(r.parent_goal_id), linked_type: optStr(r.linked_type),
-    linked_id: optNum(r.linked_id), status: String(r.status), notes: optStr(r.notes)
+    parent_goal_id: optNum(r.parent_goal_id), status: String(r.status), notes: optStr(r.notes)
   };
   return r;
 }
@@ -777,7 +775,6 @@ function deleteDebt(p, uid) {
   unsettleManyFromSavings(uid, 'debt_statement', ownedIdsWhere('debt_statements', uid, 'debt_id', p.id));
   deleteRowsWhere('debt_schedule', 'debt_id', p.id);
   deleteRowsWhere('debt_statements', 'debt_id', p.id);
-  detachNotesLinkedTo(uid, 'debt', p.id);
   sheet('debts').deleteRow(rowIndex);
   return null;
 }
@@ -1026,7 +1023,6 @@ function deleteBill(p, uid) {
   // with the ledger rows still present.
   unsettleManyFromSavings(uid, 'bill_payable', ownedIdsWhere('bill_payables', uid, 'bill_id', p.id));
   deleteRowsWhere('bill_payables', 'bill_id', p.id);
-  detachNotesLinkedTo(uid, 'bill', p.id);
   sheet('bills').deleteRow(rowIndex);
   return null;
 }
@@ -1682,7 +1678,6 @@ function updateTask(p, uid) {
 
 function deleteTask(p, uid) {
   var rowIndex = ownedRowIndex('tasks', p.id, uid);
-  detachNotesLinkedTo(uid, 'task', p.id);
   sheet('tasks').deleteRow(rowIndex);
   return null;
 }
@@ -1721,83 +1716,18 @@ function completeTask(p, uid) {
   return null;
 }
 
-/** The sheet a link target lives on, keyed by linked_type. */
-var NOTE_LINK_SHEETS = { bill: 'bills', debt: 'debts', task: 'tasks' };
-
-/*
- * linked_type and linked_id ride together: both blank (no link), or both
- * present and owned — except a "no target" type (Goals' 'savings': a user
- * has one balance, not many rows to pick from), which must have a blank
- * linked_id since the type itself is the whole target. Never validates one
- * against the other's STALE value — a patch that changes what kind of thing
- * is linked must resolve the new pair together, the same rule the
- * (now-removed) AllocationLinePatch used for target_type/target_id. Shared
- * by Notes and Goals — sheetName/noTarget/kindLabel differ per caller, not
- * the validation shape.
- */
-function assertOwnedLinkedPair(kindLabel, sheetName, noTarget, linkedType, linkedId, uid) {
-  if (blank(linkedType)) {
-    if (!blank(linkedId)) throw new Error('A link needs a type.');
-    return;
-  }
-  if (noTarget) {
-    if (!blank(linkedId)) throw new Error('A ' + linkedType + ' link has no target.');
-    return;
-  }
-  if (!sheetName) throw new Error('That is not a kind of thing a ' + kindLabel + ' can link to.');
-  if (blank(linkedId)) throw new Error('A link needs a target.');
-  assertOwned(sheetName, linkedId, uid);
-}
-
-function assertOwnedLink(linkedType, linkedId, uid) {
-  assertOwnedLinkedPair('note', NOTE_LINK_SHEETS[linkedType], false, linkedType, linkedId, uid);
-}
-
-/**
- * Blanks linked_type/linked_id on every note pointing at (linkedType, id) —
- * called before a bill/debt/task row is deleted, so a note never keeps a
- * link to a row that no longer exists. Deleting the row it points at is the
- * only way a note's link can go stale, since assertOwnedLink already refuses
- * to create or edit a link with a bad id in the first place. Single read of
- * the notes sheet, mirroring detachTasksFromGoals's own batching.
- */
-function detachNotesLinkedTo(uid, linkedType, id) {
-  var sh = sheet('notes');
-  var last = sh.getLastRow();
-  if (last < 2) return;
-  var headers = SHEETS.notes;
-  var values = sh.getRange(2, 1, last - 1, headers.length).getValues();
-  var userCol = headers.indexOf('user_id');
-  var typeCol = headers.indexOf('linked_type');
-  var idCol = headers.indexOf('linked_id');
-  for (var r = 0; r < values.length; r++) {
-    if (num(values[r][userCol]) !== num(uid)) continue;
-    if (values[r][typeCol] !== linkedType) continue;
-    if (num(values[r][idCol]) !== num(id)) continue;
-    sh.getRange(r + 2, typeCol + 1, 1, 2).setValues([['', '']]);
-  }
-}
-
 function addNote(p, uid) {
   var input = p.input || {};
   if (blank(input.title)) throw new Error('A note needs a title');
-  if (input.kind !== 'freeform' && input.kind !== 'checklist') {
-    throw new Error('Not a kind of note');
-  }
-  assertOwnedLink(input.linked_type, input.linked_id, uid);
   appendRow('notes', {
     id: nextId('notes'),
     user_id: uid,
-    kind: input.kind,
     title: input.title,
-    body: input.kind === 'freeform' ? input.body : '',
-    linked_type: input.linked_type,
-    linked_id: input.linked_id
+    body: input.body || ''
   });
   return null;
 }
 
-/** kind is never patchable — converting freeform<->checklist means delete and recreate. */
 function updateNote(p, uid) {
   var rowIndex = ownedRowIndex('notes', p.id, uid);
   var given = p.patch || {};
@@ -1807,21 +1737,6 @@ function updateNote(p, uid) {
     patch.title = given.title;
   }
   if (Object.prototype.hasOwnProperty.call(given, 'body')) patch.body = given.body;
-  if (
-    Object.prototype.hasOwnProperty.call(given, 'linked_type') ||
-    Object.prototype.hasOwnProperty.call(given, 'linked_id')
-  ) {
-    var current = getById('notes', p.id);
-    var linkedType = Object.prototype.hasOwnProperty.call(given, 'linked_type')
-      ? given.linked_type
-      : current.linked_type;
-    var linkedId = Object.prototype.hasOwnProperty.call(given, 'linked_id')
-      ? given.linked_id
-      : current.linked_id;
-    assertOwnedLink(linkedType, linkedId, uid);
-    patch.linked_type = linkedType;
-    patch.linked_id = linkedId;
-  }
   return patchRowAt('notes', rowIndex, patch);
 }
 
@@ -1844,9 +1759,7 @@ function nextSortOrder(noteId) {
 }
 
 function addNoteItem(p, uid) {
-  var note = getById('notes', p.noteId);
   ownedRowIndex('notes', p.noteId, uid); // throws if not owned
-  if (String(note.kind) !== 'checklist') throw new Error('Only a checklist note can have items.');
   var input = p.input || {};
   if (blank(input.text)) throw new Error('A checklist item needs text');
   appendRow('note_items', {
@@ -1878,14 +1791,6 @@ function deleteNoteItem(p, uid) {
   return null;
 }
 
-/** The sheet a Goal's financial link lives on. 'savings' has none — a user
- *  has one balance, not many rows to pick from. */
-var GOAL_LINK_SHEETS = { bill: 'bills', debt: 'debts' };
-
-function assertOwnedGoalLink(linkedType, linkedId, uid) {
-  assertOwnedLinkedPair('goal', GOAL_LINK_SHEETS[linkedType], linkedType === 'savings', linkedType, linkedId, uid);
-}
-
 /*
  * Depth is fixed at 2: a row that is ITSELF a subgoal (has its own
  * parent_goal_id set) may never be chosen as someone else's parent. One read
@@ -1902,22 +1807,32 @@ function assertGoalDepth(parentGoalId, uid) {
   }
 }
 
-var GOAL_STATUSES = { active: true, achieved: true, not_achieved: true, abandoned: true };
+var GOAL_STATUSES = { planned: true, active: true, achieved: true, not_achieved: true, abandoned: true };
+
+/**
+ * Mirrors the action set GoalDetail's own JSX renders (Start, Mark
+ * achieved/not achieved, Abandon) — enforced here too so a raw API call
+ * can't set an illegal transition the UI never offers.
+ */
+function isValidGoalTransition(from, to) {
+  if (from === to) return true;
+  if (to === 'abandoned') return from !== 'abandoned';
+  if (from === 'planned' && to === 'active') return true;
+  if (from === 'active' && (to === 'achieved' || to === 'not_achieved')) return true;
+  return false;
+}
 
 function addGoal(p, uid) {
   var input = p.input || {};
   if (blank(input.title)) throw new Error('A goal needs a title');
   assertGoalDepth(input.parent_goal_id, uid);
-  assertOwnedGoalLink(input.linked_type, input.linked_id, uid);
   appendRow('goals', {
     id: nextId('goals'),
     user_id: uid,
     title: input.title,
     target_date: input.target_date,
     parent_goal_id: input.parent_goal_id,
-    linked_type: input.linked_type,
-    linked_id: input.linked_id,
-    status: 'active',
+    status: 'planned',
     notes: input.notes
   });
   return null;
@@ -1942,22 +1857,11 @@ function updateGoal(p, uid) {
   if (Object.prototype.hasOwnProperty.call(given, 'notes')) patch.notes = given.notes;
   if (Object.prototype.hasOwnProperty.call(given, 'status')) {
     if (!GOAL_STATUSES[given.status]) throw new Error('Not a valid status');
-    patch.status = given.status;
-  }
-  if (
-    Object.prototype.hasOwnProperty.call(given, 'linked_type') ||
-    Object.prototype.hasOwnProperty.call(given, 'linked_id')
-  ) {
     var current = getById('goals', p.id);
-    var linkedType = Object.prototype.hasOwnProperty.call(given, 'linked_type')
-      ? given.linked_type
-      : current.linked_type;
-    var linkedId = Object.prototype.hasOwnProperty.call(given, 'linked_id')
-      ? given.linked_id
-      : current.linked_id;
-    assertOwnedGoalLink(linkedType, linkedId, uid);
-    patch.linked_type = linkedType;
-    patch.linked_id = linkedId;
+    if (!isValidGoalTransition(String(current.status), given.status)) {
+      throw new Error('Not a valid status transition');
+    }
+    patch.status = given.status;
   }
   return patchRowAt('goals', rowIndex, patch);
 }

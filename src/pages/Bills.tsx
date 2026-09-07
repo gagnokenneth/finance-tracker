@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useFinanceData } from '../hooks/useFinanceData.ts'
-import { billCaption, unpaidTotal, upcomingPayable } from '../lib/bills.ts'
+import { billBadges, unpaidTotal, upcomingPayable } from '../lib/bills.ts'
 import { isTemp } from '../lib/tempId.ts'
 import { Money } from '../components/Money.tsx'
 import { CardRow } from '../components/CardRow.tsx'
+import { Badge } from '../components/Badge.tsx'
 import { DueBadge } from '../components/DueBadge.tsx'
 import { PendingBadge } from '../components/PendingBadge.tsx'
 import { Button } from '../components/ui.tsx'
@@ -26,9 +27,11 @@ function BillRow({ bill, data }: { bill: Bill; data: FinanceData }) {
         )}
       </div>
 
-      <p className="mt-1 text-xs font-semibold tracking-wide text-ink-faint uppercase">
-        {billCaption(bill)}
-      </p>
+      <div className="mt-1.5 flex flex-wrap gap-1.5">
+        {billBadges(bill).map((label) => (
+          <Badge key={label}>{label}</Badge>
+        ))}
+      </div>
 
       <div className="mt-4 flex items-center gap-2 text-xs text-ink-faint">
         {/* A pending bill has no id to navigate to and no saved payable, so the

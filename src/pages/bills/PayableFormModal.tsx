@@ -52,7 +52,7 @@ export function PayableFormModal({
   return (
     <Modal open={open} title={title} onClose={onClose}>
       <form onSubmit={submit} className="flex flex-col gap-3">
-        <Field label="Due date">
+        <Field label="Due date" required>
           <TextInput
             type="date"
             value={dueDate}
@@ -77,7 +77,7 @@ export function PayableFormModal({
 
         {paid && (
           <>
-            <Field label="Paid date">
+            <Field label="Paid date" required>
               <TextInput
                 type="date"
                 value={paidDate}
@@ -85,7 +85,7 @@ export function PayableFormModal({
                 required
               />
             </Field>
-            <Field label="Paid amount">
+            <Field label="Paid amount" required>
               <TextInput
                 type="number"
                 step="0.01"

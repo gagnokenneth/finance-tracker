@@ -42,7 +42,7 @@ export function AddIncomeModal({
     <Modal open={open} title="Add income" onClose={onClose}>
       <form onSubmit={submit} className="space-y-4">
         <SourcePicker sources={sources} value={sourceId} onChange={setSourceId} />
-        <Field label="Amount">
+        <Field label="Amount" required>
           <TextInput
             required
             type="number"
@@ -52,7 +52,7 @@ export function AddIncomeModal({
             onChange={(e) => setAmount(e.target.value)}
           />
         </Field>
-        <Field label="Date">
+        <Field label="Date" required>
           <TextInput
             required
             type="date"

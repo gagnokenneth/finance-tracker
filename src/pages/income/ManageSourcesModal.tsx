@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { Modal } from '../../components/Modal.tsx'
-import { Field, TextInput, Button, RowButton } from '../../components/ui.tsx'
+import { Field, TextInput, Button, RowButton, DeleteRowButton } from '../../components/ui.tsx'
 import { PendingBadge } from '../../components/PendingBadge.tsx'
 import { useFinanceMutations } from '../../hooks/useFinanceMutations.ts'
 import { sourceUsage } from '../../lib/income.ts'
@@ -50,8 +50,8 @@ export function ManageSourcesModal({
     <Modal open={open} title="Manage sources" onClose={onClose}>
       <form onSubmit={submit} className="flex items-end gap-2">
         <div className="flex-1">
-          <Field label="New source">
-            <TextInput value={name} onChange={(e) => setName(e.target.value)} />
+          <Field label="New source" required>
+            <TextInput required value={name} onChange={(e) => setName(e.target.value)} />
           </Field>
         </div>
         <Button type="submit">Add</Button>
@@ -99,13 +99,7 @@ export function ManageSourcesModal({
                     {/* Offered only when unused. Both backends refuse otherwise, so
                         this hides an action that would only ever fail. */}
                     {used === 0 && (
-                      <RowButton
-                        tone="danger"
-                        onClick={() => deleteIncomeSource.mutate(s.id)}
-                        disabled={pending}
-                      >
-                        Delete
-                      </RowButton>
+                      <DeleteRowButton onClick={() => deleteIncomeSource.mutate(s.id)} disabled={pending} />
                     )}
                   </span>
                 </>

@@ -14,7 +14,7 @@ import { isTemp } from '../lib/tempId.ts'
 import { Money } from '../components/Money.tsx'
 import { Card } from '../components/Card.tsx'
 import { Table } from '../components/Table.tsx'
-import { Button, SecondaryButton, RowButton } from '../components/ui.tsx'
+import { Button, SecondaryButton, EditRowButton, DeleteRowButton } from '../components/ui.tsx'
 import { ConfirmDialog } from '../components/ConfirmDialog.tsx'
 import { PendingBadge } from '../components/PendingBadge.tsx'
 import { EmptyState } from '../components/EmptyState.tsx'
@@ -125,12 +125,8 @@ export function Savings() {
                     <span className="text-xs text-ink-faint">From a payment</span>
                   ) : (
                     <span className="flex justify-end gap-2">
-                      <RowButton onClick={() => setEditing(row)} disabled={pending}>
-                        Edit
-                      </RowButton>
-                      <RowButton tone="danger" onClick={() => setDeleting(row)} disabled={pending}>
-                        Delete
-                      </RowButton>
+                      <EditRowButton onClick={() => setEditing(row)} disabled={pending} />
+                      <DeleteRowButton onClick={() => setDeleting(row)} disabled={pending} />
                     </span>
                   )}
                 </td>

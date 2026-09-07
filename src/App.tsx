@@ -12,6 +12,7 @@ import { Tasks } from './pages/Tasks.tsx'
 import { Notes } from './pages/Notes.tsx'
 import { NoteDetail } from './pages/NoteDetail.tsx'
 import { Goals } from './pages/Goals.tsx'
+import { GoalDetail } from './pages/GoalDetail.tsx'
 import { Debts } from './pages/Debts.tsx'
 import { DebtDetail } from './pages/DebtDetail.tsx'
 import { Bills } from './pages/Bills.tsx'
@@ -38,6 +39,7 @@ function AuthedApp() {
         <Route path="notes" element={<Notes />} />
         <Route path="notes/:id" element={<NoteDetail />} />
         <Route path="goals" element={<Goals />} />
+        <Route path="goals/:id" element={<GoalDetail />} />
         <Route path="debts" element={<Debts />} />
         <Route path="debts/:id" element={<DebtDetail />} />
         <Route path="bills" element={<Bills />} />

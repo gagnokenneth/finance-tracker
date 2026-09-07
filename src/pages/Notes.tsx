@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useFinanceData } from '../hooks/useFinanceData.ts'
-import { itemsFor, doneCount, bodyPreview, LINK_LABEL } from '../lib/notes.ts'
+import { groupItemsByNote, doneCount, bodyPreview } from '../lib/notes.ts'
 import { isTemp } from '../lib/tempId.ts'
 import { CardRow } from '../components/CardRow.tsx'
 import { PendingBadge } from '../components/PendingBadge.tsx'
@@ -17,6 +17,8 @@ export function Notes() {
   if (isPending) return <LoadingScreen />
   if (isError || !data) return <LoadError error={error} />
 
+  const itemsByNote = groupItemsByNote(data.note_items)
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
@@ -27,30 +29,23 @@ export function Notes() {
       </div>
 
       {data.notes.length === 0 ? (
-        <EmptyState title="Nothing tracked yet">
-          Jot down a freeform note, or start a checklist.
-        </EmptyState>
+        <EmptyState title="Nothing tracked yet">Jot down a note, or start a checklist on one.</EmptyState>
       ) : (
         <div className="space-y-3">
           {data.notes.map((note) => {
             const pending = isTemp(note.id)
-            const summary =
-              note.kind === 'checklist'
-                ? (() => {
-                    const { done, total } = doneCount(itemsFor(data.note_items, note.id))
-                    return total === 0 ? 'No items yet' : `${done} of ${total} done`
-                  })()
-                : bodyPreview(note)
+            const preview = bodyPreview(note)
+            const { done, total } = doneCount(itemsByNote.get(note.id) ?? [])
             return (
               <CardRow key={note.id} to={`/notes/${note.id}`} pending={pending}>
                 <div className="flex items-start justify-between gap-4">
                   <span className="font-semibold tracking-tight text-ink">{note.title}</span>
                   {pending && <PendingBadge />}
                 </div>
-                {summary && <p className="mt-1 text-sm text-ink-soft">{summary}</p>}
-                {note.linked_type && (
-                  <p className="mt-2 text-xs font-semibold tracking-wide text-ink-faint uppercase">
-                    Linked to {LINK_LABEL[note.linked_type]}
+                {preview && <p className="mt-1 text-sm text-ink-soft">{preview}</p>}
+                {total > 0 && (
+                  <p className="mt-1 text-sm text-ink-soft">
+                    {done} of {total} done
                   </p>
                 )}
               </CardRow>
@@ -59,7 +54,7 @@ export function Notes() {
         </div>
       )}
 
-      {adding && <AddNoteModal open data={data} onClose={() => setAdding(false)} />}
+      {adding && <AddNoteModal open onClose={() => setAdding(false)} />}
     </div>
   )
 }

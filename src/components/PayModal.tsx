@@ -55,10 +55,10 @@ export function PayModal({
   return (
     <Modal open={open} title="Record payment" onClose={onClose}>
       <form onSubmit={submit} className="flex flex-col gap-3">
-        <Field label="Payment date">
+        <Field label="Payment date" required>
           <TextInput type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
         </Field>
-        <Field label="Amount paid">
+        <Field label="Amount paid" required>
           {/* Savings requires a positive amount; the untracked source does not,
               and a variable payable or a statement can legitimately be 0. */}
           <TextInput

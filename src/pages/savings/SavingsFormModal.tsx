@@ -74,7 +74,7 @@ export function SavingsFormModal({
   return (
     <Modal open={open} title={entry ? 'Edit movement' : 'Add movement'} onClose={onClose}>
       <form onSubmit={submit} className="space-y-4">
-        <Field label="Kind">
+        <Field label="Kind" required>
           <SelectInput
             required
             value={kind}
@@ -84,7 +84,7 @@ export function SavingsFormModal({
             <option value="withdrawal">Withdrawal</option>
           </SelectInput>
         </Field>
-        <Field label="Amount">
+        <Field label="Amount" required>
           <TextInput
             required
             type="number"
@@ -94,7 +94,7 @@ export function SavingsFormModal({
             onChange={(e) => setAmount(e.target.value)}
           />
         </Field>
-        <Field label="Date">
+        <Field label="Date" required>
           <TextInput
             required
             type="date"

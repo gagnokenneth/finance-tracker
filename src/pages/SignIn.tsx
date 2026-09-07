@@ -72,7 +72,7 @@ export function SignIn() {
         </p>
 
         <form onSubmit={submit} className="mt-8 flex flex-col gap-4">
-          <Field label="Username">
+          <Field label="Username" required>
             <TextInput
               value={username}
               onChange={(e) => setUsername(e.target.value)}
@@ -81,7 +81,7 @@ export function SignIn() {
               required
             />
           </Field>
-          <Field label="Password">
+          <Field label="Password" required>
             <TextInput
               type="password"
               value={password}
@@ -91,7 +91,7 @@ export function SignIn() {
             />
           </Field>
           {creating && needsInvite && (
-            <Field label="Invite code">
+            <Field label="Invite code" required>
               <TextInput
                 value={inviteCode}
                 onChange={(e) => setInviteCode(e.target.value)}

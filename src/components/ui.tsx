@@ -4,6 +4,7 @@ import type {
   SelectHTMLAttributes,
   ButtonHTMLAttributes,
 } from 'react'
+import { EditIcon, DeleteIcon } from './icons.tsx'
 
 export const inputClass =
   'w-full rounded-lg border border-edge bg-white px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-brand focus:ring-2 focus:ring-brand/15 focus:outline-none'
@@ -11,10 +12,27 @@ export const inputClass =
 const focusRing =
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand'
 
-export function Field({ label, children }: { label: string; children: ReactNode }) {
+export function Field({
+  label,
+  required,
+  children,
+}: {
+  label: string
+  /** Marks the label with a red asterisk. A field with no marker is optional. */
+  required?: boolean
+  children: ReactNode
+}) {
   return (
     <label className="flex flex-col gap-1.5 text-sm">
-      <span className="text-xs font-semibold tracking-wide text-ink-soft uppercase">{label}</span>
+      <span className="text-xs font-semibold tracking-wide text-ink-soft uppercase">
+        {label}
+        {required && (
+          <span className="text-overdue" aria-hidden>
+            {' '}
+            *
+          </span>
+        )}
+      </span>
       {children}
     </label>
   )
@@ -99,5 +117,44 @@ export function RowButton({
     >
       {children}
     </button>
+  )
+}
+
+/**
+ * Icon-only Edit/Delete actions, in both sizes this app uses them at — a
+ * table/list row (RowButton) and a page header (SecondaryButton). Each bakes
+ * in its own icon, tone (Delete stays danger-toned), and the title/aria-label
+ * pair a visible-text button gets for free, so every call site is one line
+ * instead of repeating all three.
+ */
+export function EditRowButton(props: ButtonHTMLAttributes<HTMLButtonElement>) {
+  return (
+    <RowButton title="Edit" aria-label="Edit" {...props}>
+      <EditIcon />
+    </RowButton>
+  )
+}
+
+export function DeleteRowButton(props: ButtonHTMLAttributes<HTMLButtonElement>) {
+  return (
+    <RowButton tone="danger" title="Delete" aria-label="Delete" {...props}>
+      <DeleteIcon />
+    </RowButton>
+  )
+}
+
+export function EditButton(props: ButtonHTMLAttributes<HTMLButtonElement>) {
+  return (
+    <SecondaryButton title="Edit" aria-label="Edit" {...props}>
+      <EditIcon />
+    </SecondaryButton>
+  )
+}
+
+export function DeleteButton(props: ButtonHTMLAttributes<HTMLButtonElement>) {
+  return (
+    <SecondaryButton title="Delete" aria-label="Delete" {...props}>
+      <DeleteIcon />
+    </SecondaryButton>
   )
 }

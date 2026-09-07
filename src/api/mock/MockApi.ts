@@ -43,7 +43,6 @@ import type {
   Task,
   Note,
   NoteItem,
-  NoteLinkType,
   Goal,
 } from '../../types.ts'
 import { createSeed } from './seed.ts'
@@ -53,6 +52,7 @@ import { normalizeUsername, isValidUsername, USERNAME_RULE } from '../../auth/pa
 import { signedAmount, isPaymentKind } from '../../lib/savings.ts'
 import { isoDate } from '../../lib/currentMonth.ts'
 import { nextSortOrder } from '../../lib/notes.ts'
+import { isValidGoalTransition } from '../../lib/goals.ts'
 
 const KEY = 'finance-mock-db'
 
@@ -549,23 +549,6 @@ export class MockApi implements FinanceApi {
     return this.delay(data)
   }
 
-  /**
-   * Blanks linked_type/linked_id on every note pointing at (linkedType, id) —
-   * called before a bill/debt/task row is deleted, so a note never keeps a
-   * link to a row that no longer exists. Mirrors Code.gs's
-   * detachNotesLinkedTo; deleting the row it points at is the only way a
-   * note's link can go stale, since assertOwnedLink already refuses to
-   * create or edit a link with a bad id in the first place.
-   */
-  private detachNotesLinkedTo(data: FinanceData, linkedType: NoteLinkType, id: number): void {
-    for (const note of data.notes) {
-      if (note.linked_type === linkedType && note.linked_id === id) {
-        note.linked_type = undefined
-        note.linked_id = undefined
-      }
-    }
-  }
-
   async deleteBill(id: number): Promise<FinanceData> {
     const data = this.load()
     // Unsettle every payable's ledger entry BEFORE the cascade deletes the
@@ -578,7 +561,6 @@ export class MockApi implements FinanceApi {
     )
     data.bills = data.bills.filter((b) => b.id !== id)
     data.bill_payables = data.bill_payables.filter((r) => r.bill_id !== id)
-    this.detachNotesLinkedTo(data, 'bill', id)
     this.save(data)
     return this.delay(data)
   }
@@ -711,7 +693,6 @@ export class MockApi implements FinanceApi {
     data.debts = data.debts.filter((d) => d.id !== id)
     data.debt_schedule = data.debt_schedule.filter((r) => r.debt_id !== id)
     data.debt_statements = data.debt_statements.filter((r) => r.debt_id !== id)
-    this.detachNotesLinkedTo(data, 'debt', id)
     this.save(data)
     return this.delay(data)
   }
@@ -997,7 +978,6 @@ export class MockApi implements FinanceApi {
     const data = this.load()
     this.ownedTask(data, id)
     data.tasks = data.tasks.filter((t) => t.id !== id)
-    this.detachNotesLinkedTo(data, 'task', id)
     this.save(data)
     return this.delay(data)
   }
@@ -1038,49 +1018,12 @@ export class MockApi implements FinanceApi {
     return item
   }
 
-  /**
-   * linked_type and linked_id ride together: both unset (no link), or both
-   * present and owned in `rows` — except a "no target" type (Goals'
-   * 'savings'), which must have linkedId unset since the type itself is the
-   * whole target. Mirrors Code.gs's assertOwnedLinkedPair; shared by Notes'
-   * and Goals' own thin wrappers below, which resolve `rows`/`noTarget`
-   * from their own link-type union before delegating here.
-   */
-  private assertOwnedLinkedPair(
-    linkedType: string | undefined,
-    linkedId: number | undefined,
-    noTarget: boolean,
-    rows: { id: number }[],
-  ): void {
-    if (!linkedType) {
-      if (linkedId !== undefined) throw new Error('A link needs a type.')
-      return
-    }
-    if (noTarget) {
-      if (linkedId !== undefined) throw new Error(`A ${linkedType} link has no target.`)
-      return
-    }
-    if (linkedId === undefined) throw new Error('A link needs a target.')
-    if (!rows.some((r) => r.id === linkedId)) throw new Error(`${linkedType} ${linkedId} not found`)
-  }
-
-  private assertOwnedLink(
-    data: FinanceData,
-    linkedType: NoteLinkType | undefined,
-    linkedId: number | undefined,
-  ): void {
-    const rows = linkedType === 'bill' ? data.bills : linkedType === 'debt' ? data.debts : data.tasks
-    this.assertOwnedLinkedPair(linkedType, linkedId, false, rows)
-  }
-
   async addNote(input: NewNote): Promise<FinanceData> {
     const data = this.load()
     if (!input.title.trim()) throw new Error('A note needs a title')
-    this.assertOwnedLink(data, input.linked_type, input.linked_id)
     const note: Note = {
       id: nextId(data.notes),
       ...input,
-      body: input.kind === 'freeform' ? input.body : undefined,
     }
     data.notes.push(note)
     this.save(data)
@@ -1093,23 +1036,9 @@ export class MockApi implements FinanceApi {
     if (Object.prototype.hasOwnProperty.call(patch, 'title') && !(patch.title ?? '').trim()) {
       throw new Error('A note needs a title')
     }
-    if (
-      Object.prototype.hasOwnProperty.call(patch, 'linked_type') ||
-      Object.prototype.hasOwnProperty.call(patch, 'linked_id')
-    ) {
-      const linkedType = Object.prototype.hasOwnProperty.call(patch, 'linked_type')
-        ? (patch.linked_type ?? undefined)
-        : note.linked_type
-      const linkedId = Object.prototype.hasOwnProperty.call(patch, 'linked_id')
-        ? (patch.linked_id ?? undefined)
-        : note.linked_id
-      this.assertOwnedLink(data, linkedType, linkedId)
-    }
     Object.assign(note, patch)
     // null is the wire's "clear this"; the stored model uses undefined.
-    for (const key of ['body', 'linked_type', 'linked_id'] as const) {
-      if (patch[key] === null) note[key] = undefined
-    }
+    if (patch.body === null) note.body = undefined
     this.save(data)
     return this.delay(data)
   }
@@ -1125,8 +1054,7 @@ export class MockApi implements FinanceApi {
 
   async addNoteItem(noteId: number, input: NewNoteItem): Promise<FinanceData> {
     const data = this.load()
-    const note = this.ownedNote(data, noteId)
-    if (note.kind !== 'checklist') throw new Error('Only a checklist note can have items.')
+    this.ownedNote(data, noteId)
     if (!input.text.trim()) throw new Error('A checklist item needs text')
     const sortOrder = nextSortOrder(data.note_items, noteId)
     data.note_items.push({ id: nextId(data.note_items), note_id: noteId, text: input.text, done: false, sort_order: sortOrder })
@@ -1159,15 +1087,6 @@ export class MockApi implements FinanceApi {
     return goal
   }
 
-  private assertOwnedGoalLink(
-    data: FinanceData,
-    linkedType: Goal['linked_type'],
-    linkedId: number | undefined,
-  ): void {
-    const rows = linkedType === 'bill' ? data.bills : linkedType === 'debt' ? data.debts : []
-    this.assertOwnedLinkedPair(linkedType, linkedId, linkedType === 'savings', rows)
-  }
-
   /** Mirrors assertGoalDepth in Code.gs. */
   private assertGoalDepth(data: FinanceData, parentGoalId: number | undefined): void {
     if (parentGoalId === undefined) return
@@ -1181,8 +1100,7 @@ export class MockApi implements FinanceApi {
     const data = this.load()
     if (!input.title.trim()) throw new Error('A goal needs a title')
     this.assertGoalDepth(data, input.parent_goal_id)
-    this.assertOwnedGoalLink(data, input.linked_type, input.linked_id)
-    const goal: Goal = { id: nextId(data.goals), ...input, status: 'active' }
+    const goal: Goal = { id: nextId(data.goals), ...input, status: 'planned' }
     data.goals.push(goal)
     this.save(data)
     return this.delay(data)
@@ -1195,20 +1113,15 @@ export class MockApi implements FinanceApi {
       throw new Error('A goal needs a title')
     }
     if (
-      Object.prototype.hasOwnProperty.call(patch, 'linked_type') ||
-      Object.prototype.hasOwnProperty.call(patch, 'linked_id')
+      Object.prototype.hasOwnProperty.call(patch, 'status') &&
+      patch.status !== undefined &&
+      !isValidGoalTransition(goal.status, patch.status)
     ) {
-      const linkedType = Object.prototype.hasOwnProperty.call(patch, 'linked_type')
-        ? (patch.linked_type ?? undefined)
-        : goal.linked_type
-      const linkedId = Object.prototype.hasOwnProperty.call(patch, 'linked_id')
-        ? (patch.linked_id ?? undefined)
-        : goal.linked_id
-      this.assertOwnedGoalLink(data, linkedType, linkedId)
+      throw new Error('Not a valid status transition')
     }
     Object.assign(goal, patch)
     // null is the wire's "clear this"; the stored model uses undefined.
-    for (const key of ['target_date', 'linked_type', 'linked_id', 'notes'] as const) {
+    for (const key of ['target_date', 'notes'] as const) {
       if (patch[key] === null) goal[key] = undefined
     }
     this.save(data)
