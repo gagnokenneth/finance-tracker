@@ -975,7 +975,7 @@ export class MockApi implements FinanceApi {
     }
     Object.assign(task, patch)
     // null is the wire's "clear this"; the stored model uses undefined.
-    for (const key of ['notes', 'start_time', 'end_time', 'recurrence', 'goal_id', 'note_id', 'date'] as const) {
+    for (const key of ['notes', 'recurrence', 'goal_id', 'note_id', 'date'] as const) {
       if (patch[key] === null) task[key] = undefined
     }
     this.save(data)
@@ -1017,8 +1017,6 @@ export class MockApi implements FinanceApi {
           title: task.title,
           notes: task.notes,
           date: input.next_date,
-          start_time: task.start_time,
-          end_time: task.end_time,
           recurrence: task.recurrence,
           column_id: firstColumn(columns).id,
           goal_id: task.goal_id,

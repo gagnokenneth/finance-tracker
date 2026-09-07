@@ -532,7 +532,7 @@ export function addTaskTo(data: FinanceData, vars: NewTask): FinanceData {
 
 /** See TaskPatch — the wire's null becomes the model's undefined. */
 function clearedTaskFields(patch: TaskPatch): Partial<Task> {
-  return clearNulls(patch, ['notes', 'start_time', 'end_time', 'recurrence', 'goal_id', 'note_id', 'date']) as Partial<Task>
+  return clearNulls(patch, ['notes', 'recurrence', 'goal_id', 'note_id', 'date']) as Partial<Task>
 }
 
 export function applyTaskPatch(
@@ -575,8 +575,6 @@ export function moveTaskIn(
     title: task.title,
     notes: task.notes,
     date: vars.input.next_date,
-    start_time: task.start_time,
-    end_time: task.end_time,
     recurrence: task.recurrence,
     column_id: firstColumn(data.task_columns).id,
     goal_id: task.goal_id,

@@ -16,7 +16,7 @@ var SHEETS = {
   income: ['id', 'user_id', 'source_id', 'amount', 'date', 'notes'],
   income_sources: ['id', 'user_id', 'name', 'archived'],
   savings_ledger: ['id', 'user_id', 'date', 'amount', 'kind', 'ref_type', 'ref_id', 'notes'],
-  tasks: ['id', 'user_id', 'title', 'notes', 'date', 'start_time', 'end_time', 'recurrence', 'column_id', 'completed_date', 'goal_id', 'note_id'],
+  tasks: ['id', 'user_id', 'title', 'notes', 'date', 'recurrence', 'column_id', 'completed_date', 'goal_id', 'note_id'],
   task_columns: ['id', 'user_id', 'name', 'sort_order', 'is_done'],
   notes: ['id', 'user_id', 'title', 'body'],
   note_items: ['id', 'user_id', 'note_id', 'text', 'done', 'sort_order'],
@@ -29,7 +29,7 @@ var SHEETS = {
  * so the new shape is applied on the very next request after a deployment,
  * instead of up to an hour later.
  */
-var SCHEMA_VERSION = 14;
+var SCHEMA_VERSION = 15;
 
 /*
  * Tabs whose stale shape may be DISCARDED and recreated. Deliberately excludes
@@ -496,7 +496,7 @@ function coerce(name, r) {
   };
   if (name === 'tasks') return {
     id: num(r.id), title: String(r.title), notes: optStr(r.notes), date: optDate(r.date),
-    start_time: optStr(r.start_time), end_time: optStr(r.end_time), recurrence: optStr(r.recurrence),
+    recurrence: optStr(r.recurrence),
     column_id: num(r.column_id), completed_date: optDate(r.completed_date),
     goal_id: optNum(r.goal_id), note_id: optNum(r.note_id)
   };
@@ -1673,8 +1673,6 @@ function addTask(p, uid) {
     title: input.title,
     notes: input.notes,
     date: input.date,
-    start_time: input.start_time,
-    end_time: input.end_time,
     recurrence: input.recurrence,
     column_id: input.column_id,
     completed_date: '',
@@ -1694,8 +1692,6 @@ function updateTask(p, uid) {
   }
   if (Object.prototype.hasOwnProperty.call(given, 'notes')) patch.notes = given.notes;
   if (Object.prototype.hasOwnProperty.call(given, 'date')) patch.date = given.date;
-  if (Object.prototype.hasOwnProperty.call(given, 'start_time')) patch.start_time = given.start_time;
-  if (Object.prototype.hasOwnProperty.call(given, 'end_time')) patch.end_time = given.end_time;
   if (Object.prototype.hasOwnProperty.call(given, 'recurrence')) patch.recurrence = given.recurrence;
   if (Object.prototype.hasOwnProperty.call(given, 'goal_id')) {
     if (!blank(given.goal_id)) assertOwned('goals', given.goal_id, uid);
@@ -1745,8 +1741,6 @@ function moveTask(p, uid) {
         title: current.title,
         notes: current.notes,
         date: input.next_date,
-        start_time: current.start_time,
-        end_time: current.end_time,
         recurrence: current.recurrence,
         column_id: firstCol.id,
         completed_date: '',

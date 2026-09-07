@@ -99,7 +99,7 @@ export type NewTask = Omit<Task, 'id' | 'completed_date'>
  */
 export type TaskPatch = Patch<
   Omit<Task, 'id' | 'column_id' | 'completed_date'>,
-  'notes' | 'start_time' | 'end_time' | 'recurrence' | 'goal_id' | 'note_id' | 'date'
+  'notes' | 'recurrence' | 'goal_id' | 'note_id' | 'date'
 >
 
 export interface MoveTaskInput {

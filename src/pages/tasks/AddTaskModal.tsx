@@ -12,6 +12,10 @@ import type { FinanceData, TaskRecurrence } from '../../types.ts'
  * `initialDate` lets the Calendar page open this pre-filled to the clicked
  * day. `data` is passed down from the parent page rather than fetched here
  * — no modal in this app calls useFinanceData() itself.
+ *
+ * Creation is deliberately minimal — a description is written afterward via
+ * the detail popup's WYSIWYG editor, matching how Notes' own creation flow
+ * defers rich content to after the row exists.
  */
 export function AddTaskModal({
   open,
@@ -50,22 +54,6 @@ export function AddTaskModal({
             onChange={(e) => form.setDate(e.target.value)}
           />
         </Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Start time">
-            <TextInput
-              type="time"
-              value={form.startTime}
-              onChange={(e) => form.setStartTime(e.target.value)}
-            />
-          </Field>
-          <Field label="End time">
-            <TextInput
-              type="time"
-              value={form.endTime}
-              onChange={(e) => form.setEndTime(e.target.value)}
-            />
-          </Field>
-        </div>
         <Field label="Repeats">
           <SelectInput
             value={form.recurrence}
@@ -91,9 +79,6 @@ export function AddTaskModal({
               </option>
             ))}
           </SelectInput>
-        </Field>
-        <Field label="Notes">
-          <TextInput value={form.notes} onChange={(e) => form.setNotes(e.target.value)} />
         </Field>
 
         <div className="mt-1 flex justify-end gap-2">

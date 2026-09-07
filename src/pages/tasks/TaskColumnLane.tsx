@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useDroppable } from '@dnd-kit/core'
 import { TaskCard } from './TaskCard.tsx'
 import { groupByDay } from '../../lib/tasks.ts'
-import { TextInput, RowButton, DeleteRowButton } from '../../components/ui.tsx'
+import { TextInput, DeleteRowButton } from '../../components/ui.tsx'
 import type { Task, TaskColumn } from '../../types.ts'
 
 /**
@@ -17,8 +17,6 @@ export function TaskColumnLane({
   onOpenTask,
   onRename,
   onDelete,
-  onMoveLeft,
-  onMoveRight,
   canDelete,
 }: {
   column: TaskColumn
@@ -27,8 +25,6 @@ export function TaskColumnLane({
   onOpenTask: (task: Task) => void
   onRename: (name: string) => void
   onDelete: () => void
-  onMoveLeft?: () => void
-  onMoveRight?: () => void
   canDelete: boolean
 }) {
   const [renaming, setRenaming] = useState(false)
@@ -82,18 +78,6 @@ export function TaskColumnLane({
       </div>
 
       <div className="flex items-center gap-1.5">
-        <RowButton type="button" title="Move left" aria-label="Move left" disabled={!onMoveLeft} onClick={onMoveLeft}>
-          ←
-        </RowButton>
-        <RowButton
-          type="button"
-          title="Move right"
-          aria-label="Move right"
-          disabled={!onMoveRight}
-          onClick={onMoveRight}
-        >
-          →
-        </RowButton>
         <DeleteRowButton
           type="button"
           disabled={!canDelete}

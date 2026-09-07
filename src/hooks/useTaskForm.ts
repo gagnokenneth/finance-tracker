@@ -9,10 +9,6 @@ export interface TaskForm {
   setNotes: (v: string) => void
   date: string
   setDate: (v: string) => void
-  startTime: string
-  setStartTime: (v: string) => void
-  endTime: string
-  setEndTime: (v: string) => void
   recurrence: TaskRecurrence | ''
   setRecurrence: (v: TaskRecurrence | '') => void
   goalId: number | ''
@@ -32,8 +28,6 @@ export function useTaskForm(task?: Task, initialDate?: string): TaskForm {
   const [title, setTitle] = useState(task?.title ?? '')
   const [notes, setNotes] = useState(task?.notes ?? '')
   const [date, setDate] = useState(task?.date ?? initialDate ?? '')
-  const [startTime, setStartTime] = useState(task?.start_time ?? '')
-  const [endTime, setEndTime] = useState(task?.end_time ?? '')
   const [recurrence, setRecurrence] = useState<TaskRecurrence | ''>(task?.recurrence ?? '')
   const [goalId, setGoalId] = useState<number | ''>(task?.goal_id ?? '')
 
@@ -44,8 +38,6 @@ export function useTaskForm(task?: Task, initialDate?: string): TaskForm {
         title: title.trim(),
         notes: notes.trim() || undefined,
         date: date || undefined,
-        start_time: startTime || undefined,
-        end_time: endTime || undefined,
         recurrence: recurrence || undefined,
         goal_id: goalId === '' ? undefined : goalId,
       }
@@ -57,10 +49,6 @@ export function useTaskForm(task?: Task, initialDate?: string): TaskForm {
     setNotes,
     date,
     setDate,
-    startTime,
-    setStartTime,
-    endTime,
-    setEndTime,
     recurrence,
     setRecurrence,
     goalId,

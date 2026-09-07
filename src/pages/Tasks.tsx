@@ -1,30 +1,34 @@
 import { useState } from 'react'
-import { DndContext } from '@dnd-kit/core'
+import { DndContext, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import type { DragEndEvent } from '@dnd-kit/core'
 import { useFinanceData } from '../hooks/useFinanceData.ts'
 import { useFinanceMutations } from '../hooks/useFinanceMutations.ts'
 import { backlogTasks, tasksInWeek, groupByColumn, buildMoveInput } from '../lib/tasks.ts'
 import { sortedColumns, doneColumn } from '../lib/taskColumns.ts'
 import { isoDate, startOfWeek, addWeeks, weekWindow } from '../lib/currentMonth.ts'
+import { isTemp } from '../lib/tempId.ts'
+import { CARD_ROW_INTERACTIVE_CLASS } from '../components/CardRow.tsx'
+import { PendingBadge } from '../components/PendingBadge.tsx'
 import { EmptyState } from '../components/EmptyState.tsx'
-import { Button, RowButton, SecondaryButton } from '../components/ui.tsx'
+import { Button, SecondaryButton } from '../components/ui.tsx'
 import { LoadError } from '../components/LoadError.tsx'
 import { LoadingScreen } from '../components/LoadingScreen.tsx'
 import { AddTaskModal } from './tasks/AddTaskModal.tsx'
 import { TaskDetailModal } from './tasks/TaskDetailModal.tsx'
 import { TaskColumnLane } from './tasks/TaskColumnLane.tsx'
 import { AddColumnForm } from './tasks/AddColumnForm.tsx'
-import type { Task, TaskColumn } from '../types.ts'
-
-type Scope = 'backlog' | 'week'
+import type { Task } from '../types.ts'
 
 export function Tasks() {
   const { data, isPending, isError, error } = useFinanceData()
   const { updateTaskColumn, deleteTaskColumn, moveTask } = useFinanceMutations()
   const [adding, setAdding] = useState(false)
   const [opened, setOpened] = useState<Task | null>(null)
-  const [scope, setScope] = useState<Scope>('week')
   const [weekStart, setWeekStart] = useState(() => startOfWeek(isoDate()))
+  // A plain click has to survive being on top of a draggable — without a
+  // distance threshold, dnd-kit "activates" (and swallows the click) on the
+  // very first pixel of pointer movement under the default PointerSensor.
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
 
   if (isPending) return <LoadingScreen />
   if (isError || !data) return <LoadError error={error} />
@@ -32,18 +36,13 @@ export function Tasks() {
   const columns = sortedColumns(data.task_columns)
   const done = doneColumn(data.task_columns)
 
-  const scoped = scope === 'backlog' ? backlogTasks(data.tasks) : tasksInWeek(data.tasks, weekStart)
-  const grouped = groupByColumn(scoped, columns)
+  const weekTasks = tasksInWeek(data.tasks, weekStart)
+  const grouped = groupByColumn(weekTasks, columns)
+  const backlog = backlogTasks(data.tasks)
   // Columns with at least one task, across ALL of the user's tasks (not just
-  // the current Backlog/week scope) — a column is only safe to delete when
-  // no task anywhere points at it. One O(tasks) pass instead of an O(tasks)
-  // .some() scan repeated per column.
+  // this week) — a column is only safe to delete when no task anywhere
+  // points at it. One O(tasks) pass instead of an O(tasks) scan per column.
   const columnsWithTasks = new Set(data.tasks.map((t) => t.column_id))
-
-  const swap = (a: TaskColumn, b: TaskColumn) => {
-    updateTaskColumn.mutate({ id: a.id, patch: { sort_order: b.sort_order } })
-    updateTaskColumn.mutate({ id: b.id, patch: { sort_order: a.sort_order } })
-  }
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event
@@ -58,7 +57,7 @@ export function Tasks() {
   const { start, end } = weekWindow(weekStart)
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <h1 className="text-2xl font-semibold tracking-tight text-ink">Tasks</h1>
         <Button type="button" onClick={() => setAdding(true)}>
@@ -66,57 +65,78 @@ export function Tasks() {
         </Button>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <RowButton tone={scope === 'backlog' ? 'primary' : 'neutral'} onClick={() => setScope('backlog')}>
-            Backlog
-          </RowButton>
-          <RowButton tone={scope === 'week' ? 'primary' : 'neutral'} onClick={() => setScope('week')}>
-            This week
-          </RowButton>
-        </div>
-        {scope === 'week' && (
-          <div className="flex items-center gap-2">
-            <SecondaryButton type="button" onClick={() => setWeekStart((w) => addWeeks(w, -1))}>
-              ← Prev
-            </SecondaryButton>
-            <span className="tnum font-mono text-sm text-ink-soft">
-              {start} – {end}
-            </span>
-            <SecondaryButton type="button" onClick={() => setWeekStart((w) => addWeeks(w, 1))}>
-              Next →
-            </SecondaryButton>
-          </div>
-        )}
-      </div>
-
       {data.tasks.length === 0 ? (
         <EmptyState title="Nothing tracked yet">
           Add a one-off errand, or something you want to repeat.
         </EmptyState>
       ) : (
-        <DndContext onDragEnd={handleDragEnd}>
-          <div className="flex gap-3 overflow-x-auto pb-2">
-            {columns.map((column, i) => (
-              <TaskColumnLane
-                key={column.id}
-                column={column}
-                tasks={grouped.get(column.id) ?? []}
-                dayGrouped={scope === 'week'}
-                onOpenTask={setOpened}
-                onRename={(name) => updateTaskColumn.mutate({ id: column.id, patch: { name } })}
-                onDelete={() => deleteTaskColumn.mutate(column.id)}
-                canDelete={!column.is_done && !columnsWithTasks.has(column.id)}
-                onMoveLeft={i > 0 ? () => swap(column, columns[i - 1]) : undefined}
-                onMoveRight={i < columns.length - 1 ? () => swap(column, columns[i + 1]) : undefined}
-              />
-            ))}
-            <AddColumnForm />
+        <>
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <SecondaryButton type="button" onClick={() => setWeekStart((w) => addWeeks(w, -1))}>
+                ← Prev
+              </SecondaryButton>
+              <span className="tnum font-mono text-sm text-ink-soft">
+                {start} – {end}
+              </span>
+              <SecondaryButton type="button" onClick={() => setWeekStart((w) => addWeeks(w, 1))}>
+                Next →
+              </SecondaryButton>
+            </div>
+
+            <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+              <div className="flex gap-3 overflow-x-auto pb-2">
+                {columns.map((column) => (
+                  <TaskColumnLane
+                    key={column.id}
+                    column={column}
+                    tasks={grouped.get(column.id) ?? []}
+                    dayGrouped
+                    onOpenTask={setOpened}
+                    onRename={(name) => updateTaskColumn.mutate({ id: column.id, patch: { name } })}
+                    onDelete={() => deleteTaskColumn.mutate(column.id)}
+                    canDelete={!column.is_done && !columnsWithTasks.has(column.id)}
+                  />
+                ))}
+                <AddColumnForm />
+              </div>
+            </DndContext>
           </div>
-        </DndContext>
+
+          <div className="space-y-3">
+            <h2 className="text-sm font-semibold tracking-wide text-ink-faint uppercase">Backlog</h2>
+            {backlog.length === 0 ? (
+              <p className="text-sm text-ink-faint">No backlog tasks.</p>
+            ) : (
+              <div className="space-y-2">
+                {backlog.map((task) => {
+                  const column = data.task_columns.find((c) => c.id === task.column_id)
+                  const pending = isTemp(task.id)
+                  return (
+                    <button
+                      key={task.id}
+                      type="button"
+                      disabled={pending}
+                      onClick={() => setOpened(task)}
+                      className={`${CARD_ROW_INTERACTIVE_CLASS} w-full text-left disabled:pointer-events-none disabled:opacity-60`}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="font-medium text-ink">{task.title}</span>
+                        <div className="flex items-center gap-2">
+                          {pending && <PendingBadge />}
+                          {column && <span className="text-xs text-ink-faint">{column.name}</span>}
+                        </div>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </>
       )}
 
-      {adding && <AddTaskModal open data={data} onClose={() => setAdding(false)} initialDate={scope === 'week' ? weekStart : undefined} />}
+      {adding && <AddTaskModal open data={data} onClose={() => setAdding(false)} initialDate={weekStart} />}
 
       {opened && <TaskDetailModal open task={opened} data={data} onClose={() => setOpened(null)} />}
     </div>

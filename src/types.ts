@@ -122,11 +122,11 @@ export interface TaskColumn {
 }
 
 /**
- * A scheduled item — one-off or recurring, optionally time-blocked. Unlike
- * Bills, a recurring task has no separate template row: each occurrence is
- * its own independent row, chained only by moving one into the done column
- * minting the next (see moveTask in FinanceApi.ts) — there is no stable id
- * grouping a series the way bill_id groups a bill's payables.
+ * A scheduled item — one-off or recurring. Unlike Bills, a recurring task
+ * has no separate template row: each occurrence is its own independent row,
+ * chained only by moving one into the done column minting the next (see
+ * moveTask in FinanceApi.ts) — there is no stable id grouping a series the
+ * way bill_id groups a bill's payables.
  *
  * A task's status is its column, not a boolean: column_id points at a
  * TaskColumn, and moving into whichever one is flagged is_done is what
@@ -135,12 +135,10 @@ export interface TaskColumn {
 export interface Task {
   id: number
   title: string
+  /** HTML from the WYSIWYG description editor. */
   notes?: string
   /** Unset means the task is in the Backlog — no week, no calendar presence. */
   date?: string
-  /** HH:MM, both unset for an all-day task. */
-  start_time?: string
-  end_time?: string
   /** Unset for a one-off task. */
   recurrence?: TaskRecurrence
   column_id: number

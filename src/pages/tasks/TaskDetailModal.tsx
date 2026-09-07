@@ -7,6 +7,7 @@ import { buildMoveInput, RECURRENCES, RECURRENCE_LABEL } from '../../lib/tasks.t
 import { sortedColumns, doneColumn } from '../../lib/taskColumns.ts'
 import { Modal } from '../../components/Modal.tsx'
 import { ConfirmDialog } from '../../components/ConfirmDialog.tsx'
+import { RichTextEditor } from '../../components/RichTextEditor.tsx'
 import { Field, TextInput, SelectInput, Button, SecondaryButton, RowButton, DeleteButton } from '../../components/ui.tsx'
 import type { FinanceData, Task } from '../../types.ts'
 
@@ -37,8 +38,6 @@ export function TaskDetailModal({
         title: form.values.title,
         notes: form.values.notes ?? null,
         date: form.values.date ?? null,
-        start_time: form.values.start_time ?? null,
-        end_time: form.values.end_time ?? null,
         recurrence: form.values.recurrence ?? null,
         goal_id: form.values.goal_id ?? null,
       },
@@ -67,17 +66,12 @@ export function TaskDetailModal({
         <Field label="Title" required>
           <TextInput required value={form.title} onChange={(e) => form.setTitle(e.target.value)} />
         </Field>
+        <Field label="Description">
+          <RichTextEditor value={form.notes} onChange={form.setNotes} />
+        </Field>
         <Field label="Date">
           <TextInput type="date" value={form.date} onChange={(e) => form.setDate(e.target.value)} />
         </Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Start time">
-            <TextInput type="time" value={form.startTime} onChange={(e) => form.setStartTime(e.target.value)} />
-          </Field>
-          <Field label="End time">
-            <TextInput type="time" value={form.endTime} onChange={(e) => form.setEndTime(e.target.value)} />
-          </Field>
-        </div>
         <Field label="Repeats">
           <SelectInput value={form.recurrence} onChange={(e) => form.setRecurrence(e.target.value as typeof form.recurrence)}>
             <option value="">Does not repeat</option>
@@ -97,9 +91,6 @@ export function TaskDetailModal({
               </option>
             ))}
           </SelectInput>
-        </Field>
-        <Field label="Notes">
-          <TextInput value={form.notes} onChange={(e) => form.setNotes(e.target.value)} />
         </Field>
 
         <div className="mt-1 flex justify-between gap-2">
