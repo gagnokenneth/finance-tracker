@@ -111,7 +111,7 @@ export function Tasks() {
               onOpenTask={openTask}
               onRename={(name) => updateTaskColumn.mutate({ id: column.id, patch: { name } })}
               onDelete={() => deleteTaskColumn.mutate(column.id)}
-              canDelete={!column.is_done && (grouped.get(column.id) ?? []).length === 0}
+              canDelete={!column.is_done && !data.tasks.some((t) => t.column_id === column.id)}
               onMoveLeft={i > 0 ? () => swap(column, columns[i - 1]) : undefined}
               onMoveRight={i < columns.length - 1 ? () => swap(column, columns[i + 1]) : undefined}
             />
