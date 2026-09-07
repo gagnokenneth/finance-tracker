@@ -1,8 +1,6 @@
-import { useDraggable } from '@dnd-kit/core'
-import { CSS } from '@dnd-kit/utilities'
+import { useDraggableTask } from '../../hooks/useDraggableTask.ts'
 import { Pill } from '../../components/StatusBadge.tsx'
 import { PendingBadge } from '../../components/PendingBadge.tsx'
-import { isTemp } from '../../lib/tempId.ts'
 import type { Task, TaskColumn } from '../../types.ts'
 
 /**
@@ -19,18 +17,14 @@ export function BacklogTaskRow({
   column: TaskColumn | undefined
   onClick: () => void
 }) {
-  const pending = isTemp(task.id)
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id: task.id,
-    disabled: pending,
-  })
+  const { pending, setNodeRef, dragAttributes, dragListeners, style, isDragging } = useDraggableTask(task)
 
   return (
     <div
       ref={setNodeRef}
-      {...attributes}
-      {...listeners}
-      style={{ transform: CSS.Translate.toString(transform) }}
+      {...dragAttributes}
+      {...dragListeners}
+      style={style}
       className={isDragging ? 'opacity-50' : ''}
     >
       <button

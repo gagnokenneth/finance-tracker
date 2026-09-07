@@ -20,16 +20,21 @@ import type { Task } from '../types.ts'
  *  dated to the currently-viewed week so it actually shows up on the board. */
 type AddTarget = 'backlog' | number
 
+// A plain click has to survive being on top of a draggable — without a
+// distance threshold, dnd-kit "activates" (and swallows the click) on the
+// very first pixel of pointer movement under the default PointerSensor.
+// Module-level, not inline in the component: useSensor/useSensors memoize
+// on this object's identity, and a fresh literal every render would defeat
+// that memoization on every single render of the page.
+const POINTER_ACTIVATION = { activationConstraint: { distance: 8 } }
+
 export function Tasks() {
   const { data, isPending, isError, error } = useFinanceData()
   const { updateTaskColumn, moveTask } = useFinanceMutations()
   const [addTarget, setAddTarget] = useState<AddTarget | null>(null)
   const [opened, setOpened] = useState<Task | null>(null)
   const [weekStart, setWeekStart] = useState(() => startOfWeek(isoDate()))
-  // A plain click has to survive being on top of a draggable — without a
-  // distance threshold, dnd-kit "activates" (and swallows the click) on the
-  // very first pixel of pointer movement under the default PointerSensor.
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
+  const sensors = useSensors(useSensor(PointerSensor, POINTER_ACTIVATION))
 
   if (isPending) return <LoadingScreen />
   if (isError || !data) return <LoadError error={error} />
@@ -40,6 +45,7 @@ export function Tasks() {
   const weekTasks = tasksInWeek(data.tasks, weekStart)
   const grouped = groupByColumn(weekTasks, columns)
   const backlog = backlogTasks(data.tasks)
+  const columnsById = new Map(data.task_columns.map((c) => [c.id, c]))
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event
@@ -57,6 +63,7 @@ export function Tasks() {
   }
 
   const { start, end } = weekWindow(weekStart)
+  const targetColumnId = typeof addTarget === 'number' ? addTarget : undefined
 
   return (
     <div className="space-y-8">
@@ -111,7 +118,7 @@ export function Tasks() {
                 <BacklogTaskRow
                   key={task.id}
                   task={task}
-                  column={data.task_columns.find((c) => c.id === task.column_id)}
+                  column={columnsById.get(task.column_id)}
                   onClick={() => setOpened(task)}
                 />
               ))}
@@ -124,8 +131,8 @@ export function Tasks() {
         <AddTaskModal
           open
           data={data}
-          initialColumnId={typeof addTarget === 'number' ? addTarget : undefined}
-          initialDate={typeof addTarget === 'number' ? weekStart : undefined}
+          initialColumnId={targetColumnId}
+          initialDate={targetColumnId !== undefined ? weekStart : undefined}
           onClose={() => setAddTarget(null)}
         />
       )}

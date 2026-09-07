@@ -107,7 +107,9 @@ export type TaskPatch = Patch<
 export interface MoveTaskInput {
   column_id: number
   /** Set only when dragging an undated (Backlog) task onto the board — the
-   *  one way a task's date is ever assigned or changed. */
+   *  one way an EXISTING task's date is ever changed. (A task can also be
+   *  given a date at creation — see AddTaskModal's initialDate — but that's
+   *  a separate, deliberate entry point, not this one.) */
   date?: string
   /** Required only when column_id resolves to the user's is_done column. */
   completed_date?: string

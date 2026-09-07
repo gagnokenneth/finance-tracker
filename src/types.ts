@@ -139,9 +139,11 @@ export interface Task {
   notes?: string
   /**
    * Unset means the task is in the Backlog — no week, no calendar presence.
-   * Never directly editable: a task only gets (or changes) a date by being
-   * dragged from the Backlog onto a board column — see MoveTaskInput.date
-   * in FinanceApi.ts.
+   * Not a form field a user edits freely: it's set by whichever specific
+   * action put the task on the board — dragging it there from the Backlog
+   * (see MoveTaskInput.date), the Dashboard calendar's "add a task on this
+   * day" click, or a board column's own "+" (both via AddTaskModal's
+   * initialDate/initialColumnId) — never a bare "change the date" control.
    */
   date?: string
   /** Unset for a one-off task. */

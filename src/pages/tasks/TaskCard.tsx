@@ -1,7 +1,5 @@
-import { useDraggable } from '@dnd-kit/core'
-import { CSS } from '@dnd-kit/utilities'
+import { useDraggableTask } from '../../hooks/useDraggableTask.ts'
 import { PendingBadge } from '../../components/PendingBadge.tsx'
-import { isTemp } from '../../lib/tempId.ts'
 import type { Task } from '../../types.ts'
 
 /**
@@ -10,18 +8,14 @@ import type { Task } from '../../types.ts'
  * lane, which calls the same moveTask path as the popup's buttons.
  */
 export function TaskCard({ task, onClick }: { task: Task; onClick: () => void }) {
-  const pending = isTemp(task.id)
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id: task.id,
-    disabled: pending,
-  })
+  const { pending, setNodeRef, dragAttributes, dragListeners, style, isDragging } = useDraggableTask(task)
 
   return (
     <div
       ref={setNodeRef}
-      {...attributes}
-      {...listeners}
-      style={{ transform: CSS.Translate.toString(transform) }}
+      {...dragAttributes}
+      {...dragListeners}
+      style={style}
       className={`rounded-lg border border-edge bg-white p-3 shadow-sm ${isDragging ? 'opacity-50' : ''}`}
     >
       <button type="button" onClick={onClick} className="block w-full text-left" disabled={pending}>

@@ -1751,11 +1751,12 @@ function moveTask(p, uid) {
   // would silently skip the date assignment the drop was for.
   var dateChanging = !blank(input.date) && String(input.date) !== String(current.date || '');
   if (num(current.column_id) === num(input.column_id) && !dateChanging) return null;
-  var datePatch = {};
-  if (!blank(input.date)) datePatch.date = input.date;
+  var patch = { column_id: input.column_id };
+  if (!blank(input.date)) patch.date = input.date;
   if (bool(column.is_done)) {
     if (blank(input.completed_date)) throw new Error('A completed task needs a date');
-    patchRowAt('tasks', rowIndex, Object.assign({ column_id: input.column_id, completed_date: input.completed_date }, datePatch));
+    patch.completed_date = input.completed_date;
+    patchRowAt('tasks', rowIndex, patch);
     if (!blank(current.recurrence) && !blank(input.next_date)) {
       var firstCol = firstTaskColumn(uid);
       appendRow('tasks', {
@@ -1773,7 +1774,8 @@ function moveTask(p, uid) {
       });
     }
   } else {
-    patchRowAt('tasks', rowIndex, Object.assign({ column_id: input.column_id, completed_date: '' }, datePatch));
+    patch.completed_date = '';
+    patchRowAt('tasks', rowIndex, patch);
   }
   return null;
 }

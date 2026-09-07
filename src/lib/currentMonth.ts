@@ -13,6 +13,13 @@ export function isoDate(date: Date = new Date()): string {
   return `${y}-${m}-${d}`
 }
 
+/** Full ISO 8601 datetime for the given moment (defaults to now) — for an
+ *  audit timestamp like Task.created_at, never a business date (isoDate
+ *  is what every one of those uses instead). Mirrors Code.gs's isoNow(). */
+export function isoDateTime(date: Date = new Date()): string {
+  return date.toISOString()
+}
+
 export function daysInMonth(year: number, month: number): number {
   return new Date(year, month, 0).getDate()
 }

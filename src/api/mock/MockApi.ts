@@ -53,7 +53,7 @@ import { backfillArrays } from '../../lib/financeShape.ts'
 import { readToken, decodeSession } from '../../auth/session.ts'
 import { normalizeUsername, isValidUsername, USERNAME_RULE } from '../../auth/password.ts'
 import { signedAmount, isPaymentKind } from '../../lib/savings.ts'
-import { isoDate } from '../../lib/currentMonth.ts'
+import { isoDate, isoDateTime } from '../../lib/currentMonth.ts'
 import { nextSortOrder } from '../../lib/notes.ts'
 import { isValidGoalTransition } from '../../lib/goals.ts'
 import { DEFAULT_TASK_COLUMNS, firstColumn, nextSortOrder as nextColumnSortOrder } from '../../lib/taskColumns.ts'
@@ -955,7 +955,7 @@ export class MockApi implements FinanceApi {
     if (!input.title.trim()) throw new Error('A task needs a title')
     if (input.goal_id !== undefined) this.ownedGoal(data, input.goal_id)
     if (input.note_id !== undefined) this.ownedNote(data, input.note_id)
-    const task: Task = { id: nextId(data.tasks), ...input, created_at: new Date().toISOString() }
+    const task: Task = { id: nextId(data.tasks), ...input, created_at: isoDateTime() }
     data.tasks.push(task)
     this.save(data)
     return this.delay(data)
@@ -1024,7 +1024,7 @@ export class MockApi implements FinanceApi {
           column_id: firstColumn(columns).id,
           goal_id: task.goal_id,
           note_id: task.note_id,
-          created_at: new Date().toISOString(),
+          created_at: isoDateTime(),
         }
         data.tasks.push(next)
       }
