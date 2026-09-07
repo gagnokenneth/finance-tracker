@@ -14,7 +14,8 @@ import { LoadError } from '../components/LoadError.tsx'
 import { LoadingScreen } from '../components/LoadingScreen.tsx'
 import { AddGoalModal } from './goals/AddGoalModal.tsx'
 import { EditGoalModal } from './goals/EditGoalModal.tsx'
-import type { Goal, GoalStatus } from '../types.ts'
+import { TaskDetailModal } from './tasks/TaskDetailModal.tsx'
+import type { Goal, GoalStatus, Task } from '../types.ts'
 
 const STATUS_GLYPH: Record<GoalStatus, string> = {
   planned: '○',
@@ -32,6 +33,7 @@ export function GoalDetail() {
   const [editing, setEditing] = useState(false)
   const [addingSubgoal, setAddingSubgoal] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [openedTask, setOpenedTask] = useState<Task | null>(null)
 
   if (isPending) return <LoadingScreen />
   if (isError || !data) return <LoadError error={error} />
@@ -42,6 +44,7 @@ export function GoalDetail() {
   const pending = isTemp(goal.id)
   const isTopLevel = goal.parent_goal_id === undefined
   const subgoals = isTopLevel ? subgoalsOf(data.goals, goal.id) : []
+  const tasks = data.tasks.filter((t) => t.goal_id === goal.id)
   const setStatus = (status: GoalStatus) => updateGoal.mutate({ id: goal.id, patch: { status } })
 
   return (
@@ -120,6 +123,31 @@ export function GoalDetail() {
             </div>
           )}
         </div>
+      )}
+
+      <div className="space-y-3">
+        <h2 className="text-sm font-semibold tracking-wide text-ink-faint uppercase">Tasks</h2>
+        {tasks.length === 0 ? (
+          <p className="text-sm text-ink-faint">No tasks yet.</p>
+        ) : (
+          <div className="space-y-2">
+            {tasks.map((task) => (
+              <button
+                key={task.id}
+                type="button"
+                onClick={() => setOpenedTask(task)}
+                className="block w-full rounded-xl border border-edge bg-white p-4 text-left transition-[box-shadow,border-color] hover:border-brand/30 hover:shadow-md hover:shadow-ink/5"
+              >
+                <span className="font-medium text-ink">{task.title}</span>
+                {task.date && <p className="mt-0.5 text-xs text-ink-faint">{task.date}</p>}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {openedTask && (
+        <TaskDetailModal open task={openedTask} data={data} onClose={() => setOpenedTask(null)} />
       )}
 
       {editing && <EditGoalModal open goal={goal} onClose={() => setEditing(false)} />}
