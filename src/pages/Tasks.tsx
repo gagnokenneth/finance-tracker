@@ -101,11 +101,9 @@ export function Tasks() {
         </div>
 
         <div className="space-y-3">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-baseline gap-2">
-              <h2 className="text-sm font-semibold tracking-wide text-ink-faint uppercase">Backlog</h2>
-              <span className="tnum font-mono text-xs text-ink-faint">{backlog.length}</span>
-            </div>
+          <div className="flex items-baseline gap-2">
+            <h2 className="text-sm font-semibold tracking-wide text-ink-faint uppercase">Backlog</h2>
+            <span className="tnum font-mono text-xs text-ink-faint">{backlog.length}</span>
             <RowButton type="button" tone="primary" title="Add task" aria-label="Add task" onClick={() => setAddTarget('backlog')}>
               +
             </RowButton>
