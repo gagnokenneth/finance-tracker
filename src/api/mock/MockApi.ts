@@ -955,7 +955,7 @@ export class MockApi implements FinanceApi {
     if (!input.title.trim()) throw new Error('A task needs a title')
     if (input.goal_id !== undefined) this.ownedGoal(data, input.goal_id)
     if (input.note_id !== undefined) this.ownedNote(data, input.note_id)
-    const task: Task = { id: nextId(data.tasks), ...input }
+    const task: Task = { id: nextId(data.tasks), ...input, created_at: isoDate() }
     data.tasks.push(task)
     this.save(data)
     return this.delay(data)
@@ -975,7 +975,7 @@ export class MockApi implements FinanceApi {
     }
     Object.assign(task, patch)
     // null is the wire's "clear this"; the stored model uses undefined.
-    for (const key of ['notes', 'recurrence', 'goal_id', 'note_id', 'date'] as const) {
+    for (const key of ['notes', 'recurrence', 'goal_id', 'note_id'] as const) {
       if (patch[key] === null) task[key] = undefined
     }
     this.save(data)
@@ -1002,11 +1002,14 @@ export class MockApi implements FinanceApi {
     const task = this.ownedTask(data, id)
     const columns = data.task_columns
     const target = this.ownedTaskColumn(data, input.column_id)
-    // Already there — a no-op, not a re-completion. Without this, a
-    // duplicate/retried move into the done column would mint a second next
-    // occurrence for a recurring task (the old completeTask refused a
-    // repeat call outright; this is the equivalent guard for moveTask).
-    if (task.column_id === target.id) return this.delay(data)
+    // A drop that neither changes the column nor assigns a date is a true
+    // no-op, not a re-completion. Without the date half of this check, a
+    // Backlog task dropped back onto the column it already (nominally) has
+    // — the common case, since every new task defaults into the first
+    // column — would silently skip the date assignment the drop was for.
+    const dateChanging = input.date !== undefined && input.date !== task.date
+    if (task.column_id === target.id && !dateChanging) return this.delay(data)
+    if (input.date !== undefined) task.date = input.date
     if (target.is_done) {
       if (!input.completed_date) throw new Error('A completed task needs a date')
       task.column_id = target.id
@@ -1021,6 +1024,7 @@ export class MockApi implements FinanceApi {
           column_id: firstColumn(columns).id,
           goal_id: task.goal_id,
           note_id: task.note_id,
+          created_at: isoDate(),
         }
         data.tasks.push(next)
       }

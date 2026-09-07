@@ -37,7 +37,6 @@ export function TaskDetailModal({
       patch: {
         title: form.values.title,
         notes: form.values.notes ?? null,
-        date: form.values.date ?? null,
         recurrence: form.values.recurrence ?? null,
         goal_id: form.values.goal_id ?? null,
       },
@@ -62,17 +61,19 @@ export function TaskDetailModal({
           ))}
       </div>
 
-      <form onSubmit={submit} className="mt-4 flex flex-col gap-3">
+      <p className="mt-2 text-xs text-ink-faint">
+        Created {task.created_at ?? '—'}
+        {task.date && ` · Scheduled ${task.date}`}
+      </p>
+
+      <form onSubmit={submit} className="mt-3 flex flex-col gap-3">
         <Field label="Title" required>
           <TextInput required value={form.title} onChange={(e) => form.setTitle(e.target.value)} />
         </Field>
         <Field label="Description">
           <RichTextEditor value={form.notes} onChange={form.setNotes} />
         </Field>
-        <div className="grid grid-cols-3 gap-3">
-          <Field label="Date">
-            <TextInput type="date" value={form.date} onChange={(e) => form.setDate(e.target.value)} />
-          </Field>
+        <div className="grid grid-cols-2 gap-3">
           <Field label="Repeats">
             <SelectInput value={form.recurrence} onChange={(e) => form.setRecurrence(e.target.value as typeof form.recurrence)}>
               <option value="">Does not repeat</option>

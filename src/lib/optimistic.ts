@@ -532,7 +532,7 @@ export function addTaskTo(data: FinanceData, vars: NewTask): FinanceData {
 
 /** See TaskPatch — the wire's null becomes the model's undefined. */
 function clearedTaskFields(patch: TaskPatch): Partial<Task> {
-  return clearNulls(patch, ['notes', 'recurrence', 'goal_id', 'note_id', 'date']) as Partial<Task>
+  return clearNulls(patch, ['notes', 'recurrence', 'goal_id', 'note_id']) as Partial<Task>
 }
 
 export function applyTaskPatch(
@@ -561,12 +561,20 @@ export function moveTaskIn(
   const task = data.tasks.find((t) => t.id === vars.id)
   const target = data.task_columns.find((c) => c.id === vars.input.column_id)
   if (!task || !target) return data
-  // Already there — a no-op, matching both backends' moveTask (a duplicate/
-  // retried move must never predict a second minted next occurrence).
-  if (task.column_id === target.id) return data
+  // A move that neither changes the column nor assigns a date is a true
+  // no-op — matches both backends' moveTask (a duplicate/retried move must
+  // never predict a second minted next occurrence, and a Backlog task
+  // dropped onto its own nominal column must still predict its new date).
+  const dateChanging = vars.input.date !== undefined && vars.input.date !== task.date
+  if (task.column_id === target.id && !dateChanging) return data
   const moved = data.tasks.map((t) =>
     t.id === vars.id
-      ? { ...t, column_id: target.id, completed_date: target.is_done ? vars.input.completed_date : undefined }
+      ? {
+          ...t,
+          column_id: target.id,
+          date: vars.input.date ?? t.date,
+          completed_date: target.is_done ? vars.input.completed_date : undefined,
+        }
       : t,
   )
   if (!target.is_done || !task.recurrence || !vars.input.next_date) return { ...data, tasks: moved }

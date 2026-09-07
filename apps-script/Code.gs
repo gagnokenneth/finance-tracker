@@ -16,7 +16,7 @@ var SHEETS = {
   income: ['id', 'user_id', 'source_id', 'amount', 'date', 'notes'],
   income_sources: ['id', 'user_id', 'name', 'archived'],
   savings_ledger: ['id', 'user_id', 'date', 'amount', 'kind', 'ref_type', 'ref_id', 'notes'],
-  tasks: ['id', 'user_id', 'title', 'notes', 'date', 'recurrence', 'column_id', 'completed_date', 'goal_id', 'note_id'],
+  tasks: ['id', 'user_id', 'title', 'notes', 'date', 'recurrence', 'column_id', 'completed_date', 'goal_id', 'note_id', 'created_at'],
   task_columns: ['id', 'user_id', 'name', 'sort_order', 'is_done'],
   notes: ['id', 'user_id', 'title', 'body'],
   note_items: ['id', 'user_id', 'note_id', 'text', 'done', 'sort_order'],
@@ -29,7 +29,7 @@ var SHEETS = {
  * so the new shape is applied on the very next request after a deployment,
  * instead of up to an hour later.
  */
-var SCHEMA_VERSION = 15;
+var SCHEMA_VERSION = 16;
 
 /*
  * Tabs whose stale shape may be DISCARDED and recreated. Deliberately excludes
@@ -498,7 +498,7 @@ function coerce(name, r) {
     id: num(r.id), title: String(r.title), notes: optStr(r.notes), date: optDate(r.date),
     recurrence: optStr(r.recurrence),
     column_id: num(r.column_id), completed_date: optDate(r.completed_date),
-    goal_id: optNum(r.goal_id), note_id: optNum(r.note_id)
+    goal_id: optNum(r.goal_id), note_id: optNum(r.note_id), created_at: optDate(r.created_at)
   };
   if (name === 'task_columns') return {
     id: num(r.id), name: String(r.name), sort_order: num(r.sort_order), is_done: bool(r.is_done)
@@ -1677,7 +1677,8 @@ function addTask(p, uid) {
     column_id: input.column_id,
     completed_date: '',
     goal_id: input.goal_id,
-    note_id: input.note_id
+    note_id: input.note_id,
+    created_at: isoToday()
   });
   return null;
 }
@@ -1691,7 +1692,6 @@ function updateTask(p, uid) {
     patch.title = given.title;
   }
   if (Object.prototype.hasOwnProperty.call(given, 'notes')) patch.notes = given.notes;
-  if (Object.prototype.hasOwnProperty.call(given, 'date')) patch.date = given.date;
   if (Object.prototype.hasOwnProperty.call(given, 'recurrence')) patch.recurrence = given.recurrence;
   if (Object.prototype.hasOwnProperty.call(given, 'goal_id')) {
     if (!blank(given.goal_id)) assertOwned('goals', given.goal_id, uid);
@@ -1725,14 +1725,18 @@ function moveTask(p, uid) {
   assertOwned('task_columns', input.column_id, uid);
   var column = getById('task_columns', input.column_id);
   if (!column) throw new Error('That column was not found. It may have been deleted.');
-  // Already there — a no-op, not a re-completion. Without this, a
-  // duplicate/retried move into the done column would mint a second next
-  // occurrence for a recurring task (the old completeTask refused a repeat
-  // call outright; this is the equivalent guard for moveTask).
-  if (num(current.column_id) === num(input.column_id)) return null;
+  // A drop that neither changes the column nor assigns a date is a true
+  // no-op, not a re-completion. Without the date half of this check, a
+  // Backlog task dropped back onto the column it already (nominally) has —
+  // the common case, since every new task defaults into the first column —
+  // would silently skip the date assignment the drop was for.
+  var dateChanging = !blank(input.date) && String(input.date) !== String(current.date || '');
+  if (num(current.column_id) === num(input.column_id) && !dateChanging) return null;
+  var datePatch = {};
+  if (!blank(input.date)) datePatch.date = input.date;
   if (bool(column.is_done)) {
     if (blank(input.completed_date)) throw new Error('A completed task needs a date');
-    patchRowAt('tasks', rowIndex, { column_id: input.column_id, completed_date: input.completed_date });
+    patchRowAt('tasks', rowIndex, Object.assign({ column_id: input.column_id, completed_date: input.completed_date }, datePatch));
     if (!blank(current.recurrence) && !blank(input.next_date)) {
       var firstCol = firstTaskColumn(uid);
       appendRow('tasks', {
@@ -1745,11 +1749,12 @@ function moveTask(p, uid) {
         column_id: firstCol.id,
         completed_date: '',
         goal_id: current.goal_id,
-        note_id: current.note_id
+        note_id: current.note_id,
+        created_at: isoToday()
       });
     }
   } else {
-    patchRowAt('tasks', rowIndex, { column_id: input.column_id, completed_date: '' });
+    patchRowAt('tasks', rowIndex, Object.assign({ column_id: input.column_id, completed_date: '' }, datePatch));
   }
   return null;
 }

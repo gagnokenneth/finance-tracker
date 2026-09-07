@@ -20,15 +20,29 @@ export function nextTaskDate(date: string, recurrence: TaskRecurrence): string {
  * recurring task, mints the next occurrence's date. Shared by the board's
  * drag-and-drop handler and the detail popup's "Move to" buttons.
  */
-export function buildMoveInput(task: Task, columnId: number, doneColumnId: number): MoveTaskInput {
+/**
+ * `dateOverride` is set when dropping a Backlog (undated) task onto the
+ * board — the drop target's column, but no drop target knows what date to
+ * assign, so the caller supplies the week currently on screen. A task
+ * already on the board (already dated) keeps its own date; only a Backlog
+ * task's drop needs one assigned.
+ */
+export function buildMoveInput(
+  task: Task,
+  columnId: number,
+  doneColumnId: number,
+  dateOverride?: string,
+): MoveTaskInput {
+  const effectiveDate = dateOverride ?? task.date
   if (columnId === doneColumnId) {
     return {
       column_id: columnId,
+      date: dateOverride,
       completed_date: isoDate(),
-      next_date: task.recurrence && task.date ? nextTaskDate(task.date, task.recurrence) : undefined,
+      next_date: effectiveDate && task.recurrence ? nextTaskDate(effectiveDate, task.recurrence) : undefined,
     }
   }
-  return { column_id: columnId }
+  return { column_id: columnId, date: dateOverride }
 }
 
 export const RECURRENCES: TaskRecurrence[] = ['daily', 'weekly', 'monthly']

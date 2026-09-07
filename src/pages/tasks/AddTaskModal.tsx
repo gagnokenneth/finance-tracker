@@ -9,13 +9,20 @@ import { firstColumn } from '../../lib/taskColumns.ts'
 import type { FinanceData, TaskRecurrence } from '../../types.ts'
 
 /**
- * `initialDate` lets the Calendar page open this pre-filled to the clicked
- * day. `data` is passed down from the parent page rather than fetched here
- * — no modal in this app calls useFinanceData() itself.
+ * `data` is passed down from the parent page rather than fetched here — no
+ * modal in this app calls useFinanceData() itself.
  *
- * Creation is deliberately minimal — a description is written afterward via
- * the detail popup's WYSIWYG editor, matching how Notes' own creation flow
- * defers rich content to after the row exists.
+ * Creation is deliberately minimal — no date field (every new task started
+ * from the Tasks page lands in the Backlog; it gets a date by being dragged
+ * onto the board) and no description (written afterward via the detail
+ * popup's WYSIWYG editor, matching how Notes' own creation flow defers rich
+ * content to after the row exists).
+ *
+ * `initialDate` is the one exception: the Dashboard calendar's "add a task
+ * on this day" gesture (MonthCalendar.tsx) still creates a task dated to
+ * the day that was clicked. There's no visible date control for it — it's
+ * a silent pass-through from that specific entry point, not a form field a
+ * user fills in.
  */
 export function AddTaskModal({
   open,
@@ -29,7 +36,7 @@ export function AddTaskModal({
   onClose: () => void
 }) {
   const { addTask } = useFinanceMutations()
-  const form = useTaskForm(undefined, initialDate)
+  const form = useTaskForm()
   const goals = referenceable(
     data.goals.filter((g) => g.status === 'planned' || g.status === 'active'),
   )
@@ -38,7 +45,7 @@ export function AddTaskModal({
     e.preventDefault()
     if (!form.values) return
     onClose()
-    addTask.mutate({ ...form.values, column_id: firstColumn(data.task_columns).id })
+    addTask.mutate({ ...form.values, date: initialDate, column_id: firstColumn(data.task_columns).id })
   }
 
   return (
@@ -46,13 +53,6 @@ export function AddTaskModal({
       <form onSubmit={submit} className="flex flex-col gap-3">
         <Field label="Title" required>
           <TextInput required value={form.title} onChange={(e) => form.setTitle(e.target.value)} />
-        </Field>
-        <Field label="Date">
-          <TextInput
-            type="date"
-            value={form.date}
-            onChange={(e) => form.setDate(e.target.value)}
-          />
         </Field>
         <Field label="Repeats">
           <SelectInput

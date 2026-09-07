@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useDroppable } from '@dnd-kit/core'
 import { TaskCard } from './TaskCard.tsx'
 import { groupByDay } from '../../lib/tasks.ts'
-import { TextInput, DeleteRowButton } from '../../components/ui.tsx'
+import { TextInput } from '../../components/ui.tsx'
 import type { Task, TaskColumn } from '../../types.ts'
 
 /**
@@ -16,16 +16,12 @@ export function TaskColumnLane({
   dayGrouped,
   onOpenTask,
   onRename,
-  onDelete,
-  canDelete,
 }: {
   column: TaskColumn
   tasks: Task[]
   dayGrouped: boolean
   onOpenTask: (task: Task) => void
   onRename: (name: string) => void
-  onDelete: () => void
-  canDelete: boolean
 }) {
   const [renaming, setRenaming] = useState(false)
   const [nameDraft, setNameDraft] = useState('')
@@ -85,21 +81,7 @@ export function TaskColumnLane({
             </h3>
           )}
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <span className="tnum font-mono text-xs text-ink-faint">{tasks.length}</span>
-          <DeleteRowButton
-            type="button"
-            disabled={!canDelete}
-            title={
-              canDelete
-                ? 'Delete'
-                : column.is_done
-                  ? "The Done column can't be deleted"
-                  : "Move or delete this column's tasks first"
-            }
-            onClick={onDelete}
-          />
-        </div>
+        <span className="tnum shrink-0 font-mono text-xs text-ink-faint">{tasks.length}</span>
       </div>
 
       {tasks.length === 0 ? (

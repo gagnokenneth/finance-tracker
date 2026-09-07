@@ -90,20 +90,25 @@ export interface NewSavingsEntry {
 }
 export type SavingsEntryPatch = Patch<NewSavingsEntry, 'notes'>
 
-export type NewTask = Omit<Task, 'id' | 'completed_date'>
+/** created_at is server-set at insert time (like users.created), never
+ *  client-supplied — matches how completed_date is server-managed too. */
+export type NewTask = Omit<Task, 'id' | 'completed_date' | 'created_at'>
 /**
- * column_id and completed_date are excluded entirely — a column change
- * (including into/out of done) only ever goes through moveTask, which also
- * handles minting a recurring task's next occurrence. date is Clearable now
- * that it's optional (unset = Backlog).
+ * column_id, completed_date, date, and created_at are excluded entirely.
+ * column_id/date only ever change via moveTask (which also handles minting
+ * a recurring task's next occurrence); created_at is set once at creation
+ * and never patched.
  */
 export type TaskPatch = Patch<
-  Omit<Task, 'id' | 'column_id' | 'completed_date'>,
-  'notes' | 'recurrence' | 'goal_id' | 'note_id' | 'date'
+  Omit<Task, 'id' | 'column_id' | 'completed_date' | 'date' | 'created_at'>,
+  'notes' | 'recurrence' | 'goal_id' | 'note_id'
 >
 
 export interface MoveTaskInput {
   column_id: number
+  /** Set only when dragging an undated (Backlog) task onto the board — the
+   *  one way a task's date is ever assigned or changed. */
+  date?: string
   /** Required only when column_id resolves to the user's is_done column. */
   completed_date?: string
   /** Only when moving into is_done AND the task recurs — computed by nextTaskDate in lib/tasks.ts. */

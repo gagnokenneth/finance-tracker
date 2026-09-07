@@ -137,7 +137,12 @@ export interface Task {
   title: string
   /** HTML from the WYSIWYG description editor. */
   notes?: string
-  /** Unset means the task is in the Backlog — no week, no calendar presence. */
+  /**
+   * Unset means the task is in the Backlog — no week, no calendar presence.
+   * Never directly editable: a task only gets (or changes) a date by being
+   * dragged from the Backlog onto a board column — see MoveTaskInput.date
+   * in FinanceApi.ts.
+   */
   date?: string
   /** Unset for a one-off task. */
   recurrence?: TaskRecurrence
@@ -146,6 +151,10 @@ export interface Task {
   /** At most one goal per task. */
   goal_id?: number
   note_id?: number
+  /** Set once at creation (client-computed, like every other date in this
+   *  app), never patched afterward. Unset on rows created before this field
+   *  existed. */
+  created_at?: string
 }
 
 /**

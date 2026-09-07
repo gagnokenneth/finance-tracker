@@ -7,16 +7,15 @@ export interface TaskForm {
   setTitle: (v: string) => void
   notes: string
   setNotes: (v: string) => void
-  date: string
-  setDate: (v: string) => void
   recurrence: TaskRecurrence | ''
   setRecurrence: (v: TaskRecurrence | '') => void
   goalId: number | ''
   setGoalId: (v: number | '') => void
-  /** The write payload, or null while the form is incomplete. column_id is
-   *  not this hook's to know — the caller (AddTaskModal / Task 2's board)
-   *  supplies it. */
-  values: Omit<NewTask, 'column_id'> | null
+  /** The write payload, or null while the form is incomplete. column_id and
+   *  date are not this hook's to know — column_id is supplied by the
+   *  caller (AddTaskModal), and date is never form-editable at all — a
+   *  task only gets one by being dragged onto the board. */
+  values: Omit<NewTask, 'column_id' | 'date'> | null
 }
 
 /**
@@ -24,20 +23,18 @@ export interface TaskForm {
  * either way and differs only in what happens on submit, matching
  * useBillForm's own division of responsibility.
  */
-export function useTaskForm(task?: Task, initialDate?: string): TaskForm {
+export function useTaskForm(task?: Task): TaskForm {
   const [title, setTitle] = useState(task?.title ?? '')
   const [notes, setNotes] = useState(task?.notes ?? '')
-  const [date, setDate] = useState(task?.date ?? initialDate ?? '')
   const [recurrence, setRecurrence] = useState<TaskRecurrence | ''>(task?.recurrence ?? '')
   const [goalId, setGoalId] = useState<number | ''>(task?.goal_id ?? '')
 
   const complete = title.trim() !== ''
-  const values: Omit<NewTask, 'column_id'> | null = !complete
+  const values: Omit<NewTask, 'column_id' | 'date'> | null = !complete
     ? null
     : {
         title: title.trim(),
         notes: notes.trim() || undefined,
-        date: date || undefined,
         recurrence: recurrence || undefined,
         goal_id: goalId === '' ? undefined : goalId,
       }
@@ -47,8 +44,6 @@ export function useTaskForm(task?: Task, initialDate?: string): TaskForm {
     setTitle,
     notes,
     setNotes,
-    date,
-    setDate,
     recurrence,
     setRecurrence,
     goalId,
