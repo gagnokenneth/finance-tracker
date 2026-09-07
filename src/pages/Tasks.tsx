@@ -11,13 +11,14 @@ import { LoadError } from '../components/LoadError.tsx'
 import { LoadingScreen } from '../components/LoadingScreen.tsx'
 import { AddTaskModal } from './tasks/AddTaskModal.tsx'
 import { TaskColumnLane } from './tasks/TaskColumnLane.tsx'
-import type { Task } from '../types.ts'
+import { AddColumnForm } from './tasks/AddColumnForm.tsx'
+import type { Task, TaskColumn } from '../types.ts'
 
 type Scope = 'backlog' | 'week'
 
 export function Tasks() {
   const { data, isPending, isError, error } = useFinanceData()
-  const { moveTask, deleteTask } = useFinanceMutations()
+  const { moveTask, deleteTask, updateTaskColumn, deleteTaskColumn } = useFinanceMutations()
   const [adding, setAdding] = useState(false)
   const [deleting, setDeleting] = useState<Task | null>(null)
   const [scope, setScope] = useState<Scope>('week')
@@ -52,6 +53,11 @@ export function Tasks() {
   // Task 4 replaces this with the real detail popup; for now clicking a
   // card does nothing extra beyond what its own Move control already offers.
   const openTask = () => {}
+
+  const swap = (a: TaskColumn, b: TaskColumn) => {
+    updateTaskColumn.mutate({ id: a.id, patch: { sort_order: b.sort_order } })
+    updateTaskColumn.mutate({ id: b.id, patch: { sort_order: a.sort_order } })
+  }
 
   const { start, end } = weekWindow(weekStart)
 
@@ -94,7 +100,7 @@ export function Tasks() {
         </EmptyState>
       ) : (
         <div className="flex gap-3 overflow-x-auto pb-2">
-          {columns.map((column) => (
+          {columns.map((column, i) => (
             <TaskColumnLane
               key={column.id}
               column={column}
@@ -103,8 +109,14 @@ export function Tasks() {
               dayGrouped={scope === 'week'}
               onMove={move}
               onOpenTask={openTask}
+              onRename={(name) => updateTaskColumn.mutate({ id: column.id, patch: { name } })}
+              onDelete={() => deleteTaskColumn.mutate(column.id)}
+              canDelete={!column.is_done && (grouped.get(column.id) ?? []).length === 0}
+              onMoveLeft={i > 0 ? () => swap(column, columns[i - 1]) : undefined}
+              onMoveRight={i < columns.length - 1 ? () => swap(column, columns[i + 1]) : undefined}
             />
           ))}
+          <AddColumnForm />
         </div>
       )}
 
