@@ -18,21 +18,24 @@ import type { FinanceData, TaskRecurrence } from '../../types.ts'
  * popup's WYSIWYG editor, matching how Notes' own creation flow defers rich
  * content to after the row exists).
  *
- * `initialDate` is the one exception: the Dashboard calendar's "add a task
- * on this day" gesture (MonthCalendar.tsx) still creates a task dated to
- * the day that was clicked. There's no visible date control for it — it's
- * a silent pass-through from that specific entry point, not a form field a
- * user fills in.
+ * `initialDate`/`initialColumnId` are silent pass-throughs, not form
+ * fields — there's no visible date or column control here. The Dashboard
+ * calendar's "add a task on this day" gesture (MonthCalendar.tsx) supplies
+ * `initialDate` alone; a board column's own "+" (Tasks.tsx) supplies both,
+ * so the task actually lands in that column, on the board, instead of
+ * silently landing in the Backlog where it would look like nothing happened.
  */
 export function AddTaskModal({
   open,
   data,
   initialDate,
+  initialColumnId,
   onClose,
 }: {
   open: boolean
   data: FinanceData
   initialDate?: string
+  initialColumnId?: number
   onClose: () => void
 }) {
   const { addTask } = useFinanceMutations()
@@ -45,7 +48,11 @@ export function AddTaskModal({
     e.preventDefault()
     if (!form.values) return
     onClose()
-    addTask.mutate({ ...form.values, date: initialDate, column_id: firstColumn(data.task_columns).id })
+    addTask.mutate({
+      ...form.values,
+      date: initialDate,
+      column_id: initialColumnId ?? firstColumn(data.task_columns).id,
+    })
   }
 
   return (

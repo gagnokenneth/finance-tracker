@@ -2,13 +2,18 @@ import { useState } from 'react'
 import { useDroppable } from '@dnd-kit/core'
 import { TaskCard } from './TaskCard.tsx'
 import { groupByDay } from '../../lib/tasks.ts'
-import { TextInput } from '../../components/ui.tsx'
+import { TextInput, RowButton } from '../../components/ui.tsx'
 import type { Task, TaskColumn } from '../../types.ts'
 
 /**
  * One column's lane. When `dayGrouped` is true (the "This week" scope),
  * cards are sub-headed by their date; Backlog scope renders them flat since
  * every card there has no date to group by.
+ *
+ * `onAddTask` is omitted (not just disabled) for the done column — there's
+ * no such thing as adding a task that's already done, so the "+" simply
+ * doesn't exist there rather than existing in a state that would need
+ * explaining.
  */
 export function TaskColumnLane({
   column,
@@ -16,12 +21,14 @@ export function TaskColumnLane({
   dayGrouped,
   onOpenTask,
   onRename,
+  onAddTask,
 }: {
   column: TaskColumn
   tasks: Task[]
   dayGrouped: boolean
   onOpenTask: (task: Task) => void
   onRename: (name: string) => void
+  onAddTask?: () => void
 }) {
   const [renaming, setRenaming] = useState(false)
   const [nameDraft, setNameDraft] = useState('')
@@ -81,7 +88,14 @@ export function TaskColumnLane({
             </h3>
           )}
         </div>
-        <span className="tnum shrink-0 font-mono text-xs text-ink-faint">{tasks.length}</span>
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="tnum font-mono text-xs text-ink-faint">{tasks.length}</span>
+          {onAddTask && (
+            <RowButton type="button" tone="primary" title="Add task" aria-label="Add task" onClick={onAddTask}>
+              +
+            </RowButton>
+          )}
+        </div>
       </div>
 
       {tasks.length === 0 ? (

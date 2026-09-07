@@ -955,7 +955,7 @@ export class MockApi implements FinanceApi {
     if (!input.title.trim()) throw new Error('A task needs a title')
     if (input.goal_id !== undefined) this.ownedGoal(data, input.goal_id)
     if (input.note_id !== undefined) this.ownedNote(data, input.note_id)
-    const task: Task = { id: nextId(data.tasks), ...input, created_at: isoDate() }
+    const task: Task = { id: nextId(data.tasks), ...input, created_at: new Date().toISOString() }
     data.tasks.push(task)
     this.save(data)
     return this.delay(data)
@@ -1024,7 +1024,7 @@ export class MockApi implements FinanceApi {
           column_id: firstColumn(columns).id,
           goal_id: task.goal_id,
           note_id: task.note_id,
-          created_at: isoDate(),
+          created_at: new Date().toISOString(),
         }
         data.tasks.push(next)
       }

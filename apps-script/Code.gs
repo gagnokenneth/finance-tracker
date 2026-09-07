@@ -440,6 +440,18 @@ function optNum(v) { return blank(v) ? undefined : Number(v); }
 
 function optDate(v) { return blank(v) ? undefined : fmtDate(v); }
 
+/**
+ * Full ISO 8601 datetime, never truncated to a bare day like optDate/fmtDate
+ * do. Sheets may auto-parse a stored ISO string into a native Date cell;
+ * when it comes back as a Date object here, .toISOString() reconstructs the
+ * exact instant instead of collapsing it to a calendar day.
+ */
+function optDateTime(v) {
+  if (blank(v)) return undefined;
+  if (v instanceof Date) return v.toISOString();
+  return String(v);
+}
+
 /** Blank text cell as undefined, matching optNum/optDate. */
 function optStr(v) { return blank(v) ? undefined : String(v); }
 
@@ -498,7 +510,7 @@ function coerce(name, r) {
     id: num(r.id), title: String(r.title), notes: optStr(r.notes), date: optDate(r.date),
     recurrence: optStr(r.recurrence),
     column_id: num(r.column_id), completed_date: optDate(r.completed_date),
-    goal_id: optNum(r.goal_id), note_id: optNum(r.note_id), created_at: optDate(r.created_at)
+    goal_id: optNum(r.goal_id), note_id: optNum(r.note_id), created_at: optDateTime(r.created_at)
   };
   if (name === 'task_columns') return {
     id: num(r.id), name: String(r.name), sort_order: num(r.sort_order), is_done: bool(r.is_done)
@@ -1365,6 +1377,13 @@ function isoToday() {
   return Utilities.formatDate(new Date(), ss().getSpreadsheetTimeZone(), 'yyyy-MM-dd');
 }
 
+/** The exact current instant, for audit timestamps like Task.created_at —
+ *  unlike isoToday, deliberately NOT spreadsheet-timezone-formatted, since
+ *  this records a moment, not a calendar day. */
+function isoNow() {
+  return new Date().toISOString();
+}
+
 /*
  * The as-of-today balance after optionally replacing one row: money you actually
  * have. A movement dated for a future payday is stored but not counted, so it
@@ -1678,7 +1697,7 @@ function addTask(p, uid) {
     completed_date: '',
     goal_id: input.goal_id,
     note_id: input.note_id,
-    created_at: isoToday()
+    created_at: isoNow()
   });
   return null;
 }
@@ -1750,7 +1769,7 @@ function moveTask(p, uid) {
         completed_date: '',
         goal_id: current.goal_id,
         note_id: current.note_id,
-        created_at: isoToday()
+        created_at: isoNow()
       });
     }
   } else {

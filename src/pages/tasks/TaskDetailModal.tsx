@@ -11,6 +11,18 @@ import { RichTextEditor } from '../../components/RichTextEditor.tsx'
 import { Field, TextInput, SelectInput, Button, SecondaryButton, RowButton, DeleteButton } from '../../components/ui.tsx'
 import type { FinanceData, Task } from '../../types.ts'
 
+/** `created_at` is a full ISO 8601 datetime (see Task's own doc comment) —
+ *  formatted in the viewer's own locale/timezone, not the raw ISO string. */
+function formatCreatedAt(createdAt: string | undefined): string {
+  if (!createdAt) return '—'
+  const date = new Date(createdAt)
+  if (Number.isNaN(date.getTime())) return '—'
+  return date.toLocaleString(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  })
+}
+
 export function TaskDetailModal({
   open,
   task,
@@ -61,10 +73,7 @@ export function TaskDetailModal({
           ))}
       </div>
 
-      <p className="mt-2 text-xs text-ink-faint">
-        Created {task.created_at ?? '—'}
-        {task.date && ` · Scheduled ${task.date}`}
-      </p>
+      <p className="mt-2 text-xs text-ink-faint">Created {formatCreatedAt(task.created_at)}</p>
 
       <form onSubmit={submit} className="mt-3 flex flex-col gap-3">
         <Field label="Title" required>

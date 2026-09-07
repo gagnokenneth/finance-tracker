@@ -151,9 +151,12 @@ export interface Task {
   /** At most one goal per task. */
   goal_id?: number
   note_id?: number
-  /** Set once at creation (client-computed, like every other date in this
-   *  app), never patched afterward. Unset on rows created before this field
-   *  existed. */
+  /**
+   * Full ISO 8601 datetime (unlike every other date field in this app,
+   * which is a bare yyyy-mm-dd calendar day) — an audit timestamp needs the
+   * time, a business date doesn't. Server-set at insert time, never patched
+   * afterward. Unset on rows created before this field existed.
+   */
   created_at?: string
 }
 
