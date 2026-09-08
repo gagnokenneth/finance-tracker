@@ -150,6 +150,15 @@ export interface Task {
   recurrence?: TaskRecurrence
   column_id: number
   completed_date?: string
+  /**
+   * True once this row has minted its recurring successor (see moveTask in
+   * FinanceApi.ts) — set the first time it moves into the done column and
+   * never cleared afterward, even once the task later leaves Done and
+   * re-enters. Without this, cycling a recurring task out of Done and back
+   * in would mint a second successor for what is still the same occurrence.
+   * Meaningless for a non-recurring task.
+   */
+  recurred?: boolean
   /** At most one goal per task. */
   goal_id?: number
   note_id?: number

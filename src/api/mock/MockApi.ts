@@ -21,7 +21,6 @@ import type {
   NewTask,
   TaskPatch,
   MoveTaskInput,
-  NewTaskColumn,
   TaskColumnPatch,
   NewNote,
   NotePatch,
@@ -56,7 +55,7 @@ import { signedAmount, isPaymentKind } from '../../lib/savings.ts'
 import { isoDate, isoDateTime } from '../../lib/currentMonth.ts'
 import { nextSortOrder } from '../../lib/notes.ts'
 import { isValidGoalTransition } from '../../lib/goals.ts'
-import { DEFAULT_TASK_COLUMNS, firstColumn, nextSortOrder as nextColumnSortOrder } from '../../lib/taskColumns.ts'
+import { DEFAULT_TASK_COLUMNS, firstColumn } from '../../lib/taskColumns.ts'
 
 const KEY = 'finance-mock-db'
 
@@ -992,10 +991,12 @@ export class MockApi implements FinanceApi {
 
   /**
    * The one mutation for every column change. Moving into the done column
-   * sets completed_date and, when the task recurs, mints the next
-   * occurrence — exactly today's completeTask. Moving to any other column
-   * (including out of done) just updates column_id and clears
-   * completed_date, matching the old "Undo" (updateTask completed:false).
+   * sets completed_date and, the first time this row does so, mints the
+   * next occurrence for a recurring task — exactly today's completeTask.
+   * recurred then stays true so a later re-entry into Done never mints a
+   * duplicate. Moving to any other column (including out of done) just
+   * updates column_id and clears completed_date, matching the old "Undo"
+   * (updateTask completed:false).
    */
   async moveTask(id: number, input: MoveTaskInput): Promise<FinanceData> {
     const data = this.load()
@@ -1014,7 +1015,8 @@ export class MockApi implements FinanceApi {
       if (!input.completed_date) throw new Error('A completed task needs a date')
       task.column_id = target.id
       task.completed_date = input.completed_date
-      if (task.recurrence && input.next_date) {
+      if (task.recurrence && input.next_date && !task.recurred) {
+        task.recurred = true
         const next: Task = {
           id: nextId(data.tasks),
           title: task.title,
@@ -1036,15 +1038,6 @@ export class MockApi implements FinanceApi {
     return this.delay(data)
   }
 
-  async addTaskColumn(input: NewTaskColumn): Promise<FinanceData> {
-    const data = this.load()
-    if (!input.name.trim()) throw new Error('A column needs a name')
-    const sortOrder = nextColumnSortOrder(data.task_columns)
-    data.task_columns.push({ id: nextId(data.task_columns), name: input.name.trim(), sort_order: sortOrder, is_done: false })
-    this.save(data)
-    return this.delay(data)
-  }
-
   async updateTaskColumn(id: number, patch: TaskColumnPatch): Promise<FinanceData> {
     const data = this.load()
     const column = this.ownedTaskColumn(data, id)
@@ -1053,18 +1046,6 @@ export class MockApi implements FinanceApi {
       patch = { ...patch, name: patch.name!.trim() }
     }
     Object.assign(column, patch)
-    this.save(data)
-    return this.delay(data)
-  }
-
-  async deleteTaskColumn(id: number): Promise<FinanceData> {
-    const data = this.load()
-    const column = this.ownedTaskColumn(data, id)
-    if (column.is_done) throw new Error('The Done column cannot be deleted.')
-    if (data.tasks.some((t) => t.column_id === id)) {
-      throw new Error('Move or delete this column’s tasks first.')
-    }
-    data.task_columns = data.task_columns.filter((c) => c.id !== id)
     this.save(data)
     return this.delay(data)
   }

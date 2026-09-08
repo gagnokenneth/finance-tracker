@@ -21,7 +21,6 @@ import type {
   NewTask,
   TaskPatch,
   MoveTaskInput,
-  NewTaskColumn,
   TaskColumnPatch,
   NewNote,
   NotePatch,
@@ -246,14 +245,8 @@ export class AppsScriptApi implements FinanceApi {
     return this.call<FinanceData>('moveTask', { id, input })
   }
 
-  addTaskColumn(input: NewTaskColumn): Promise<FinanceData> {
-    return this.call<FinanceData>('addTaskColumn', { input })
-  }
   updateTaskColumn(id: number, patch: TaskColumnPatch): Promise<FinanceData> {
     return this.call<FinanceData>('updateTaskColumn', { id, patch })
-  }
-  deleteTaskColumn(id: number): Promise<FinanceData> {
-    return this.call<FinanceData>('deleteTaskColumn', { id })
   }
 
   addNote(input: NewNote): Promise<FinanceData> {

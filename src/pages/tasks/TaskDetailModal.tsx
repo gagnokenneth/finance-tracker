@@ -27,11 +27,15 @@ export function TaskDetailModal({
   open,
   task,
   data,
+  weekStart,
   onClose,
 }: {
   open: boolean
   task: Task
   data: FinanceData
+  /** The board's currently-viewed week — stands in for the date an undated
+   *  (Backlog) task needs when moved via a button here, same as a drag drop. */
+  weekStart: string
   onClose: () => void
 }) {
   const { updateTask, moveTask, deleteTask } = useFinanceMutations()
@@ -57,7 +61,11 @@ export function TaskDetailModal({
   }
 
   const move = (columnId: number) => {
-    moveTask.mutate({ id: task.id, input: buildMoveInput(task, columnId, done.id) })
+    // Same stand-in date as the board's drag-and-drop: an undated (Backlog)
+    // task has no date of its own to keep, so the currently-viewed week fills
+    // in for it.
+    const dateOverride = task.date === undefined ? weekStart : undefined
+    moveTask.mutate({ id: task.id, input: buildMoveInput(task, columnId, done.id, dateOverride) })
     onClose()
   }
 

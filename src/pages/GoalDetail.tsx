@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useFinanceData } from '../hooks/useFinanceData.ts'
 import { useFinanceMutations } from '../hooks/useFinanceMutations.ts'
+import { startOfWeek, isoDate } from '../lib/currentMonth.ts'
 import { subgoalsOf, GOAL_STATUS_LABEL, GOAL_STATUS_CLASS } from '../lib/goals.ts'
 import { isTemp } from '../lib/tempId.ts'
 import { Card } from '../components/Card.tsx'
@@ -147,7 +148,13 @@ export function GoalDetail() {
       </div>
 
       {openedTask && (
-        <TaskDetailModal open task={openedTask} data={data} onClose={() => setOpenedTask(null)} />
+        <TaskDetailModal
+          open
+          task={openedTask}
+          data={data}
+          weekStart={startOfWeek(isoDate())}
+          onClose={() => setOpenedTask(null)}
+        />
       )}
 
       {editing && <EditGoalModal open goal={goal} onClose={() => setEditing(false)} />}

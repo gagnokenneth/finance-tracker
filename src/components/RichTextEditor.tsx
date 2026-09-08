@@ -42,6 +42,7 @@ export function RichTextEditor({
       <div className="flex items-center gap-1 border-b border-edge px-2 py-1">
         <button
           type="button"
+          onMouseDown={(e) => e.preventDefault()}
           onClick={() => editor.chain().focus().toggleBold().run()}
           className={`${TOOLBAR_BUTTON} ${editor.isActive('bold') ? TOOLBAR_BUTTON_ACTIVE : ''}`}
         >
@@ -49,6 +50,7 @@ export function RichTextEditor({
         </button>
         <button
           type="button"
+          onMouseDown={(e) => e.preventDefault()}
           onClick={() => editor.chain().focus().toggleItalic().run()}
           className={`${TOOLBAR_BUTTON} ${editor.isActive('italic') ? TOOLBAR_BUTTON_ACTIVE : ''}`}
         >
@@ -56,6 +58,7 @@ export function RichTextEditor({
         </button>
         <button
           type="button"
+          onMouseDown={(e) => e.preventDefault()}
           onClick={() => editor.chain().focus().toggleBulletList().run()}
           className={`${TOOLBAR_BUTTON} ${editor.isActive('bulletList') ? TOOLBAR_BUTTON_ACTIVE : ''}`}
         >
@@ -63,6 +66,7 @@ export function RichTextEditor({
         </button>
         <button
           type="button"
+          onMouseDown={(e) => e.preventDefault()}
           onClick={() => editor.chain().focus().toggleOrderedList().run()}
           className={`${TOOLBAR_BUTTON} ${editor.isActive('orderedList') ? TOOLBAR_BUTTON_ACTIVE : ''}`}
         >

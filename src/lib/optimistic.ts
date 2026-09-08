@@ -11,7 +11,6 @@ import type {
   SavingsMovementKind,
   SavingsRefType,
   Task,
-  TaskColumn,
   Note,
   NoteItem,
   Goal,
@@ -35,7 +34,6 @@ import type {
   NewTask,
   TaskPatch,
   MoveTaskInput,
-  NewTaskColumn,
   TaskColumnPatch,
   NewNote,
   NotePatch,
@@ -47,7 +45,7 @@ import type {
 import { tempId } from './tempId.ts'
 import { signedAmount } from './savings.ts'
 import { nextSortOrder } from './notes.ts'
-import { firstColumn, nextSortOrder as nextColumnSortOrder } from './taskColumns.ts'
+import { firstColumn } from './taskColumns.ts'
 
 /**
  * Client-side predictions of what a write does to the dataset, used to show the
@@ -567,6 +565,10 @@ export function moveTaskIn(
   // dropped onto its own nominal column must still predict its new date).
   const dateChanging = vars.input.date !== undefined && vars.input.date !== task.date
   if (task.column_id === target.id && !dateChanging) return data
+  // Mirrors both backends' moveTask: recurred, once true, is never cleared —
+  // cycling a recurring task out of Done and back in must not predict a
+  // second minted successor for what is still the same occurrence.
+  const willMint = target.is_done && !!task.recurrence && !!vars.input.next_date && !task.recurred
   const moved = data.tasks.map((t) =>
     t.id === vars.id
       ? {
@@ -574,10 +576,11 @@ export function moveTaskIn(
           column_id: target.id,
           date: vars.input.date ?? t.date,
           completed_date: target.is_done ? vars.input.completed_date : undefined,
+          recurred: willMint ? true : t.recurred,
         }
       : t,
   )
-  if (!target.is_done || !task.recurrence || !vars.input.next_date) return { ...data, tasks: moved }
+  if (!willMint) return { ...data, tasks: moved }
   const next: Task = {
     id: tempId(),
     title: task.title,
@@ -591,12 +594,6 @@ export function moveTaskIn(
   return { ...data, tasks: [...moved, next] }
 }
 
-export function addTaskColumnTo(data: FinanceData, vars: NewTaskColumn): FinanceData {
-  const sortOrder = nextColumnSortOrder(data.task_columns)
-  const column: TaskColumn = { id: tempId(), name: vars.name, sort_order: sortOrder, is_done: false }
-  return { ...data, task_columns: [...data.task_columns, column] }
-}
-
 export function applyTaskColumnPatch(
   data: FinanceData,
   vars: { id: number; patch: TaskColumnPatch },
@@ -605,10 +602,6 @@ export function applyTaskColumnPatch(
     ...data,
     task_columns: data.task_columns.map((c) => (c.id === vars.id ? { ...c, ...vars.patch } : c)),
   }
-}
-
-export function removeTaskColumn(data: FinanceData, id: number): FinanceData {
-  return { ...data, task_columns: data.task_columns.filter((c) => c.id !== id) }
 }
 
 /** See NotePatch — the wire's null becomes the model's undefined. */

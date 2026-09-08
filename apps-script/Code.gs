@@ -16,7 +16,7 @@ var SHEETS = {
   income: ['id', 'user_id', 'source_id', 'amount', 'date', 'notes'],
   income_sources: ['id', 'user_id', 'name', 'archived'],
   savings_ledger: ['id', 'user_id', 'date', 'amount', 'kind', 'ref_type', 'ref_id', 'notes'],
-  tasks: ['id', 'user_id', 'title', 'notes', 'date', 'recurrence', 'column_id', 'completed_date', 'goal_id', 'note_id', 'created_at'],
+  tasks: ['id', 'user_id', 'title', 'notes', 'date', 'recurrence', 'column_id', 'completed_date', 'goal_id', 'note_id', 'created_at', 'recurred'],
   task_columns: ['id', 'user_id', 'name', 'sort_order', 'is_done'],
   notes: ['id', 'user_id', 'title', 'body'],
   note_items: ['id', 'user_id', 'note_id', 'text', 'done', 'sort_order'],
@@ -29,7 +29,7 @@ var SHEETS = {
  * so the new shape is applied on the very next request after a deployment,
  * instead of up to an hour later.
  */
-var SCHEMA_VERSION = 16;
+var SCHEMA_VERSION = 17;
 
 /*
  * Tabs whose stale shape may be DISCARDED and recreated. Deliberately excludes
@@ -63,7 +63,7 @@ var RETURNS_DATA = {
   setCurrency: true,
   addSavingsEntry: true, updateSavingsEntry: true, deleteSavingsEntry: true,
   addTask: true, updateTask: true, deleteTask: true, moveTask: true,
-  addTaskColumn: true, updateTaskColumn: true, deleteTaskColumn: true,
+  updateTaskColumn: true,
   addNote: true, updateNote: true, deleteNote: true,
   addNoteItem: true, updateNoteItem: true, deleteNoteItem: true,
   addGoal: true, updateGoal: true, deleteGoal: true
@@ -510,7 +510,8 @@ function coerce(name, r) {
     id: num(r.id), title: String(r.title), notes: optStr(r.notes), date: optDate(r.date),
     recurrence: optStr(r.recurrence),
     column_id: num(r.column_id), completed_date: optDate(r.completed_date),
-    goal_id: optNum(r.goal_id), note_id: optNum(r.note_id), created_at: optDateTime(r.created_at)
+    goal_id: optNum(r.goal_id), note_id: optNum(r.note_id), created_at: optDateTime(r.created_at),
+    recurred: bool(r.recurred)
   };
   if (name === 'task_columns') return {
     id: num(r.id), name: String(r.name), sort_order: num(r.sort_order), is_done: bool(r.is_done)
@@ -771,9 +772,7 @@ function dispatch(action, p, uid) {
     case 'updateTask': return updateTask(p, uid);
     case 'deleteTask': return deleteTask(p, uid);
     case 'moveTask': return moveTask(p, uid);
-    case 'addTaskColumn': return addTaskColumn(p, uid);
     case 'updateTaskColumn': return updateTaskColumn(p, uid);
-    case 'deleteTaskColumn': return deleteTaskColumn(p, uid);
     case 'addNote': return addNote(p, uid);
     case 'updateNote': return updateNote(p, uid);
     case 'deleteNote': return deleteNote(p, uid);
@@ -1731,10 +1730,12 @@ function deleteTask(p, uid) {
 
 /**
  * The one action for every column change — drag or button, done or not.
- * Moving into the done column sets completed_date and, when the task
- * recurs, mints the next occurrence (the CLIENT computes both dates, same
- * split payBillPayable already uses). Moving to any other column just
- * updates column_id and clears completed_date.
+ * Moving into the done column sets completed_date and, the first time this
+ * row does so, mints the next occurrence for a recurring task (the CLIENT
+ * computes both dates, same split payBillPayable already uses) — recurred
+ * then stays true so a later re-entry into Done never mints a duplicate.
+ * Moving to any other column just updates column_id and clears
+ * completed_date.
  */
 function moveTask(p, uid) {
   var rowIndex = ownedRowIndex('tasks', p.id, uid);
@@ -1756,8 +1757,13 @@ function moveTask(p, uid) {
   if (bool(column.is_done)) {
     if (blank(input.completed_date)) throw new Error('A completed task needs a date');
     patch.completed_date = input.completed_date;
+    // recurred, once true, is never cleared — cycling a recurring task out
+    // of Done and back in must not mint a second successor for what is
+    // still the same occurrence.
+    var shouldMint = !blank(current.recurrence) && !blank(input.next_date) && !bool(current.recurred);
+    if (shouldMint) patch.recurred = true;
     patchRowAt('tasks', rowIndex, patch);
-    if (!blank(current.recurrence) && !blank(input.next_date)) {
+    if (shouldMint) {
       var firstCol = firstTaskColumn(uid);
       appendRow('tasks', {
         id: nextId('tasks'),
@@ -1788,23 +1794,6 @@ function firstTaskColumn(uid) {
   return rows[0];
 }
 
-function addTaskColumn(p, uid) {
-  var input = p.input || {};
-  var name = String(input.name || '').trim();
-  if (!name) throw new Error('A column needs a name');
-  var rows = readOwnedRows('task_columns', uid).map(function (r) { return coerce('task_columns', r); });
-  var maxSort = -1;
-  for (var i = 0; i < rows.length; i++) if (rows[i].sort_order > maxSort) maxSort = rows[i].sort_order;
-  appendRow('task_columns', {
-    id: nextId('task_columns'),
-    user_id: uid,
-    name: name,
-    sort_order: maxSort + 1,
-    is_done: false
-  });
-  return null;
-}
-
 function updateTaskColumn(p, uid) {
   var rowIndex = ownedRowIndex('task_columns', p.id, uid);
   var given = p.patch || {};
@@ -1816,22 +1805,6 @@ function updateTaskColumn(p, uid) {
   }
   if (Object.prototype.hasOwnProperty.call(given, 'sort_order')) patch.sort_order = given.sort_order;
   return patchRowAt('task_columns', rowIndex, patch);
-}
-
-function deleteTaskColumn(p, uid) {
-  var rowIndex = ownedRowIndex('task_columns', p.id, uid);
-  var column = getById('task_columns', p.id);
-  if (bool(column.is_done)) throw new Error('The Done column cannot be deleted.');
-  // Raw rows, not coerce()'d — every other task field (dates, times,
-  // recurrence, notes...) goes unused here, only column_id matters.
-  var tasks = readOwnedRows('tasks', uid);
-  for (var i = 0; i < tasks.length; i++) {
-    if (num(tasks[i].column_id) === num(p.id)) {
-      throw new Error('Move or delete this column’s tasks first.');
-    }
-  }
-  sheet('task_columns').deleteRow(rowIndex);
-  return null;
 }
 
 function addNote(p, uid) {

@@ -135,7 +135,9 @@ export function Tasks() {
         />
       )}
 
-      {opened && <TaskDetailModal open task={opened} data={data} onClose={() => setOpened(null)} />}
+      {opened && (
+        <TaskDetailModal open task={opened} data={data} weekStart={weekStart} onClose={() => setOpened(null)} />
+      )}
     </div>
   )
 }

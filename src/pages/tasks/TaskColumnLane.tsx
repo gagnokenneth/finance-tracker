@@ -1,7 +1,7 @@
-import { useState } from 'react'
 import { useDroppable } from '@dnd-kit/core'
 import { TaskCard } from './TaskCard.tsx'
 import { groupByDay } from '../../lib/tasks.ts'
+import { useInlineRename } from '../../hooks/useInlineRename.ts'
 import { TextInput, RowButton } from '../../components/ui.tsx'
 import type { Task, TaskColumn } from '../../types.ts'
 
@@ -30,24 +30,10 @@ export function TaskColumnLane({
   onRename: (name: string) => void
   onAddTask?: () => void
 }) {
-  const [renaming, setRenaming] = useState(false)
-  const [nameDraft, setNameDraft] = useState('')
+  const rename = useInlineRename(column.name, onRename)
   const { setNodeRef, isOver } = useDroppable({ id: column.id })
 
   const days = dayGrouped ? [...groupByDay(tasks).entries()].sort(([a], [b]) => a.localeCompare(b)) : null
-
-  const startRename = () => {
-    setNameDraft(column.name)
-    setRenaming(true)
-  }
-
-  const saveRename = () => {
-    setRenaming(false)
-    const trimmed = nameDraft.trim()
-    if (trimmed && trimmed !== column.name) {
-      onRename(trimmed)
-    }
-  }
 
   const card = (task: Task) => <TaskCard key={task.id} task={task} onClick={() => onOpenTask(task)} />
 
@@ -67,22 +53,19 @@ export function TaskColumnLane({
               ✓
             </span>
           )}
-          {renaming ? (
+          {rename.renaming ? (
             <TextInput
               autoFocus
-              value={nameDraft}
-              onChange={(e) => setNameDraft(e.target.value)}
-              onBlur={saveRename}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') e.currentTarget.blur()
-                if (e.key === 'Escape') setRenaming(false)
-              }}
+              value={rename.draft}
+              onChange={(e) => rename.setDraft(e.target.value)}
+              onBlur={rename.save}
+              onKeyDown={rename.onKeyDown}
               className="!w-auto text-sm font-semibold tracking-tight text-ink"
             />
           ) : (
             <h3
               className="cursor-text truncate text-sm font-semibold tracking-tight text-ink hover:underline"
-              onClick={startRename}
+              onClick={rename.start}
             >
               {column.name}
             </h3>

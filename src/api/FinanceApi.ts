@@ -91,16 +91,18 @@ export interface NewSavingsEntry {
 export type SavingsEntryPatch = Patch<NewSavingsEntry, 'notes'>
 
 /** created_at is server-set at insert time (like users.created), never
- *  client-supplied — matches how completed_date is server-managed too. */
-export type NewTask = Omit<Task, 'id' | 'completed_date' | 'created_at'>
+ *  client-supplied — matches how completed_date and recurred are
+ *  server-managed too. */
+export type NewTask = Omit<Task, 'id' | 'completed_date' | 'created_at' | 'recurred'>
 /**
- * column_id, completed_date, date, and created_at are excluded entirely.
- * column_id/date only ever change via moveTask (which also handles minting
- * a recurring task's next occurrence); created_at is set once at creation
- * and never patched.
+ * column_id, completed_date, date, created_at, and recurred are excluded
+ * entirely. column_id/date only ever change via moveTask (which also
+ * handles minting a recurring task's next occurrence, and stamping
+ * recurred so it happens only once per occurrence); created_at is set once
+ * at creation and never patched.
  */
 export type TaskPatch = Patch<
-  Omit<Task, 'id' | 'column_id' | 'completed_date' | 'date' | 'created_at'>,
+  Omit<Task, 'id' | 'column_id' | 'completed_date' | 'date' | 'created_at' | 'recurred'>,
   'notes' | 'recurrence' | 'goal_id' | 'note_id'
 >
 
@@ -117,7 +119,6 @@ export interface MoveTaskInput {
   next_date?: string
 }
 
-export type NewTaskColumn = Pick<TaskColumn, 'name'>
 /** is_done is never patchable — only ever true for the seeded Done column. */
 export type TaskColumnPatch = Patch<Pick<TaskColumn, 'name' | 'sort_order'>>
 
@@ -238,11 +239,8 @@ export interface FinanceApi {
   /** The one mutation for every column change — drag or button, done or not. */
   moveTask(id: number, input: MoveTaskInput): Promise<FinanceData>
 
-  addTaskColumn(input: NewTaskColumn): Promise<FinanceData>
   /** is_done can never be patched — see TaskColumnPatch. */
   updateTaskColumn(id: number, patch: TaskColumnPatch): Promise<FinanceData>
-  /** Refused if the column has any tasks, or is the is_done column. */
-  deleteTaskColumn(id: number): Promise<FinanceData>
 
   /* Note writes return the whole updated dataset, for the same reasons above. */
 

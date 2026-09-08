@@ -35,9 +35,7 @@ import {
   applyTaskPatch,
   removeTask,
   moveTaskIn,
-  addTaskColumnTo,
   applyTaskColumnPatch,
-  removeTaskColumn,
   addNoteTo,
   applyNotePatch,
   removeNote,
@@ -68,7 +66,6 @@ import type {
   NewTask,
   TaskPatch,
   MoveTaskInput,
-  NewTaskColumn,
   TaskColumnPatch,
   NewNote,
   NotePatch,
@@ -257,17 +254,9 @@ export function useFinanceMutations() {
     mutationFn: (v: { id: number; input: MoveTaskInput }) => getApi().moveTask(v.id, v.input),
     ...optimistic(moveTaskIn, 'That move did not save. The task is back where it was.'),
   })
-  const addTaskColumn = useMutation({
-    mutationFn: (i: NewTaskColumn) => getApi().addTaskColumn(i),
-    ...optimistic(addTaskColumnTo, 'That column did not save. It has been removed.'),
-  })
   const updateTaskColumn = useMutation({
     mutationFn: (v: { id: number; patch: TaskColumnPatch }) => getApi().updateTaskColumn(v.id, v.patch),
     ...optimistic(applyTaskColumnPatch, 'That column did not save. It is back as it was.'),
-  })
-  const deleteTaskColumn = useMutation({
-    mutationFn: (id: number) => getApi().deleteTaskColumn(id),
-    ...optimistic(removeTaskColumn, 'That column could not be deleted. It has been restored.'),
   })
 
   const addNote = useMutation({
@@ -395,9 +384,7 @@ export function useFinanceMutations() {
     updateTask,
     deleteTask,
     moveTask,
-    addTaskColumn,
     updateTaskColumn,
-    deleteTaskColumn,
     addNote,
     updateNote,
     deleteNote,

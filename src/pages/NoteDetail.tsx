@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useFinanceData } from '../hooks/useFinanceData.ts'
 import { useFinanceMutations } from '../hooks/useFinanceMutations.ts'
+import { useInlineRename } from '../hooks/useInlineRename.ts'
 import { itemsFor } from '../lib/notes.ts'
 import { isTemp } from '../lib/tempId.ts'
 import { Card } from '../components/Card.tsx'
@@ -18,8 +19,10 @@ export function NoteDetail() {
   const navigate = useNavigate()
   const { data, isPending, isError, error } = useFinanceData()
   const { updateNote, deleteNote, addNoteItem, updateNoteItem, deleteNoteItem } = useFinanceMutations()
-  const [renaming, setRenaming] = useState(false)
-  const [titleDraft, setTitleDraft] = useState('')
+  const note = data?.notes.find((n) => n.id === Number(id))
+  const rename = useInlineRename(note?.title ?? '', (trimmed) => {
+    if (note) updateNote.mutate({ id: note.id, patch: { title: trimmed } })
+  })
   const [deleting, setDeleting] = useState(false)
   const [newItemText, setNewItemText] = useState('')
   // Opt-in for this session once "Add checklist" is clicked; once the note
@@ -28,27 +31,11 @@ export function NoteDetail() {
 
   if (isPending) return <LoadingScreen />
   if (isError || !data) return <LoadError error={error} />
-
-  const note = data.notes.find((n) => n.id === Number(id))
   if (!note) return <LoadError error={new Error('Note not found')} />
 
   const items = itemsFor(data.note_items, note.id)
   const pending = isTemp(note.id)
   const showChecklist = checklistOpen || items.length > 0
-
-  const startRename = () => {
-    if (pending) return
-    setTitleDraft(note.title)
-    setRenaming(true)
-  }
-
-  const saveRename = () => {
-    setRenaming(false)
-    const trimmed = titleDraft.trim()
-    if (trimmed && trimmed !== note.title) {
-      updateNote.mutate({ id: note.id, patch: { title: trimmed } })
-    }
-  }
 
   const addItem = (e: FormEvent) => {
     e.preventDefault()
@@ -61,26 +48,19 @@ export function NoteDetail() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
-        {renaming ? (
+        {rename.renaming ? (
           <TextInput
             autoFocus
-            value={titleDraft}
-            onChange={(e) => setTitleDraft(e.target.value)}
-            onBlur={saveRename}
-            onKeyDown={(e) => {
-              // Blur (not a direct saveRename() call) so onBlur remains the
-              // single place a save happens — calling both would unmount the
-              // input mid-render and let the resulting native blur fire a
-              // second, stale saveRename with the same patch.
-              if (e.key === 'Enter') e.currentTarget.blur()
-              if (e.key === 'Escape') setRenaming(false)
-            }}
+            value={rename.draft}
+            onChange={(e) => rename.setDraft(e.target.value)}
+            onBlur={rename.save}
+            onKeyDown={rename.onKeyDown}
             className="!w-auto text-2xl font-semibold tracking-tight text-ink"
           />
         ) : (
           <h1
             className={`text-2xl font-semibold tracking-tight text-ink ${!pending ? 'cursor-text hover:underline' : ''}`}
-            onClick={startRename}
+            onClick={() => !pending && rename.start()}
           >
             {note.title}
           </h1>
