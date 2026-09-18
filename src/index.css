@@ -4,13 +4,34 @@
  * Design tokens for the debt tracker.
  *
  * The app is ~80% figures, so the numerals carry the personality: IBM Plex
- * Mono for every amount, date and count, IBM Plex Sans for everything else.
+ * Mono for every amount, date and count, Programme for everything else.
  * Paper is a cool grey rather than a warm cream, so the ink and the money
  * stay the only warm-neutral contrast on screen.
  */
+@font-face {
+  font-family: "Programme";
+  src: url("/fonts/programme_light.ttf") format("truetype");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Programme";
+  src: url("/fonts/programme_normal.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Programme";
+  src: url("/fonts/programme_bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 @theme {
-  --font-sans:
-    "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-sans: "Programme", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
 
   --color-ink: #101828;
@@ -36,6 +57,10 @@
    but lining figures are forced here so mixed contexts stay aligned too. */
 .tnum {
   font-variant-numeric: tabular-nums lining-nums;
+}
+
+* {
+  letter-spacing: 0.02em;
 }
 
 /* Capping the duration alone is not enough: an infinite animation shortened to
