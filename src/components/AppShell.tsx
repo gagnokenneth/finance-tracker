@@ -1,9 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useIsFetching, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../auth/useAuth.ts'
 import { financeKey } from '../hooks/useFinanceData.ts'
-import { Strip } from './Strip.tsx'
 import {
   DashboardIcon,
   TasksIcon,
@@ -55,13 +54,20 @@ function RefreshButton() {
 export function AppShell() {
   const { user, signOut } = useAuth()
   const [open, setOpen] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!menuOpen) return
+    const onClickOutside = (e: MouseEvent) => {
+      if (!menuRef.current?.contains(e.target as Node)) setMenuOpen(false)
+    }
+    document.addEventListener('mousedown', onClickOutside)
+    return () => document.removeEventListener('mousedown', onClickOutside)
+  }, [menuOpen])
 
   const linkClass = ({ isActive }: { isActive: boolean }) =>
-    `flex items-center gap-2.5 rounded-r-lg border-l-2 px-3 py-2 text-sm font-medium transition-colors ${
-      isActive
-        ? 'border-brand bg-brand/8 text-brand'
-        : 'border-transparent text-ink-soft hover:border-edge hover:bg-paper hover:text-ink'
-    }`
+    `mx-4 px-2 py-1.5 text-sm font-normal uppercase text-ink ${isActive ? 'underline' : 'hover:underline'}`
 
   return (
     <div className="min-h-screen bg-paper">
@@ -75,8 +81,6 @@ export function AppShell() {
         >
           ☰
         </button>
-        <Strip ticks={4} tickClassName="h-3 w-1" className="gap-[2px]" />
-        <span className="font-semibold tracking-tight text-ink">Finance Tracker</span>
       </div>
 
       {open && (
@@ -89,20 +93,11 @@ export function AppShell() {
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-20 flex w-60 flex-col border-r border-edge bg-white transition-transform md:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-20 flex w-60 flex-col bg-white transition-transform md:translate-x-0 ${
           open ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <div className="px-5 py-5">
-          <div className="flex items-center gap-2">
-            <Strip ticks={4} tickClassName="h-3.5 w-1" className="gap-[2px]" />
-            <div className="text-base font-semibold tracking-tight text-ink">Finance Tracker</div>
-          </div>
-          {/* Deliberately names no module: adding one should not mean editing
-              this line. */}
-          <div className="mt-0.5 text-xs text-ink-faint">Personal finance</div>
-        </div>
-        <nav className="flex flex-1 flex-col gap-1 px-3">
+        <nav className="flex flex-1 flex-col gap-1 px-1 pt-6">
           {NAV_ITEMS.map((item) => (
             <NavLink
               key={item.to}
@@ -110,22 +105,44 @@ export function AppShell() {
               className={linkClass}
               onClick={() => setOpen(false)}
             >
-              <item.icon />
               {item.label}
             </NavLink>
           ))}
         </nav>
-        <div className="border-t border-edge px-5 py-4">
-          <div className="truncate text-sm font-medium text-ink">{user?.username}</div>
-          <div className="mt-2">
-            <RefreshButton />
-          </div>
+        <div ref={menuRef} className="relative px-3 py-4">
+          {menuOpen && (
+            <div className="absolute bottom-full left-3 mb-2 w-44 rounded-lg bg-white p-3 shadow-lg shadow-ink/10">
+              <RefreshButton />
+              <button
+                type="button"
+                onClick={signOut}
+                className={`mt-2 block ${sidebarActionClass}`}
+              >
+                Sign out
+              </button>
+            </div>
+          )}
           <button
             type="button"
-            onClick={signOut}
-            className={`mt-2 ${sidebarActionClass}`}
+            onClick={() => setMenuOpen((v) => !v)}
+            className="flex w-full items-center justify-between gap-2 rounded-lg bg-paper px-3 py-2 text-sm font-medium text-ink shadow-sm hover:bg-edge/40"
           >
-            Sign out
+            <span className="truncate">{user?.username}</span>
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 12 12"
+              fill="none"
+              className={`shrink-0 transition-transform ${menuOpen ? 'rotate-180' : ''}`}
+            >
+              <path
+                d="M2.5 4.5L6 8l3.5-3.5"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
           </button>
         </div>
       </aside>
