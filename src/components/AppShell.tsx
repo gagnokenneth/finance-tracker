@@ -3,33 +3,22 @@ import { NavLink, Outlet } from 'react-router-dom'
 import { useIsFetching, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../auth/useAuth.ts'
 import { financeKey } from '../hooks/useFinanceData.ts'
-import {
-  DashboardIcon,
-  TasksIcon,
-  NotesIcon,
-  GoalsIcon,
-  DebtsIcon,
-  BillsIcon,
-  IncomeIcon,
-  SavingsIcon,
-  SettingsIcon,
-} from './icons.tsx'
 
 const NAV_ITEMS = [
-  { to: '/dashboard', label: 'Dashboard', icon: DashboardIcon },
-  { to: '/tasks', label: 'Tasks', icon: TasksIcon },
-  { to: '/notes', label: 'Notes', icon: NotesIcon },
-  { to: '/goals', label: 'Goals', icon: GoalsIcon },
-  { to: '/debts', label: 'Debts', icon: DebtsIcon },
-  { to: '/bills', label: 'Bills', icon: BillsIcon },
-  { to: '/income', label: 'Income', icon: IncomeIcon },
-  { to: '/savings', label: 'Savings', icon: SavingsIcon },
-  { to: '/settings', label: 'Settings', icon: SettingsIcon },
+  { to: '/dashboard', label: 'Dashboard' },
+  { to: '/tasks', label: 'Tasks' },
+  { to: '/notes', label: 'Notes' },
+  { to: '/goals', label: 'Goals' },
+  { to: '/debts', label: 'Debts' },
+  { to: '/bills', label: 'Bills' },
+  { to: '/income', label: 'Income' },
+  { to: '/savings', label: 'Savings' },
+  { to: '/settings', label: 'Settings' },
 ]
 
-/** The bare underline-on-hover affordance shared by the sidebar's footer actions. */
-const sidebarActionClass =
-  'text-xs font-medium text-ink-soft underline-offset-2 hover:text-ink hover:underline'
+/** The bare underline-on-hover affordance shared by the account menu's actions. */
+const menuActionClass =
+  'text-xs font-medium uppercase text-ink-soft underline-offset-2 hover:text-ink hover:underline'
 
 /**
  * Data is held for minutes at a time, so this is the way to ask for it again
@@ -44,7 +33,7 @@ function RefreshButton() {
       type="button"
       onClick={() => void qc.invalidateQueries({ queryKey: financeKey })}
       disabled={fetching}
-      className={`${sidebarActionClass} disabled:no-underline disabled:opacity-60`}
+      className={`${menuActionClass} disabled:no-underline disabled:opacity-60`}
     >
       {fetching ? 'Refreshing…' : 'Refresh data'}
     </button>
@@ -53,7 +42,6 @@ function RefreshButton() {
 
 export function AppShell() {
   const { user, signOut } = useAuth()
-  const [open, setOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -67,56 +55,35 @@ export function AppShell() {
   }, [menuOpen])
 
   const linkClass = ({ isActive }: { isActive: boolean }) =>
-    `mx-4 px-2 py-1.5 text-sm font-normal uppercase text-ink ${isActive ? 'underline' : 'hover:underline'}`
+    `flex items-center gap-1.5 px-2 py-1.5 text-xs font-normal uppercase ${
+      isActive ? 'text-black' : 'text-black/50'
+    }`
 
   return (
     <div className="min-h-screen bg-paper">
-      {/* Compact bar shown only below md, where the sidebar is off-canvas. */}
-      <div className="flex items-center gap-3 border-b border-edge bg-white px-4 py-3 md:hidden">
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          aria-label="Open navigation"
-          className="rounded-lg border border-edge px-2 py-1 text-ink-soft hover:bg-paper"
-        >
-          ☰
-        </button>
-      </div>
-
-      {open && (
-        <button
-          type="button"
-          aria-label="Close navigation"
-          onClick={() => setOpen(false)}
-          className="fixed inset-0 z-10 bg-ink/40 md:hidden"
-        />
-      )}
-
-      <aside
-        className={`fixed inset-y-0 left-0 z-20 flex w-60 flex-col bg-white transition-transform md:translate-x-0 ${
-          open ? 'translate-x-0' : '-translate-x-full'
-        }`}
-      >
-        <nav className="flex flex-1 flex-col gap-1 px-1 pt-6">
+      <header className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 bg-paper px-6 py-4">
+        <div />
+        <nav className="flex flex-wrap items-center justify-center gap-5">
           {NAV_ITEMS.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              className={linkClass}
-              onClick={() => setOpen(false)}
-            >
-              {item.label}
+            <NavLink key={item.to} to={item.to} className={linkClass}>
+              {({ isActive }) => (
+                <>
+                  {isActive && <span className="size-1.5 bg-black" />}
+                  {item.label}
+                </>
+              )}
             </NavLink>
           ))}
         </nav>
-        <div ref={menuRef} className="relative px-3 py-4">
+
+        <div ref={menuRef} className="relative justify-self-end">
           {menuOpen && (
-            <div className="absolute bottom-full left-3 mb-2 w-44 rounded-lg bg-white p-3 shadow-lg shadow-ink/10">
+            <div className="absolute right-0 top-full z-10 mt-2 w-44 bg-paper p-3">
               <RefreshButton />
               <button
                 type="button"
                 onClick={signOut}
-                className={`mt-2 block ${sidebarActionClass}`}
+                className={`mt-2 block ${menuActionClass}`}
               >
                 Sign out
               </button>
@@ -125,9 +92,8 @@ export function AppShell() {
           <button
             type="button"
             onClick={() => setMenuOpen((v) => !v)}
-            className="flex w-full items-center justify-between gap-2 rounded-lg bg-paper px-3 py-2 text-sm font-medium text-ink shadow-sm hover:bg-edge/40"
+            className="flex items-center gap-2 text-xs font-normal uppercase text-black/50"
           >
-            <span className="truncate">{user?.username}</span>
             <svg
               width="12"
               height="12"
@@ -143,11 +109,12 @@ export function AppShell() {
                 strokeLinejoin="round"
               />
             </svg>
+            <span className="truncate">{user?.username}</span>
           </button>
         </div>
-      </aside>
+      </header>
 
-      <main className="px-4 py-8 md:ml-60 md:px-8">
+      <main className="px-4 py-8 md:px-8">
         <div className="mx-auto max-w-4xl">
           <Outlet />
         </div>
