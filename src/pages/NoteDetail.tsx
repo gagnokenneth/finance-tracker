@@ -108,7 +108,7 @@ export function NoteDetail() {
               placeholder="Add an item…"
               className="min-w-0 flex-1 placeholder:text-neutral-500"
             />
-            <BrutalButton type="submit" className="shadow-hard-xs">
+            <BrutalButton type="submit">
               Add
             </BrutalButton>
           </form>
