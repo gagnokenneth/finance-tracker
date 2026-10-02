@@ -2,24 +2,11 @@ import { formatMoney } from '../lib/money.ts'
 import { useCurrency } from '../hooks/useCurrency.ts'
 
 /**
- * `tone="inherit"` takes the surrounding text colour — the revamp's pages are
- * monochrome, and a negative still reads by its minus sign. The default keeps
- * the original ink, red when negative, for pages not yet redesigned.
+ * An amount in the user's currency, in tabular mono figures. It takes the
+ * surrounding text colour — the design is monochrome, and a negative reads by
+ * its minus sign.
  */
-export function Money({
-  value,
-  className,
-  tone: toneMode = 'default',
-}: {
-  value: number
-  className?: string
-  tone?: 'default' | 'inherit'
-}) {
+export function Money({ value, className }: { value: number; className?: string }) {
   const currency = useCurrency()
-  const tone = toneMode === 'inherit' ? '' : value < 0 ? 'text-overdue' : 'text-ink'
-  return (
-    <span className={`tnum font-mono ${tone} ${className ?? ''}`}>
-      {formatMoney(value, currency)}
-    </span>
-  )
+  return <span className={`tnum font-mono ${className ?? ''}`}>{formatMoney(value, currency)}</span>
 }

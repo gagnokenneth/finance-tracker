@@ -62,7 +62,7 @@ export function BrutalPayModal({
             </BrutalSelect>
             {fromSavings && (
               <p className="mt-2 font-mono text-xs text-neutral-500">
-                Savings balance <Money value={savingsBalance} tone="inherit" />
+                Savings balance <Money value={savingsBalance} />
               </p>
             )}
             {overdrawn && (

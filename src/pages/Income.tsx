@@ -43,7 +43,7 @@ export function Income() {
         title="Income"
         summary={
           <>
-            <Money value={total} tone="inherit" className="font-bold" /> in {label}
+            <Money value={total} className="font-bold" /> in {label}
           </>
         }
         action={

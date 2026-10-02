@@ -6,8 +6,8 @@ import type { LookName } from './brutalLook.tsx'
 
 /*
  * The monochrome "architectural" controls from the UI revamp. Kept apart from
- * ui.tsx rather than restyling it in place: every page not yet redesigned
- * still renders the old controls, and migrates here one screen at a time.
+ * ui.tsx rather than restyling it in place: Settings and SignIn, not yet
+ * redesigned, still render the old controls.
  */
 
 /** The design's one interactive gesture: a flat control inverts to solid

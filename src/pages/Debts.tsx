@@ -23,7 +23,6 @@ function DebtRow({ debt, data }: { debt: Debt; data: FinanceData }) {
         <span className="text-lg font-bold tracking-tight text-black">{debt.name}</span>
         <Money
           value={totalBalance(debt, data.debt_schedule, data.debt_statements)}
-          tone="inherit"
           className="text-lg font-bold text-black"
         />
       </div>
@@ -64,7 +63,7 @@ export function Debts() {
         summary={
           data.debts.length > 0 && (
             <>
-              <Money value={owed} tone="inherit" className="font-bold" /> left across{' '}
+              <Money value={owed} className="font-bold" /> left across{' '}
               <span className="tnum font-mono">{data.debts.length}</span> {data.debts.length === 1 ? 'debt' : 'debts'}
             </>
           )

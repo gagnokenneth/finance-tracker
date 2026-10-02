@@ -121,7 +121,7 @@ export function BillDetail() {
       >
         <BrutalStat label="Amount due">
           {upcoming?.amount !== undefined ? (
-            <Money value={upcoming.amount} tone="inherit" className="text-4xl font-bold" />
+            <Money value={upcoming.amount} className="text-4xl font-bold" />
           ) : (
             <span className="font-mono text-sm text-neutral-500">{upcoming ? 'Not set yet' : '—'}</span>
           )}

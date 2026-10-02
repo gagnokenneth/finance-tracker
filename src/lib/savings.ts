@@ -125,3 +125,12 @@ export function paymentsByRef(rows: SavingsLedgerEntry[]): Map<string, SavingsLe
 export function refKey(refType: SavingsRefType, refId: number): string {
   return `${refType}:${refId}`
 }
+
+/* Keyed to the union, not string: a fifth kind becomes a compile error here
+   rather than a raw enum value leaking into the ledger. */
+export const SAVINGS_KIND_LABEL: Record<SavingsLedgerKind, string> = {
+  deposit: 'Deposit',
+  withdrawal: 'Withdrawal',
+  bill_payment: 'Bill payment',
+  debt_payment: 'Debt payment',
+}

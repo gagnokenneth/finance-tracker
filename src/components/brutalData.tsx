@@ -7,8 +7,8 @@ import { DeleteIcon, EditIcon } from './icons.tsx'
 import { BrutalIconButton, labelClass, panelTitleClass, smallButtonClass, smallPrimaryButtonClass } from './brutal.tsx'
 
 /*
- * The revamp's monochrome data displays Debts and Bills share. BrutalTable is
- * kept apart from the old Table, which Income and Savings still render.
+ * The revamp's monochrome data displays: ledger tables and their cells, row
+ * actions, chips, figures, stats and the summary panels that hold them.
  */
 
 /**
@@ -145,7 +145,7 @@ export function BrutalFigure({ value }: { value: number | undefined }) {
   return value === undefined ? (
     <span className="font-mono text-neutral-400">—</span>
   ) : (
-    <Money value={value} tone="inherit" className="font-bold" />
+    <Money value={value} className="font-bold" />
   )
 }
 
@@ -167,7 +167,7 @@ export function BrutalRowStatus({
         {row.paid_amount !== undefined && (
           <>
             {' · '}
-            <Money value={row.paid_amount} tone="inherit" className="text-xs" />
+            <Money value={row.paid_amount} className="text-xs" />
           </>
         )}
       </span>
@@ -180,19 +180,23 @@ export function BrutalRowStatus({
  * A table row's actions: any leading ones a page adds (`children`), then
  * Edit and Delete. A pending row has no backend id yet, so every action would
  * be sent against an id the backend has never seen — it gets the pending
- * badge instead.
+ * badge instead. A `locked` row is owned elsewhere (a savings movement made
+ * by a bill or debt payment): it shows why, in place of the actions.
  */
 export function BrutalRowActions({
   pending,
+  locked,
   onEdit,
   onDelete,
   children,
 }: {
   pending: boolean
+  locked?: string
   onEdit: () => void
   onDelete: () => void
   children?: ReactNode
 }) {
+  if (locked) return <span className="block text-right font-mono text-xs text-neutral-500">{locked}</span>
   if (pending) {
     return (
       <div className="flex justify-end">
@@ -251,13 +255,26 @@ export function BrutalLedgerRowActions({
   )
 }
 
-/** One labelled figure in a detail hero's dashed-ruled row. */
+/** One labelled figure in a stat list (BrutalDetailHero, BrutalStatPanel). */
 export function BrutalStat({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="space-y-2">
       <dt className={`${labelClass} text-neutral-500`}>{label}</dt>
       <dd>{children}</dd>
     </div>
+  )
+}
+
+/** The flat bordered frame summary panels share. */
+const summaryPanelClass = 'border border-black bg-white p-8'
+
+/** A bordered panel of BrutalStat figures on their own — no title row
+ *  (the Savings balance). */
+export function BrutalStatPanel({ children }: { children: ReactNode }) {
+  return (
+    <section className={summaryPanelClass}>
+      <dl className="grid gap-6 sm:grid-cols-2">{children}</dl>
+    </section>
   )
 }
 
@@ -280,7 +297,7 @@ export function BrutalDetailHero({
   children: ReactNode
 }) {
   return (
-    <section className="border border-black bg-white p-8">
+    <section className={summaryPanelClass}>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-3">
           <h1 className={panelTitleClass}>{title}</h1>

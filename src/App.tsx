@@ -42,9 +42,9 @@ function AuthedApp() {
           <Route path="bills" element={<Bills />} />
           <Route path="bills/:id" element={<BillDetail />} />
           <Route path="income" element={<Income />} />
+          <Route path="savings" element={<Savings />} />
         </Route>
         <Route element={<LegacyColumn />}>
-          <Route path="savings" element={<Savings />} />
           <Route path="settings" element={<Settings />} />
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />

@@ -1,12 +1,11 @@
-import type {
-  ReactNode,
-  InputHTMLAttributes,
-  SelectHTMLAttributes,
-  ButtonHTMLAttributes,
-} from 'react'
-import { EditIcon, DeleteIcon } from './icons.tsx'
+/*
+ * Legacy controls, kept only for the screens not yet redesigned (Settings,
+ * through ConfirmDialog, and SignIn). New code uses brutal.tsx; delete this
+ * file once those two move over.
+ */
+import type { ReactNode, InputHTMLAttributes, ButtonHTMLAttributes } from 'react'
 
-export const inputClass =
+const inputClass =
   'w-full rounded-lg border border-edge bg-white px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-brand focus:ring-2 focus:ring-brand/15 focus:outline-none'
 
 const focusRing =
@@ -51,15 +50,6 @@ export function TextInput(props: InputHTMLAttributes<HTMLInputElement>) {
   )
 }
 
-export function SelectInput(props: SelectHTMLAttributes<HTMLSelectElement>) {
-  const { className, children, ...rest } = props
-  return (
-    <select {...rest} className={`${inputClass} ${className ?? ''}`}>
-      {children}
-    </select>
-  )
-}
-
 export function Button(props: ButtonHTMLAttributes<HTMLButtonElement>) {
   const { className, children, ...rest } = props
   return (
@@ -97,47 +87,3 @@ export function DangerButton(props: ButtonHTMLAttributes<HTMLButtonElement>) {
     </button>
   )
 }
-
-/** Compact row-level action, used inside table cells. */
-export function RowButton({
-  tone = 'neutral',
-  className,
-  children,
-  ...rest
-}: ButtonHTMLAttributes<HTMLButtonElement> & { tone?: 'neutral' | 'primary' | 'danger' }) {
-  const tones = {
-    neutral: 'border-edge bg-white text-ink-soft hover:bg-paper hover:text-ink',
-    primary: 'border-brand bg-brand text-white hover:bg-brand-dark',
-    danger: 'border-edge bg-white text-overdue hover:bg-overdue-wash',
-  }
-  return (
-    <button
-      {...rest}
-      className={`rounded-md border px-2 py-1 text-xs font-medium transition-colors disabled:opacity-50 ${tones[tone]} ${focusRing} ${className ?? ''}`}
-    >
-      {children}
-    </button>
-  )
-}
-
-/**
- * Icon-only Edit/Delete row actions (RowButton-sized). Each bakes in its own
- * icon, tone (Delete stays danger-toned), and the title/aria-label pair a
- * visible-text button gets for free, so every call site is one line.
- */
-export function EditRowButton(props: ButtonHTMLAttributes<HTMLButtonElement>) {
-  return (
-    <RowButton title="Edit" aria-label="Edit" {...props}>
-      <EditIcon />
-    </RowButton>
-  )
-}
-
-export function DeleteRowButton(props: ButtonHTMLAttributes<HTMLButtonElement>) {
-  return (
-    <RowButton tone="danger" title="Delete" aria-label="Delete" {...props}>
-      <DeleteIcon />
-    </RowButton>
-  )
-}
-

@@ -20,7 +20,7 @@ function BillRow({ bill, data }: { bill: Bill; data: FinanceData }) {
       <div className="flex items-start justify-between gap-4">
         <span className="text-lg font-bold tracking-tight text-black">{bill.name}</span>
         {upcoming?.amount !== undefined && (
-          <Money value={upcoming.amount} tone="inherit" className="text-lg font-bold text-black" />
+          <Money value={upcoming.amount} className="text-lg font-bold text-black" />
         )}
       </div>
 
@@ -68,7 +68,7 @@ export function Bills() {
         summary={
           open > 0 && (
             <>
-              <Money value={due} tone="inherit" className="font-bold" /> due across{' '}
+              <Money value={due} className="font-bold" /> due across{' '}
               <span className="tnum font-mono">{open}</span> {open === 1 ? 'bill' : 'bills'}
             </>
           )

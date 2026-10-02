@@ -1,7 +1,18 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Modal } from '../../components/Modal.tsx'
-import { Field, TextInput, SelectInput, Button, SecondaryButton } from '../../components/ui.tsx'
+import {
+  BrutalModal,
+  BrutalModalBody,
+  BrutalModalFooter,
+  BrutalField,
+  BrutalInput,
+  BrutalMoneyInput,
+  BrutalSelect,
+  BrutalButton,
+  BrutalSecondaryButton,
+} from '../../components/brutal.tsx'
+import { BrutalDatePicker } from '../../components/BrutalDatePicker.tsx'
+import type { LookName } from '../../components/brutalLook.tsx'
 import { useFinanceMutations } from '../../hooks/useFinanceMutations.ts'
 import { isoDate } from '../../lib/currentMonth.ts'
 import type { SavingsLedgerEntry, SavingsMovementKind } from '../../types.ts'
@@ -14,13 +25,14 @@ import type { SavingsLedgerEntry, SavingsMovementKind } from '../../types.ts'
  * amount is signed, hence Math.abs when prefilling.
  */
 export function SavingsFormModal({
-  open,
+  look,
   entry,
   month,
   onClose,
   onMonthChange,
 }: {
-  open: boolean
+  /** Set by the caller, like the Add/Edit wrappers elsewhere: grid to add, plain to edit. */
+  look: LookName
   entry?: SavingsLedgerEntry
   /** The month currently displayed, so an add landing outside it can be announced. */
   month?: string
@@ -29,6 +41,7 @@ export function SavingsFormModal({
   onMonthChange?: (month: string) => void
 }) {
   const { addSavingsEntry, updateSavingsEntry } = useFinanceMutations()
+  const id = useId()
   // entry.kind is always 'deposit' or 'withdrawal' here: a payment-kind row
   // exposes no Edit control (Savings.tsx gates on isPaymentKind).
   const [kind, setKind] = useState<SavingsMovementKind>(
@@ -72,46 +85,43 @@ export function SavingsFormModal({
   }
 
   return (
-    <Modal open={open} title={entry ? 'Edit movement' : 'Add movement'} onClose={onClose}>
-      <form onSubmit={submit} className="space-y-4">
-        <Field label="Kind" required>
-          <SelectInput
-            required
-            value={kind}
-            onChange={(e) => setKind(e.target.value as SavingsMovementKind)}
-          >
-            <option value="deposit">Deposit</option>
-            <option value="withdrawal">Withdrawal</option>
-          </SelectInput>
-        </Field>
-        <Field label="Amount" required>
-          <TextInput
-            required
-            type="number"
-            step="0.01"
-            min="0.01"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-          />
-        </Field>
-        <Field label="Date" required>
-          <TextInput
-            required
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-          />
-        </Field>
-        <Field label="Notes">
-          <TextInput value={notes} onChange={(e) => setNotes(e.target.value)} />
-        </Field>
-        <div className="flex justify-end gap-2">
-          <SecondaryButton type="button" onClick={onClose}>
+    <BrutalModal open title={entry ? 'Edit movement' : 'Add movement'} onClose={onClose} look={look}>
+      <form onSubmit={submit}>
+        <BrutalModalBody>
+          <BrutalField label="Kind" htmlFor={`${id}-kind`} required>
+            <BrutalSelect
+              id={`${id}-kind`}
+              required
+              value={kind}
+              onChange={(e) => setKind(e.target.value as SavingsMovementKind)}
+            >
+              <option value="deposit">Deposit</option>
+              <option value="withdrawal">Withdrawal</option>
+            </BrutalSelect>
+          </BrutalField>
+          <BrutalField label="Amount" htmlFor={`${id}-amount`} required>
+            <BrutalMoneyInput
+              id={`${id}-amount`}
+              required
+              min="0.01"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+            />
+          </BrutalField>
+          <BrutalField label="Date" htmlFor={`${id}-date`} required>
+            <BrutalDatePicker id={`${id}-date`} value={date} onChange={setDate} />
+          </BrutalField>
+          <BrutalField label="Notes" htmlFor={`${id}-notes`}>
+            <BrutalInput id={`${id}-notes`} value={notes} onChange={(e) => setNotes(e.target.value)} />
+          </BrutalField>
+        </BrutalModalBody>
+        <BrutalModalFooter>
+          <BrutalSecondaryButton type="button" onClick={onClose}>
             Cancel
-          </SecondaryButton>
-          <Button type="submit">{entry ? 'Save' : 'Add movement'}</Button>
-        </div>
+          </BrutalSecondaryButton>
+          <BrutalButton type="submit">{entry ? 'Save' : 'Add movement'}</BrutalButton>
+        </BrutalModalFooter>
       </form>
-    </Modal>
+    </BrutalModal>
   )
 }

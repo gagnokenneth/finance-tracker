@@ -187,7 +187,7 @@ export function DebtDetail() {
         }
       >
         <BrutalStat label="Balance left">
-          <Money value={balance} tone="inherit" className="text-4xl font-bold" />
+          <Money value={balance} className="text-4xl font-bold" />
         </BrutalStat>
         <BrutalStat label="Next payment">
           <BrutalDueBadge dueDate={next} className="text-xl font-bold" />
