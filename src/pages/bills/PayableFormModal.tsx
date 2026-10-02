@@ -1,7 +1,17 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import { Modal } from '../../components/Modal.tsx'
-import { Field, TextInput, Button, SecondaryButton } from '../../components/ui.tsx'
+import {
+  BrutalModal,
+  BrutalModalBody,
+  BrutalModalFooter,
+  BrutalField,
+  BrutalMoneyInput,
+  BrutalButton,
+  BrutalSecondaryButton,
+} from '../../components/brutal.tsx'
+import { BrutalDatePicker } from '../../components/BrutalDatePicker.tsx'
+import { BrutalPaidFields } from '../../components/BrutalPaidFields.tsx'
+import { usePaidFields } from '../../hooks/usePaidFields.ts'
 import type { BillPayable } from '../../types.ts'
 import type { BillPayablePatch } from '../../api/FinanceApi.ts'
 
@@ -26,19 +36,12 @@ export function PayableFormModal({
 }) {
   const [dueDate, setDueDate] = useState(row.due_date)
   const [amount, setAmount] = useState(row.amount !== undefined ? String(row.amount) : '')
-  const [paid, setPaid] = useState(row.paid)
-  const [paidDate, setPaidDate] = useState(row.paid_date ?? row.due_date)
-  const [paidAmount, setPaidAmount] = useState(
-    row.paid_amount !== undefined ? String(row.paid_amount) : '',
-  )
+  const paidState = usePaidFields(row, row.due_date)
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    // Unchecking Paid clears the payment fields and un-mints the payable that
-    // the payment created — this is how a mistaken payment is undone.
-    const paidFields = paid
-      ? { paid: true as const, paid_date: paidDate, paid_amount: Number(paidAmount) }
-      : { paid: false as const, paid_date: undefined, paid_amount: undefined }
+    // Unchecking Paid also un-mints the payable that the payment created.
+    const { paidFields } = paidState
 
     onSubmit({
       due_date: dueDate,
@@ -50,61 +53,26 @@ export function PayableFormModal({
   }
 
   return (
-    <Modal open={open} title={title} onClose={onClose}>
-      <form onSubmit={submit} className="flex flex-col gap-3">
-        <Field label="Due date" required>
-          <TextInput
-            type="date"
-            value={dueDate}
-            onChange={(e) => setDueDate(e.target.value)}
-            required
-          />
-        </Field>
-        <Field label="Amount">
-          <TextInput
-            type="number"
-            step="0.01"
-            min="0"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-          />
-        </Field>
+    <BrutalModal open={open} title={title} onClose={onClose} look="plain">
+      <form onSubmit={submit}>
+        <BrutalModalBody>
+          <BrutalField label="Due date" htmlFor="payable-due" required>
+            <BrutalDatePicker id="payable-due" value={dueDate} onChange={setDueDate} />
+          </BrutalField>
+          <BrutalField label="Amount" htmlFor="payable-amount">
+            <BrutalMoneyInput id="payable-amount" value={amount} onChange={(e) => setAmount(e.target.value)} />
+          </BrutalField>
 
-        <label className="flex items-center gap-2 text-sm text-ink">
-          <input type="checkbox" checked={paid} onChange={(e) => setPaid(e.target.checked)} />
-          Paid
-        </label>
+          <BrutalPaidFields fields={paidState} idPrefix="payable" />
+        </BrutalModalBody>
 
-        {paid && (
-          <>
-            <Field label="Paid date" required>
-              <TextInput
-                type="date"
-                value={paidDate}
-                onChange={(e) => setPaidDate(e.target.value)}
-                required
-              />
-            </Field>
-            <Field label="Paid amount" required>
-              <TextInput
-                type="number"
-                step="0.01"
-                min="0"
-                value={paidAmount}
-                onChange={(e) => setPaidAmount(e.target.value)}
-                required
-              />
-            </Field>
-          </>
-        )}
-
-        <div className="mt-1 flex justify-end gap-2">
-          <SecondaryButton type="button" onClick={onClose}>
+        <BrutalModalFooter>
+          <BrutalSecondaryButton type="button" onClick={onClose}>
             Cancel
-          </SecondaryButton>
-          <Button type="submit">Save</Button>
-        </div>
+          </BrutalSecondaryButton>
+          <BrutalButton type="submit">Save</BrutalButton>
+        </BrutalModalFooter>
       </form>
-    </Modal>
+    </BrutalModal>
   )
 }

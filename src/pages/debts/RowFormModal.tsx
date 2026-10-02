@@ -6,12 +6,12 @@ import {
   BrutalMoneyInput,
   BrutalButton,
   BrutalSecondaryButton,
-  checkboxClass,
-  labelClass,
   BrutalModalBody,
   BrutalModalFooter,
 } from '../../components/brutal.tsx'
 import { BrutalDatePicker } from '../../components/BrutalDatePicker.tsx'
+import { BrutalPaidFields } from '../../components/BrutalPaidFields.tsx'
+import { usePaidFields } from '../../hooks/usePaidFields.ts'
 import { isoDate } from '../../lib/currentMonth.ts'
 import type { DebtScheduleRow, DebtStatement } from '../../types.ts'
 import type { NewScheduleRow, NewStatement } from '../../api/FinanceApi.ts'
@@ -65,19 +65,11 @@ export function RowFormModal({
   const [outstanding, setOutstanding] = useState(
     asStatement?.outstanding !== undefined ? String(asStatement.outstanding) : '',
   )
-  const [paid, setPaid] = useState(initial?.paid ?? false)
-  const [paidDate, setPaidDate] = useState(initial?.paid_date ?? isoDate())
-  const [paidAmount, setPaidAmount] = useState(
-    initial?.paid_amount !== undefined ? String(initial.paid_amount) : '',
-  )
+  const paidState = usePaidFields(initial, isoDate())
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    // Unchecking Paid clears the payment fields — this is how a mistaken
-    // payment is undone.
-    const paidFields = paid
-      ? { paid: true as const, paid_date: paidDate, paid_amount: Number(paidAmount) }
-      : { paid: false as const, paid_date: undefined, paid_amount: undefined }
+    const { paidFields } = paidState
 
     if (kind === 'schedule') {
       onSubmit({ due_date: dueDate, amount: Number(amount), ...paidFields })
@@ -125,26 +117,7 @@ export function RowFormModal({
             </>
           )}
 
-          <label className={`flex items-center gap-2.5 ${labelClass}`}>
-            <input type="checkbox" className={checkboxClass} checked={paid} onChange={(e) => setPaid(e.target.checked)} />
-            Paid
-          </label>
-
-          {paid && (
-            <>
-              <BrutalField label="Paid date" htmlFor="row-paid-date" required>
-                <BrutalDatePicker id="row-paid-date" value={paidDate} onChange={setPaidDate} />
-              </BrutalField>
-              <BrutalField label="Paid amount" htmlFor="row-paid-amount" required>
-                <BrutalMoneyInput
-                  id="row-paid-amount"
-                  value={paidAmount}
-                  onChange={(e) => setPaidAmount(e.target.value)}
-                  required
-                />
-              </BrutalField>
-            </>
-          )}
+          <BrutalPaidFields fields={paidState} idPrefix="row" />
         </BrutalModalBody>
 
         <BrutalModalFooter>

@@ -1,7 +1,13 @@
 import type { FormEvent } from 'react'
 import { useBillForm } from '../../hooks/useBillForm.ts'
-import { Modal } from '../../components/Modal.tsx'
-import { Button, SecondaryButton } from '../../components/ui.tsx'
+import {
+  BrutalFormError,
+  BrutalModal,
+  BrutalModalBody,
+  BrutalModalFooter,
+  BrutalButton,
+  BrutalSecondaryButton,
+} from '../../components/brutal.tsx'
 import { BillFormFields } from './BillFormFields.tsx'
 import type { Bill } from '../../types.ts'
 import type { BillPatch } from '../../api/FinanceApi.ts'
@@ -34,24 +40,25 @@ export function EditBillModal({
   }
 
   return (
-    <Modal open={open} title="Edit bill" onClose={onClose}>
-      <form onSubmit={submit} className="flex flex-col gap-3">
-        <BillFormFields form={form} />
+    <BrutalModal open={open} title="Edit bill" onClose={onClose} look="plain">
+      <form onSubmit={submit}>
+        <BrutalModalBody>
+          <BillFormFields form={form} />
+          <p className="font-mono text-xs text-neutral-500">
+            A new schedule applies from the next payable — the ones already listed stay put.
+          </p>
+          {form.error && <BrutalFormError>{form.error}</BrutalFormError>}
+        </BrutalModalBody>
 
-        <p className="text-xs text-ink-soft">
-          A new schedule applies from the next payable — the ones already listed stay put.
-        </p>
-        {form.error && <p className="text-xs text-overdue">{form.error}</p>}
-
-        <div className="mt-1 flex justify-end gap-2">
-          <SecondaryButton type="button" onClick={onClose}>
+        <BrutalModalFooter>
+          <BrutalSecondaryButton type="button" onClick={onClose}>
             Cancel
-          </SecondaryButton>
-          <Button type="submit" disabled={form.error !== null}>
+          </BrutalSecondaryButton>
+          <BrutalButton type="submit" disabled={form.error !== null}>
             Save
-          </Button>
-        </div>
+          </BrutalButton>
+        </BrutalModalFooter>
       </form>
-    </Modal>
+    </BrutalModal>
   )
 }

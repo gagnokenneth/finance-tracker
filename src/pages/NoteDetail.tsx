@@ -78,7 +78,7 @@ export function NoteDetail() {
           </h1>
         )}
         <BrutalIconButton label="Delete note" onClick={() => setDeleting(true)}>
-          <DeleteIcon className="size-4" />
+          <DeleteIcon />
         </BrutalIconButton>
       </div>
 

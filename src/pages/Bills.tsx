@@ -3,12 +3,9 @@ import { useFinanceData } from '../hooks/useFinanceData.ts'
 import { billBadges, unpaidTotal, upcomingPayable } from '../lib/bills.ts'
 import { isTemp } from '../lib/tempId.ts'
 import { Money } from '../components/Money.tsx'
-import { CardRow } from '../components/CardRow.tsx'
-import { Badge } from '../components/Badge.tsx'
-import { DueBadge } from '../components/DueBadge.tsx'
 import { PendingBadge } from '../components/PendingBadge.tsx'
-import { Button } from '../components/ui.tsx'
-import { EmptyState } from '../components/EmptyState.tsx'
+import { BrutalButton, BrutalCardRow, BrutalEmptyState, BrutalPageHeader } from '../components/brutal.tsx'
+import { BrutalDueBadge, BrutalTag } from '../components/brutalData.tsx'
 import { LoadError } from '../components/LoadError.tsx'
 import { LoadingScreen } from '../components/LoadingScreen.tsx'
 import { AddBillModal } from './bills/AddBillModal.tsx'
@@ -19,40 +16,36 @@ function BillRow({ bill, data }: { bill: Bill; data: FinanceData }) {
   const pending = isTemp(bill.id)
 
   return (
-    <CardRow to={`/bills/${bill.id}`} pending={pending}>
+    <BrutalCardRow to={`/bills/${bill.id}`} pending={pending} className="block space-y-4 p-6">
       <div className="flex items-start justify-between gap-4">
-        <span className="font-semibold tracking-tight text-ink">{bill.name}</span>
+        <span className="text-lg font-bold tracking-tight text-black">{bill.name}</span>
         {upcoming?.amount !== undefined && (
-          <Money value={upcoming.amount} className="text-base font-semibold" />
+          <Money value={upcoming.amount} tone="inherit" className="text-lg font-bold text-black" />
         )}
       </div>
 
-      <div className="mt-1.5 flex flex-wrap gap-1.5">
+      <div className="flex flex-wrap gap-2">
         {billBadges(bill).map((label) => (
-          <Badge key={label}>{label}</Badge>
+          <BrutalTag key={label}>{label}</BrutalTag>
         ))}
       </div>
 
-      <div className="mt-4 flex items-center gap-2 text-xs text-ink-faint">
+      <div className="flex items-center gap-3 font-mono text-xs text-neutral-500">
         {/* A pending bill has no id to navigate to and no saved payable, so the
             badge stands in for both. A closed bill has no next payment, so the
-            badge is replaced rather than shown empty. Inlined instead of added
-            to StatusBadge, which is keyed to a row's due state — and closed is
-            a bill's state. */}
+            tag replaces the due date rather than showing it empty. */}
         {pending ? (
           <PendingBadge />
         ) : bill.closed ? (
-          <span className="inline-flex items-center rounded-full bg-brand/10 px-2 py-0.5 text-xs font-medium text-brand ring-1 ring-brand/20 ring-inset">
-            Closed
-          </span>
+          <BrutalTag muted>Closed</BrutalTag>
         ) : (
           <>
             <span>Next</span>
-            <DueBadge dueDate={upcoming?.due_date ?? null} />
+            <BrutalDueBadge dueDate={upcoming?.due_date ?? null} />
           </>
         )}
       </div>
-    </CardRow>
+    </BrutalCardRow>
   )
 }
 
@@ -69,26 +62,28 @@ export function Bills() {
   const open = data.bills.filter((b) => !b.closed).length
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-ink">Bills</h1>
-          {open > 0 && (
-            <p className="mt-1 text-sm text-ink-soft">
-              <Money value={due} className="font-semibold" /> due across{' '}
+    <div className="space-y-10">
+      <BrutalPageHeader
+        title="Bills"
+        summary={
+          open > 0 && (
+            <>
+              <Money value={due} tone="inherit" className="font-bold" /> due across{' '}
               <span className="tnum font-mono">{open}</span> {open === 1 ? 'bill' : 'bills'}
-            </p>
-          )}
-        </div>
-        <Button type="button" onClick={() => setAdding(true)}>
-          Add bill
-        </Button>
-      </div>
+            </>
+          )
+        }
+        action={
+          <BrutalButton type="button" onClick={() => setAdding(true)}>
+            + Add bill
+          </BrutalButton>
+        }
+      />
 
       {bills.length === 0 ? (
-        <EmptyState title="Nothing tracked yet">
+        <BrutalEmptyState title="Nothing tracked yet">
           Add rent, a utility, or a subscription to see what is due next.
-        </EmptyState>
+        </BrutalEmptyState>
       ) : (
         <div className="space-y-3">
           {bills.map((b) => (

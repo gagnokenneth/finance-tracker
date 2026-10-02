@@ -6,6 +6,7 @@ import { formatMoney } from '../../lib/money.ts'
 import { useCurrency } from '../../hooks/useCurrency.ts'
 import { isoDate } from '../../lib/currentMonth.ts'
 import {
+  BrutalFormError,
   BrutalModal,
   BrutalField,
   BrutalInput,
@@ -123,7 +124,7 @@ export function AddDebtModal({ open, onClose }: { open: boolean; onClose: () => 
                 />
               </BrutalField>
               {preview && <p className="font-mono text-xs text-neutral-600">→ {preview}</p>}
-              {previewError && <p className="font-mono text-xs font-bold text-black">{previewError}</p>}
+              {previewError && <BrutalFormError>{previewError}</BrutalFormError>}
             </>
           ) : (
             <>

@@ -3,7 +3,7 @@ import { useFinanceData } from '../hooks/useFinanceData.ts'
 import { groupItemsByNote, doneCount, bodyPreview } from '../lib/notes.ts'
 import { isTemp } from '../lib/tempId.ts'
 import { PendingBadge } from '../components/PendingBadge.tsx'
-import { BrutalButton, BrutalCardRow, BrutalEmptyState, pageTitleClass } from '../components/brutal.tsx'
+import { BrutalButton, BrutalCardRow, BrutalEmptyState, BrutalPageHeader } from '../components/brutal.tsx'
 import { LoadError } from '../components/LoadError.tsx'
 import { LoadingScreen } from '../components/LoadingScreen.tsx'
 import { AddNoteModal } from './notes/AddNoteModal.tsx'
@@ -19,12 +19,14 @@ export function Notes() {
 
   return (
     <div className="space-y-10">
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-black pb-8">
-        <h1 className={pageTitleClass}>Notes</h1>
-        <BrutalButton type="button" onClick={() => setAdding(true)}>
-          + Add note
-        </BrutalButton>
-      </div>
+      <BrutalPageHeader
+        title="Notes"
+        action={
+          <BrutalButton type="button" onClick={() => setAdding(true)}>
+            + Add note
+          </BrutalButton>
+        }
+      />
 
       {data.notes.length === 0 ? (
         <BrutalEmptyState title="Nothing tracked yet">Jot down a note, or start a checklist on one.</BrutalEmptyState>

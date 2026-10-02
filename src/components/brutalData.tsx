@@ -1,11 +1,14 @@
 import type { ReactNode } from 'react'
 import { dueStatus, ROW_STATUS_LABEL } from '../lib/debts.ts'
 import type { RowStatus } from '../lib/debts.ts'
+import { Money } from './Money.tsx'
+import { PendingBadge } from './PendingBadge.tsx'
+import { DeleteIcon, EditIcon } from './icons.tsx'
+import { BrutalIconButton, labelClass, panelTitleClass, smallButtonClass, smallPrimaryButtonClass } from './brutal.tsx'
 
 /*
- * The revamp's monochrome takes on the data displays Debts (and later Bills)
- * share — kept apart from StatusBadge/DueBadge/InstallmentStrip/Table, which
- * pages not yet redesigned still render.
+ * The revamp's monochrome data displays Debts and Bills share. BrutalTable is
+ * kept apart from the old Table, which Income and Savings still render.
  */
 
 /**
@@ -21,12 +24,23 @@ const STATUS_CLASS: Record<RowStatus, string> = {
   paid: 'border-neutral-300 bg-neutral-200 text-neutral-700',
 }
 
+/** Every chip's shape: a status badge or a descriptive tag. */
+const chipClass = 'inline-block border px-2 py-0.5 font-mono text-[10px] font-bold tracking-wider whitespace-nowrap uppercase'
+
 export function BrutalStatusBadge({ status }: { status: RowStatus }) {
   return (
-    <span
-      className={`inline-block border px-2 py-0.5 font-mono text-[10px] font-bold tracking-wider whitespace-nowrap uppercase ${STATUS_CLASS[status]}`}
-    >
+    <span className={`${chipClass} ${STATUS_CLASS[status]}`}>
       {ROW_STATUS_LABEL[status]}
+    </span>
+  )
+}
+
+/** A plain descriptive tag — a bill's type and schedule, or 'Closed'
+ *  (muted, since a closed bill is history). */
+export function BrutalTag({ children, muted = false }: { children: ReactNode; muted?: boolean }) {
+  return (
+    <span className={`${chipClass} ${muted ? STATUS_CLASS.paid : 'border-black bg-white text-black'}`}>
+      {children}
     </span>
   )
 }
@@ -93,33 +107,161 @@ export function BrutalInstallmentStrip(
 /** Padding every ledger cell shares with its column header. */
 export const cellClass = 'px-6 py-4'
 
-export interface BrutalColumn {
-  label: string
-  /** A column of actions or figures reads from the right edge. */
-  align?: 'right'
-}
-
-/** A bordered ledger table: black-ruled header, hairline rows. */
-export function BrutalTable({ columns, children }: { columns: BrutalColumn[]; children: ReactNode }) {
+/**
+ * A bordered ledger table: black-ruled header, hairline rows. `actions` adds
+ * the trailing, right-aligned Actions column a row's BrutalRowActions sits in.
+ */
+export function BrutalTable({
+  columns,
+  actions = false,
+  children,
+}: {
+  columns: string[]
+  actions?: boolean
+  children: ReactNode
+}) {
+  const th = `${cellClass} font-mono text-xs font-bold tracking-wider whitespace-nowrap text-black uppercase`
   return (
     <div className="overflow-x-auto border border-black bg-white">
       <table className="w-full text-sm">
         <thead className="border-b border-black text-left">
           <tr>
-            {columns.map((c) => (
-              <th
-                key={c.label}
-                className={`${cellClass} font-mono text-xs font-bold tracking-wider whitespace-nowrap text-black uppercase ${
-                  c.align === 'right' ? 'text-right' : ''
-                }`}
-              >
-                {c.label}
+            {columns.map((label) => (
+              <th key={label} className={th}>
+                {label}
               </th>
             ))}
+            {actions && <th className={`${th} text-right`}>Actions</th>}
           </tr>
         </thead>
         <tbody className="divide-y divide-neutral-200 text-black">{children}</tbody>
       </table>
     </div>
+  )
+}
+
+/** A money cell, or a dash for a figure not set yet — never a zero it doesn't mean. */
+export function BrutalFigure({ value }: { value: number | undefined }) {
+  return value === undefined ? (
+    <span className="font-mono text-neutral-400">—</span>
+  ) : (
+    <Money value={value} tone="inherit" className="font-bold" />
+  )
+}
+
+/** A ledger row's status: Paid with when and how much (and whether savings
+ *  funded it), or its due-state chip while unpaid. */
+export function BrutalRowStatus({
+  row,
+  fromSavings,
+}: {
+  row: { due_date: string; paid: boolean; paid_date?: string; paid_amount?: number }
+  fromSavings: boolean
+}) {
+  if (!row.paid) return <BrutalStatusBadge status={dueStatus(row.due_date)} />
+  return (
+    <span className="inline-flex flex-wrap items-center gap-2">
+      <BrutalStatusBadge status="paid" />
+      <span className="tnum font-mono text-xs text-neutral-500">
+        {row.paid_date}
+        {row.paid_amount !== undefined && (
+          <>
+            {' · '}
+            <Money value={row.paid_amount} tone="inherit" className="text-xs" />
+          </>
+        )}
+      </span>
+      {fromSavings && <span className="font-mono text-xs text-neutral-500">from savings</span>}
+    </span>
+  )
+}
+
+/**
+ * A ledger row's actions. A pending row has no backend id yet, so every
+ * action would be sent against an id the backend has never seen — it gets the
+ * pending badge instead. An unpriced unpaid row leads with Set amount, its
+ * actual next step, and keeps Pay visible but inert so the sequence stays
+ * legible.
+ */
+export function BrutalRowActions({
+  pending,
+  paid,
+  priced,
+  onSetAmount,
+  onPay,
+  onEdit,
+  onDelete,
+}: {
+  pending: boolean
+  paid: boolean
+  priced: boolean
+  onSetAmount: () => void
+  onPay: () => void
+  onEdit: () => void
+  onDelete: () => void
+}) {
+  if (pending) return <PendingBadge />
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-2">
+      {!paid && !priced && (
+        <button type="button" className={smallButtonClass} onClick={onSetAmount}>
+          Set amount
+        </button>
+      )}
+      {!paid && (
+        <button type="button" className={smallPrimaryButtonClass} disabled={!priced} onClick={onPay}>
+          Pay
+        </button>
+      )}
+      <BrutalIconButton size="sm" label="Edit" onClick={onEdit}>
+        <EditIcon />
+      </BrutalIconButton>
+      <BrutalIconButton size="sm" label="Delete" onClick={onDelete}>
+        <DeleteIcon />
+      </BrutalIconButton>
+    </div>
+  )
+}
+
+/** One labelled figure in a detail hero's dashed-ruled row. */
+export function BrutalStat({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="space-y-2">
+      <dt className={`${labelClass} text-neutral-500`}>{label}</dt>
+      <dd>{children}</dd>
+    </div>
+  )
+}
+
+/**
+ * A record's bordered summary panel: its name and descriptive tags, its
+ * actions, anything the record leads with (a payoff strip), then its
+ * BrutalStat figures under a dashed rule.
+ */
+export function BrutalDetailHero({
+  title,
+  tags,
+  actions,
+  lead,
+  children,
+}: {
+  title: string
+  tags: ReactNode
+  actions: ReactNode
+  lead?: ReactNode
+  children: ReactNode
+}) {
+  return (
+    <section className="border border-black bg-white p-8">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="space-y-3">
+          <h1 className={panelTitleClass}>{title}</h1>
+          <div className="flex flex-wrap gap-2">{tags}</div>
+        </div>
+        <div className="flex items-center gap-3">{actions}</div>
+      </div>
+      {lead && <div className="mt-8">{lead}</div>}
+      <dl className="mt-8 grid gap-6 border-t border-dashed border-neutral-400 pt-6 sm:grid-cols-2">{children}</dl>
+    </section>
   )
 }

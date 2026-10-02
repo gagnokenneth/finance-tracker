@@ -11,8 +11,8 @@ export interface PayResult {
 }
 
 /**
- * Shared state for both Pay modals (the original and the revamp's). Records a
- * payment against one row. `defaultAmount` is the row's scheduled installment
+ * The Record payment form's state (BrutalPayModal). Records a payment against
+ * one row. `defaultAmount` is the row's scheduled installment
  * for a fixed debt, the minimum due for a revolving one, or a bill payable's
  * amount — the usual case, but always editable.
  */

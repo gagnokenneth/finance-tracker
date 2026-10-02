@@ -121,11 +121,9 @@ export function RowButton({
 }
 
 /**
- * Icon-only Edit/Delete actions, in both sizes this app uses them at — a
- * table/list row (RowButton) and a page header (SecondaryButton). Each bakes
- * in its own icon, tone (Delete stays danger-toned), and the title/aria-label
- * pair a visible-text button gets for free, so every call site is one line
- * instead of repeating all three.
+ * Icon-only Edit/Delete row actions (RowButton-sized). Each bakes in its own
+ * icon, tone (Delete stays danger-toned), and the title/aria-label pair a
+ * visible-text button gets for free, so every call site is one line.
  */
 export function EditRowButton(props: ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
@@ -143,18 +141,3 @@ export function DeleteRowButton(props: ButtonHTMLAttributes<HTMLButtonElement>) 
   )
 }
 
-export function EditButton(props: ButtonHTMLAttributes<HTMLButtonElement>) {
-  return (
-    <SecondaryButton title="Edit" aria-label="Edit" {...props}>
-      <EditIcon />
-    </SecondaryButton>
-  )
-}
-
-export function DeleteButton(props: ButtonHTMLAttributes<HTMLButtonElement>) {
-  return (
-    <SecondaryButton title="Delete" aria-label="Delete" {...props}>
-      <DeleteIcon />
-    </SecondaryButton>
-  )
-}

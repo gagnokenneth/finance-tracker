@@ -39,10 +39,10 @@ function AuthedApp() {
           <Route path="notes/:id" element={<NoteDetail />} />
           <Route path="debts" element={<Debts />} />
           <Route path="debts/:id" element={<DebtDetail />} />
-        </Route>
-        <Route element={<LegacyColumn />}>
           <Route path="bills" element={<Bills />} />
           <Route path="bills/:id" element={<BillDetail />} />
+        </Route>
+        <Route element={<LegacyColumn />}>
           <Route path="income" element={<Income />} />
           <Route path="savings" element={<Savings />} />
           <Route path="settings" element={<Settings />} />

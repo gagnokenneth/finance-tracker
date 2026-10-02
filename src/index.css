@@ -24,12 +24,9 @@
   --color-brand-dark: #372fa8;
 
   --color-overdue: #b42318;
-  --color-soon: #b54708;
   --color-settled: #067647;
 
   --color-overdue-wash: #fef3f2;
-  --color-soon-wash: #fffaeb;
-  --color-settled-wash: #ecfdf3;
 
   /* The revamp's hard, unblurred offset shadows (components/brutal.tsx). */
   --shadow-hard-xs: 2px 2px 0 0 var(--color-black);

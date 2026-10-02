@@ -13,7 +13,7 @@ import {
 } from './brutal.tsx'
 import { BrutalDatePicker } from './BrutalDatePicker.tsx'
 
-/** The revamp's Record payment modal — same form as PayModal, plain look. */
+/** Records a payment against a debt row or a bill payable — see usePayForm. */
 export function BrutalPayModal({
   open,
   defaultAmount,

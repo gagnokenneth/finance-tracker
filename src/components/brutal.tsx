@@ -113,8 +113,8 @@ export function BrutalModalFooter({ spread, children }: { spread?: boolean; chil
 
 /** A bordered square icon action. */
 const ICON_BUTTON_SIZE = {
-  /** A page's own action — a detail page's Delete. */
-  md: 'size-10 shadow-hard-xs',
+  /** A page's own action — a detail page's Delete. Sizes its icon too. */
+  md: 'size-10 shadow-hard-xs [&_svg]:size-4',
   /** A row's action inside a table — Edit / Delete. */
   sm: 'size-7',
 }
@@ -167,6 +167,46 @@ export function BrutalCardRow({
 /** Square checkbox, filled solid black when checked. */
 export const checkboxClass =
   'size-4 shrink-0 cursor-pointer appearance-none rounded-none border border-black bg-white checked:bg-black disabled:cursor-not-allowed disabled:opacity-50'
+
+/** A list page's header: big title, an optional summary line under it, its
+ *  primary action, and the black rule beneath. */
+export function BrutalPageHeader({ title, summary, action }: { title: string; summary?: ReactNode; action: ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-4 border-b border-black pb-8">
+      <div className="space-y-3">
+        <h1 className={pageTitleClass}>{title}</h1>
+        {summary && <p className="text-xl text-neutral-500">{summary}</p>}
+      </div>
+      {action}
+    </div>
+  )
+}
+
+/** A detail page's "← Debts"-style link back to its list. */
+export function BrutalBackLink({ to, children }: { to: string; children: ReactNode }) {
+  return (
+    <Link to={to} className="inline-block font-mono text-sm text-black underline-offset-4 hover:underline">
+      ← {children}
+    </Link>
+  )
+}
+
+/** A detail page whose record is gone (deleted elsewhere, a stale link). */
+export function BrutalNotFound({ noun, to, listLabel }: { noun: string; to: string; listLabel: string }) {
+  return (
+    <p className="font-mono text-sm text-neutral-600">
+      That {noun} no longer exists.{' '}
+      <Link to={to} className="font-bold text-black underline underline-offset-2">
+        Back to {listLabel}
+      </Link>
+    </p>
+  )
+}
+
+/** A form's validation message, under its fields. */
+export function BrutalFormError({ children }: { children: ReactNode }) {
+  return <p className="font-mono text-xs font-bold text-black">{children}</p>
+}
 
 /** The bordered "nothing here yet" block a list shows when it's empty. */
 export function BrutalEmptyState({ title, children }: { title: string; children: ReactNode }) {

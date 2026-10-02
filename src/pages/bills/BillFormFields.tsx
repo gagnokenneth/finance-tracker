@@ -1,5 +1,5 @@
 import { FREQUENCIES, FREQUENCY_LABEL, MONTH_LABEL } from '../../lib/billSchedule.ts'
-import { Field, TextInput, SelectInput } from '../../components/ui.tsx'
+import { BrutalField, BrutalInput, BrutalMoneyInput, BrutalSelect } from '../../components/brutal.tsx'
 import type { BillForm } from '../../hooks/useBillForm.ts'
 import type { BillFrequency, BillType } from '../../types.ts'
 
@@ -9,22 +9,21 @@ import type { BillFrequency, BillType } from '../../types.ts'
  * monthly and quarterly, two for bi-monthly, a month and a day for annually.
  */
 export function BillFormFields({ form }: { form: BillForm }) {
+  const day = { type: 'number', step: '1', min: '1', max: '31', required: true } as const
   return (
     <>
-      <Field label="Name" required>
-        <TextInput value={form.name} onChange={(e) => form.setName(e.target.value)} required />
-      </Field>
-      <Field label="Type">
-        <SelectInput
-          value={form.type}
-          onChange={(e) => form.setType(e.target.value as BillType)}
-        >
+      <BrutalField label="Name" htmlFor="bill-name" required>
+        <BrutalInput id="bill-name" autoFocus value={form.name} onChange={(e) => form.setName(e.target.value)} required />
+      </BrutalField>
+      <BrutalField label="Type" htmlFor="bill-type">
+        <BrutalSelect id="bill-type" value={form.type} onChange={(e) => form.setType(e.target.value as BillType)}>
           <option value="fixed">Fixed — same amount every time</option>
           <option value="variable">Variable — amount set each time</option>
-        </SelectInput>
-      </Field>
-      <Field label="Frequency">
-        <SelectInput
+        </BrutalSelect>
+      </BrutalField>
+      <BrutalField label="Frequency" htmlFor="bill-frequency">
+        <BrutalSelect
+          id="bill-frequency"
           value={form.frequency}
           onChange={(e) => form.setFrequency(e.target.value as BillFrequency)}
         >
@@ -33,61 +32,44 @@ export function BillFormFields({ form }: { form: BillForm }) {
               {FREQUENCY_LABEL[f]}
             </option>
           ))}
-        </SelectInput>
-      </Field>
+        </BrutalSelect>
+      </BrutalField>
 
       {form.type === 'fixed' && (
-        <Field label="Amount" required>
-          <TextInput
-            type="number"
-            step="0.01"
-            min="0"
-            value={form.amount}
-            onChange={(e) => form.setAmount(e.target.value)}
-            required
-          />
-        </Field>
+        <BrutalField label="Amount" htmlFor="bill-amount" required>
+          <BrutalMoneyInput id="bill-amount" value={form.amount} onChange={(e) => form.setAmount(e.target.value)} required />
+        </BrutalField>
       )}
 
       {form.frequency === 'annually' && (
-        <Field label="Due month">
-          <SelectInput value={form.month} onChange={(e) => form.setMonth(e.target.value)}>
+        <BrutalField label="Due month" htmlFor="bill-month">
+          <BrutalSelect id="bill-month" value={form.month} onChange={(e) => form.setMonth(e.target.value)}>
             {MONTH_LABEL.map((label, i) => (
               <option key={label} value={i + 1}>
                 {label}
               </option>
             ))}
-          </SelectInput>
-        </Field>
+          </BrutalSelect>
+        </BrutalField>
       )}
 
-      <Field
+      <BrutalField
         label={form.frequency === 'bimonthly' ? 'First due day' : 'Due day of the month'}
+        htmlFor="bill-day"
         required
       >
-        <TextInput
-          type="number"
-          step="1"
-          min="1"
-          max="31"
-          value={form.day}
-          onChange={(e) => form.setDay(e.target.value)}
-          required
-        />
-      </Field>
+        <BrutalInput id="bill-day" {...day} value={form.day} onChange={(e) => form.setDay(e.target.value)} />
+      </BrutalField>
 
       {form.frequency === 'bimonthly' && (
-        <Field label="Second due day" required>
-          <TextInput
-            type="number"
-            step="1"
-            min="1"
-            max="31"
+        <BrutalField label="Second due day" htmlFor="bill-second-day" required>
+          <BrutalInput
+            id="bill-second-day"
+            {...day}
             value={form.secondDay}
             onChange={(e) => form.setSecondDay(e.target.value)}
-            required
           />
-        </Field>
+        </BrutalField>
       )}
     </>
   )

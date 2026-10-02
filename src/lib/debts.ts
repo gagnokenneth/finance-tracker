@@ -34,17 +34,6 @@ export const ROW_STATUS_LABEL: Record<RowStatus, string> = {
   paid: 'Paid',
 }
 
-/**
- * Graded by urgency: red → orange → yellow → green. Colour never carries
- * meaning alone — always pair with ROW_STATUS_LABEL.
- */
-export const ROW_STATUS_CLASS: Record<RowStatus, string> = {
-  late: 'bg-overdue-wash text-overdue ring-overdue/20',
-  'due-soon': 'bg-soon-wash text-soon ring-soon/20',
-  upcoming: 'bg-paper text-ink-soft ring-ink-faint/30',
-  paid: 'bg-settled-wash text-settled ring-settled/20',
-}
-
 /** Earliest unpaid row by due date, or null when everything is settled. */
 export function nextUnpaid<T extends DueRow>(rows: T[]): T | null {
   const unpaid = rows.filter((r) => !r.paid)

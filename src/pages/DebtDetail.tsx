@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { useFinanceData } from '../hooks/useFinanceData.ts'
 import { useFinanceMutations } from '../hooks/useFinanceMutations.ts'
 import {
@@ -7,7 +7,6 @@ import {
   scheduleFor,
   statementsFor,
   totalBalance,
-  dueStatus,
   isRowPriced,
   nextStatementDate,
 } from '../lib/debts.ts'
@@ -15,29 +14,30 @@ import { nextMonthOn } from '../lib/currentMonth.ts'
 import { isTemp } from '../lib/tempId.ts'
 import { balanceAsOf, paymentsByRef, refKey } from '../lib/savings.ts'
 import { Money } from '../components/Money.tsx'
-import { PendingBadge } from '../components/PendingBadge.tsx'
-import { DeleteIcon, EditIcon } from '../components/icons.tsx'
+import { DeleteIcon } from '../components/icons.tsx'
 import { LoadError } from '../components/LoadError.tsx'
 import { LoadingScreen } from '../components/LoadingScreen.tsx'
 import {
+  BrutalBackLink,
   BrutalButton,
   BrutalConfirm,
   BrutalEmptyState,
   BrutalIconButton,
+  BrutalNotFound,
   BrutalSecondaryButton,
-  labelClass,
-  panelTitleClass,
-  smallButtonClass,
-  smallPrimaryButtonClass,
 } from '../components/brutal.tsx'
 import {
+  BrutalDetailHero,
   BrutalDueBadge,
+  BrutalFigure,
   BrutalInstallmentStrip,
-  BrutalStatusBadge,
+  BrutalRowActions,
+  BrutalRowStatus,
+  BrutalStat,
   BrutalTable,
+  BrutalTag,
   cellClass,
 } from '../components/brutalData.tsx'
-import type { BrutalColumn } from '../components/brutalData.tsx'
 import { BrutalPayModal } from '../components/BrutalPayModal.tsx'
 import { EditDebtModal } from './debts/EditDebtModal.tsx'
 import type { PayResult } from '../hooks/usePayForm.ts'
@@ -49,21 +49,8 @@ import type { NewScheduleRow } from '../api/FinanceApi.ts'
 type AnyRow = DebtScheduleRow | DebtStatement
 type RowForm = { mode: 'add' } | { mode: 'edit'; row: AnyRow }
 
-/** An unpriced statement shows a dash, not a zero it does not mean. */
-function figureCell(value: number | undefined) {
-  return value === undefined ? <span className="font-mono text-neutral-400">—</span> : <Money value={value} tone="inherit" className="font-bold" />
-}
-
-const ACTIONS: BrutalColumn = { label: 'Actions', align: 'right' }
-const FIXED_COLUMNS: BrutalColumn[] = [{ label: 'Due date' }, { label: 'Amount' }, { label: 'Status' }, ACTIONS]
-const REVOLVING_COLUMNS: BrutalColumn[] = [
-  { label: 'Due date' },
-  { label: 'Min due' },
-  { label: 'Total due' },
-  { label: 'Outstanding' },
-  { label: 'Status' },
-  ACTIONS,
-]
+const FIXED_COLUMNS = ['Due date', 'Amount', 'Status']
+const REVOLVING_COLUMNS = ['Due date', 'Min due', 'Total due', 'Outstanding', 'Status']
 
 export function DebtDetail() {
   const { id } = useParams()
@@ -91,16 +78,7 @@ export function DebtDetail() {
 
   const debtId = Number(id)
   const debt = data.debts.find((d) => d.id === debtId)
-  if (!debt) {
-    return (
-      <p className="font-mono text-sm text-neutral-600">
-        That debt no longer exists.{' '}
-        <Link to="/debts" className="font-bold text-black underline underline-offset-2">
-          Back to debts
-        </Link>
-      </p>
-    )
-  }
+  if (!debt) return <BrutalNotFound noun="debt" to="/debts" listLabel="debts" />
 
   const isFixed = debt.type === 'fixed'
   // Kept apart as well as merged: the statement-only actions below need the
@@ -179,109 +157,42 @@ export function DebtDetail() {
     }
   }
 
-  const statusCell = (row: AnyRow) =>
-    row.paid ? (
-      <span className="inline-flex flex-wrap items-center gap-2">
-        <BrutalStatusBadge status="paid" />
-        <span className="tnum font-mono text-xs text-neutral-500">
-          {row.paid_date}
-          {row.paid_amount !== undefined && (
-            <>
-              {' · '}
-              <Money value={row.paid_amount} tone="inherit" className="text-xs" />
-            </>
-          )}
-        </span>
-        {fundedByRef.has(refKey('amount' in row ? 'debt_schedule' : 'debt_statement', row.id)) && (
-          <span className="font-mono text-xs text-neutral-500">from savings</span>
-        )}
-      </span>
-    ) : (
-      <BrutalStatusBadge status={dueStatus(row.due_date)} />
-    )
-
-  const rowActions = (row: AnyRow) => {
-    // A pending row has no backend id yet, so every action here would be sent
-    // against an id the backend has never seen.
-    if (isTemp(row.id)) return <PendingBadge />
-    return (
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        {!row.paid && !isRowPriced(row) && (
-          <button type="button" className={smallButtonClass} onClick={() => setRowForm({ mode: 'edit', row })}>
-            Set amount
-          </button>
-        )}
-        {!row.paid && (
-          <button
-            type="button"
-            className={smallPrimaryButtonClass}
-            disabled={!isRowPriced(row)}
-            onClick={() => setPayRow(row)}
-          >
-            Pay
-          </button>
-        )}
-        <BrutalIconButton size="sm" label="Edit" onClick={() => setRowForm({ mode: 'edit', row })}>
-          <EditIcon />
-        </BrutalIconButton>
-        <BrutalIconButton size="sm" label="Delete" onClick={() => setDeletingRow(row)}>
-          <DeleteIcon />
-        </BrutalIconButton>
-      </div>
-    )
-  }
-
   const rowNoun = isFixed ? 'scheduled payments' : 'statements'
 
   return (
     <div className="space-y-8">
-      <Link to="/debts" className="inline-block font-mono text-sm text-black underline-offset-4 hover:underline">
-        ← Debts
-      </Link>
+      <BrutalBackLink to="/debts">Debts</BrutalBackLink>
 
-      {/* Hero: the payoff strip leads, because "how close am I to done" is the
+      {/* The payoff strip leads, because "how close am I to done" is the
           question this page exists to answer. */}
-      <section className="border border-black bg-white p-8">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="space-y-2">
-            <h1 className={panelTitleClass}>{debt.name}</h1>
-            <p className="font-mono text-xs font-bold tracking-wider text-neutral-500 uppercase">
-              {isFixed ? 'Fixed term' : 'Revolving'}
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
+      <BrutalDetailHero
+        title={debt.name}
+        tags={<BrutalTag>{isFixed ? 'Fixed term' : 'Revolving'}</BrutalTag>}
+        actions={
+          <>
             <BrutalSecondaryButton type="button" className="h-10" onClick={() => setEditingDebt(true)}>
               Rename
             </BrutalSecondaryButton>
             <BrutalIconButton label="Delete debt" onClick={() => setDeletingDebt(true)}>
-              <DeleteIcon className="size-4" />
+              <DeleteIcon />
             </BrutalIconButton>
-          </div>
-        </div>
-
-        <div className="mt-8">
-          {isFixed ? (
+          </>
+        }
+        lead={
+          isFixed ? (
             <BrutalInstallmentStrip kind="fixed" paid={paidCount} total={rows.length} />
           ) : (
             <BrutalInstallmentStrip kind="revolving" paid={paidCount} />
-          )}
-        </div>
-
-        <dl className="mt-8 grid gap-6 border-t border-dashed border-neutral-400 pt-6 sm:grid-cols-2">
-          <div className="space-y-2">
-            <dt className={`${labelClass} text-neutral-500`}>Balance left</dt>
-            <dd>
-              <Money value={balance} tone="inherit" className="text-4xl font-bold" />
-            </dd>
-          </div>
-          <div className="space-y-2">
-            <dt className={`${labelClass} text-neutral-500`}>Next payment</dt>
-            <dd>
-              <BrutalDueBadge dueDate={next} className="text-xl font-bold" />
-            </dd>
-          </div>
-        </dl>
-      </section>
+          )
+        }
+      >
+        <BrutalStat label="Balance left">
+          <Money value={balance} tone="inherit" className="text-4xl font-bold" />
+        </BrutalStat>
+        <BrutalStat label="Next payment">
+          <BrutalDueBadge dueDate={next} className="text-xl font-bold" />
+        </BrutalStat>
+      </BrutalDetailHero>
 
       {rows.length === 0 ? (
         <BrutalEmptyState title={`No ${rowNoun} yet`}>
@@ -290,23 +201,44 @@ export function DebtDetail() {
             : 'Start the statement you are waiting on, then set its amounts when it arrives.'}
         </BrutalEmptyState>
       ) : (
-        <BrutalTable columns={isFixed ? FIXED_COLUMNS : REVOLVING_COLUMNS}>
+        <BrutalTable columns={isFixed ? FIXED_COLUMNS : REVOLVING_COLUMNS} actions>
           {rows.map((row) => (
             <tr key={row.id} className={row.paid ? 'bg-neutral-50' : undefined}>
               <td className={`tnum ${cellClass} font-mono`}>{row.due_date}</td>
               {'amount' in row ? (
                 <td className={cellClass}>
-                  <Money value={row.amount} tone="inherit" className="font-bold" />
+                  <BrutalFigure value={row.amount} />
                 </td>
               ) : (
                 <>
-                  <td className={cellClass}>{figureCell(row.min_due)}</td>
-                  <td className={cellClass}>{figureCell(row.total_due)}</td>
-                  <td className={cellClass}>{figureCell(row.outstanding)}</td>
+                  <td className={cellClass}>
+                    <BrutalFigure value={row.min_due} />
+                  </td>
+                  <td className={cellClass}>
+                    <BrutalFigure value={row.total_due} />
+                  </td>
+                  <td className={cellClass}>
+                    <BrutalFigure value={row.outstanding} />
+                  </td>
                 </>
               )}
-              <td className={cellClass}>{statusCell(row)}</td>
-              <td className={cellClass}>{rowActions(row)}</td>
+              <td className={cellClass}>
+                <BrutalRowStatus
+                  row={row}
+                  fromSavings={fundedByRef.has(refKey('amount' in row ? 'debt_schedule' : 'debt_statement', row.id))}
+                />
+              </td>
+              <td className={cellClass}>
+                <BrutalRowActions
+                  pending={isTemp(row.id)}
+                  paid={row.paid}
+                  priced={isRowPriced(row)}
+                  onSetAmount={() => setRowForm({ mode: 'edit', row })}
+                  onPay={() => setPayRow(row)}
+                  onEdit={() => setRowForm({ mode: 'edit', row })}
+                  onDelete={() => setDeletingRow(row)}
+                />
+              </td>
             </tr>
           ))}
         </BrutalTable>

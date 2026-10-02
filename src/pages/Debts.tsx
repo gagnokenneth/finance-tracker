@@ -4,7 +4,7 @@ import { nextDueDate, scheduleFor, statementsFor, totalBalance } from '../lib/de
 import { isTemp } from '../lib/tempId.ts'
 import { Money } from '../components/Money.tsx'
 import { PendingBadge } from '../components/PendingBadge.tsx'
-import { BrutalButton, BrutalCardRow, BrutalEmptyState, pageTitleClass } from '../components/brutal.tsx'
+import { BrutalButton, BrutalCardRow, BrutalEmptyState, BrutalPageHeader } from '../components/brutal.tsx'
 import { BrutalDueBadge, BrutalInstallmentStrip } from '../components/brutalData.tsx'
 import { LoadError } from '../components/LoadError.tsx'
 import { LoadingScreen } from '../components/LoadingScreen.tsx'
@@ -18,7 +18,7 @@ function DebtRow({ debt, data }: { debt: Debt; data: FinanceData }) {
   const pending = isTemp(debt.id)
 
   return (
-    <BrutalCardRow to={`/debts/${debt.id}`} pending={pending} className="block space-y-5 p-6">
+    <BrutalCardRow to={`/debts/${debt.id}`} pending={pending} className="block space-y-4 p-6">
       <div className="flex items-start justify-between gap-4">
         <span className="text-lg font-bold tracking-tight text-black">{debt.name}</span>
         <Money
@@ -59,20 +59,22 @@ export function Debts() {
 
   return (
     <div className="space-y-10">
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-black pb-8">
-        <div className="space-y-3">
-          <h1 className={pageTitleClass}>Debts</h1>
-          {data.debts.length > 0 && (
-            <p className="text-xl text-neutral-500">
+      <BrutalPageHeader
+        title="Debts"
+        summary={
+          data.debts.length > 0 && (
+            <>
               <Money value={owed} tone="inherit" className="font-bold" /> left across{' '}
               <span className="tnum font-mono">{data.debts.length}</span> {data.debts.length === 1 ? 'debt' : 'debts'}
-            </p>
-          )}
-        </div>
-        <BrutalButton type="button" onClick={() => setAdding(true)}>
-          + Add debt
-        </BrutalButton>
-      </div>
+            </>
+          )
+        }
+        action={
+          <BrutalButton type="button" onClick={() => setAdding(true)}>
+            + Add debt
+          </BrutalButton>
+        }
+      />
 
       {data.debts.length === 0 ? (
         <BrutalEmptyState title="Nothing tracked yet">

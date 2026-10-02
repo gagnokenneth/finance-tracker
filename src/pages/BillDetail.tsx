@@ -1,37 +1,41 @@
 import { useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { useFinanceData } from '../hooks/useFinanceData.ts'
 import { useFinanceMutations } from '../hooks/useFinanceMutations.ts'
 import { billBadges, payablesFor, recurrenceOf, upcomingPayable } from '../lib/bills.ts'
 import { nextDueDate } from '../lib/billSchedule.ts'
-import { dueStatus } from '../lib/debts.ts'
 import { isTemp } from '../lib/tempId.ts'
 import { balanceAsOf, paymentsByRef, refKey } from '../lib/savings.ts'
 import { Money } from '../components/Money.tsx'
-import { Table } from '../components/Table.tsx'
-import { DueBadge } from '../components/DueBadge.tsx'
-import { StatusBadge } from '../components/StatusBadge.tsx'
-import { PendingBadge } from '../components/PendingBadge.tsx'
-import { ConfirmDialog } from '../components/ConfirmDialog.tsx'
-import { EmptyState } from '../components/EmptyState.tsx'
+import { DeleteIcon, EditIcon } from '../components/icons.tsx'
 import { LoadError } from '../components/LoadError.tsx'
 import { LoadingScreen } from '../components/LoadingScreen.tsx'
-import { PayModal } from '../components/PayModal.tsx'
-import type { PayResult } from '../hooks/usePayForm.ts'
 import {
-  SecondaryButton,
-  RowButton,
-  EditRowButton,
-  DeleteRowButton,
-  EditButton,
-  DeleteButton,
-} from '../components/ui.tsx'
-import { Badge } from '../components/Badge.tsx'
+  BrutalBackLink,
+  BrutalConfirm,
+  BrutalEmptyState,
+  BrutalIconButton,
+  BrutalNotFound,
+  BrutalSecondaryButton,
+} from '../components/brutal.tsx'
+import {
+  BrutalDetailHero,
+  BrutalDueBadge,
+  BrutalFigure,
+  BrutalRowActions,
+  BrutalRowStatus,
+  BrutalStat,
+  BrutalTable,
+  BrutalTag,
+  cellClass,
+} from '../components/brutalData.tsx'
+import { BrutalPayModal } from '../components/BrutalPayModal.tsx'
+import type { PayResult } from '../hooks/usePayForm.ts'
 import { EditBillModal } from './bills/EditBillModal.tsx'
 import { PayableFormModal } from './bills/PayableFormModal.tsx'
 import type { BillPayable } from '../types.ts'
 
-const HEADERS = ['Due date', 'Amount', 'Status', '']
+const COLUMNS = ['Due date', 'Amount', 'Status']
 
 export function BillDetail() {
   const { id } = useParams()
@@ -58,16 +62,7 @@ export function BillDetail() {
 
   const billId = Number(id)
   const bill = data.bills.find((b) => b.id === billId)
-  if (!bill) {
-    return (
-      <p className="text-ink-soft">
-        That bill no longer exists.{' '}
-        <Link to="/bills" className="font-medium text-brand underline underline-offset-2">
-          Back to bills
-        </Link>
-      </p>
-    )
-  }
+  if (!bill) return <BrutalNotFound noun="bill" to="/bills" listLabel="bills" />
 
   const rows = payablesFor(data.bill_payables, bill.id)
   const upcoming = upcomingPayable(data.bill_payables, bill.id)
@@ -92,144 +87,84 @@ export function BillDetail() {
     })
   }
 
-  const statusCell = (row: BillPayable) =>
-    row.paid ? (
-      <span className="inline-flex flex-wrap items-center gap-2">
-        <StatusBadge status="paid" />
-        <span className="tnum font-mono text-xs text-ink-faint">
-          {row.paid_date}
-          {row.paid_amount !== undefined && (
-            <>
-              {' · '}
-              <Money value={row.paid_amount} className="text-xs !text-ink-faint" />
-            </>
-          )}
-        </span>
-        {fundedByRef.has(refKey('bill_payable', row.id)) && (
-          <span className="text-xs text-ink-faint">from savings</span>
-        )}
-      </span>
-    ) : (
-      <StatusBadge status={dueStatus(row.due_date)} />
-    )
-
-  const rowActions = (row: BillPayable) => {
-    // A closed bill is history: readable, and frozen.
-    if (bill.closed) return null
-    // A pending row has no backend id yet, so every action here would be sent
-    // against an id the backend has never seen. Same treatment, for the second
-    // it lasts.
-    if (isTemp(row.id)) return <PendingBadge />
-    const priced = row.amount !== undefined
-    return (
-      <div className="flex flex-wrap justify-end gap-1.5">
-        {/* An unpriced row leads with Set amount because that is its actual next
-            step, and keeps Pay visible but inert so the sequence stays legible. */}
-        {!row.paid && !priced && (
-          <RowButton tone="primary" type="button" onClick={() => setEditingRow(row)}>
-            Set amount
-          </RowButton>
-        )}
-        {!row.paid && (
-          <RowButton
-            tone={priced ? 'primary' : 'neutral'}
-            type="button"
-            disabled={!priced}
-            onClick={() => setPayRow(row)}
-          >
-            Pay
-          </RowButton>
-        )}
-        <EditRowButton type="button" onClick={() => setEditingRow(row)} />
-        <DeleteRowButton type="button" onClick={() => setDeletingRow(row)} />
-      </div>
-    )
-  }
-
   return (
-    <div className="space-y-6">
-      <Link
-        to="/bills"
-        className="inline-block text-sm text-ink-soft underline-offset-2 hover:text-ink hover:underline"
-      >
-        ← Bills
-      </Link>
+    <div className="space-y-8">
+      <BrutalBackLink to="/bills">Bills</BrutalBackLink>
 
-      <section className="rounded-2xl border border-edge bg-white p-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-ink">{bill.name}</h1>
-            <div className="mt-1.5 flex flex-wrap gap-1.5">
-              {billBadges(bill).map((label) => (
-                <Badge key={label}>{label}</Badge>
-              ))}
-              {bill.closed && <Badge>Closed</Badge>}
-            </div>
-          </div>
-          <div className="flex gap-2">
+      <BrutalDetailHero
+        title={bill.name}
+        tags={
+          <>
+            {billBadges(bill).map((label) => (
+              <BrutalTag key={label}>{label}</BrutalTag>
+            ))}
+            {bill.closed && <BrutalTag muted>Closed</BrutalTag>}
+          </>
+        }
+        actions={
+          <>
             {!bill.closed && (
               <>
-                <EditButton type="button" onClick={() => setEditingBill(true)} />
-                <SecondaryButton type="button" onClick={() => setClosingBill(true)}>
+                <BrutalIconButton label="Edit bill" onClick={() => setEditingBill(true)}>
+                  <EditIcon />
+                </BrutalIconButton>
+                <BrutalSecondaryButton type="button" className="h-10" onClick={() => setClosingBill(true)}>
                   Close
-                </SecondaryButton>
+                </BrutalSecondaryButton>
               </>
             )}
-            <DeleteButton
-              type="button"
-              onClick={() => setDeletingBill(true)}
-              className="!text-overdue hover:!bg-overdue-wash"
-            />
-          </div>
-        </div>
-
-        <dl className="mt-6 flex flex-wrap gap-x-10 gap-y-4 border-t border-edge pt-5">
-          <div>
-            <dt className="text-xs font-semibold tracking-wide text-ink-faint uppercase">
-              Next payment
-            </dt>
-            <dd className="mt-1.5">
-              <DueBadge dueDate={upcoming?.due_date ?? null} />
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs font-semibold tracking-wide text-ink-faint uppercase">
-              Amount due
-            </dt>
-            <dd className="mt-1">
-              {upcoming?.amount !== undefined ? (
-                <Money value={upcoming.amount} className="text-xl font-semibold" />
-              ) : (
-                <span className="text-sm text-ink-soft">{upcoming ? 'Not set yet' : '—'}</span>
-              )}
-            </dd>
-          </div>
-        </dl>
-      </section>
+            <BrutalIconButton label="Delete bill" onClick={() => setDeletingBill(true)}>
+              <DeleteIcon />
+            </BrutalIconButton>
+          </>
+        }
+      >
+        <BrutalStat label="Amount due">
+          {upcoming?.amount !== undefined ? (
+            <Money value={upcoming.amount} tone="inherit" className="text-4xl font-bold" />
+          ) : (
+            <span className="font-mono text-sm text-neutral-500">{upcoming ? 'Not set yet' : '—'}</span>
+          )}
+        </BrutalStat>
+        <BrutalStat label="Next payment">
+          <BrutalDueBadge dueDate={upcoming?.due_date ?? null} className="text-xl font-bold" />
+        </BrutalStat>
+      </BrutalDetailHero>
 
       {rows.length === 0 ? (
-        <EmptyState title="No payables">
+        <BrutalEmptyState title="No payables">
           {bill.closed
             ? 'This bill was closed before any payment was recorded.'
             : 'Something went wrong generating this bill’s first payable.'}
-        </EmptyState>
+        </BrutalEmptyState>
       ) : (
-        <Table headers={HEADERS}>
+        <BrutalTable columns={COLUMNS} actions>
           {rows.map((row) => (
-            <tr key={row.id} className={row.paid ? 'bg-settled-wash/40' : undefined}>
-              <td className="tnum px-4 py-3 font-mono text-sm">{row.due_date}</td>
-              <td className="px-4 py-3">
-                {row.amount !== undefined ? (
-                  <Money value={row.amount} />
-                ) : (
-                  <span className="text-sm text-ink-faint">—</span>
+            <tr key={row.id} className={row.paid ? 'bg-neutral-50' : undefined}>
+              <td className={`tnum ${cellClass} font-mono`}>{row.due_date}</td>
+              <td className={cellClass}>
+                <BrutalFigure value={row.amount} />
+              </td>
+              <td className={cellClass}>
+                <BrutalRowStatus row={row} fromSavings={fundedByRef.has(refKey('bill_payable', row.id))} />
+              </td>
+              <td className={cellClass}>
+                {/* A closed bill is history: readable, and frozen. */}
+                {!bill.closed && (
+                  <BrutalRowActions
+                    pending={isTemp(row.id)}
+                    paid={row.paid}
+                    priced={row.amount !== undefined}
+                    onSetAmount={() => setEditingRow(row)}
+                    onPay={() => setPayRow(row)}
+                    onEdit={() => setEditingRow(row)}
+                    onDelete={() => setDeletingRow(row)}
+                  />
                 )}
               </td>
-              <td className="px-4 py-3">{statusCell(row)}</td>
-              <td className="px-4 py-3">{rowActions(row)}</td>
             </tr>
           ))}
-        </Table>
+        </BrutalTable>
       )}
 
       {editingBill && (
@@ -244,7 +179,7 @@ export function BillDetail() {
         />
       )}
 
-      <ConfirmDialog
+      <BrutalConfirm
         open={closingBill}
         title="Close bill"
         message={
@@ -262,7 +197,7 @@ export function BillDetail() {
         onClose={() => setClosingBill(false)}
       />
 
-      <ConfirmDialog
+      <BrutalConfirm
         open={deletingBill}
         title="Delete bill"
         message={`Delete ${bill.name} and its ${rows.length} ${
@@ -280,7 +215,7 @@ export function BillDetail() {
       />
 
       {payRow?.amount !== undefined && (
-        <PayModal
+        <BrutalPayModal
           open
           defaultAmount={payRow.amount}
           savingsBalance={balanceAsOf(data.savings_ledger)}
@@ -303,7 +238,7 @@ export function BillDetail() {
         />
       )}
 
-      <ConfirmDialog
+      <BrutalConfirm
         open={deletingRow !== null}
         title="Delete payable"
         message={`Delete the ${deletingRow?.due_date ?? ''} payable?`}
