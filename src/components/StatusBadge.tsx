@@ -4,7 +4,7 @@ import type { RowStatus } from '../lib/debts.ts'
 /**
  * The bare pill markup, colour driven entirely by `className` — shared by
  * StatusBadge (below, for a due-state RowStatus) and any other status enum
- * that wants the same look (e.g. Goals) without adopting RowStatus itself.
+ * that wants the same look without adopting RowStatus itself.
  */
 export function Pill({ label, className }: { label: string; className: string }) {
   return (

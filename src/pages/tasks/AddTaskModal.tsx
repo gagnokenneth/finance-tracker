@@ -1,9 +1,8 @@
 import type { FormEvent } from 'react'
 import { useFinanceMutations } from '../../hooks/useFinanceMutations.ts'
 import { useTaskForm } from '../../hooks/useTaskForm.ts'
-import { referenceable } from '../../lib/tempId.ts'
 import { BrutalModal, BrutalField, BrutalInput, BrutalButton, BrutalSecondaryButton } from '../../components/brutal.tsx'
-import { TaskScheduleFields } from './TaskScheduleFields.tsx'
+import { TaskRepeatsField } from './TaskRepeatsField.tsx'
 import { firstColumn } from '../../lib/taskColumns.ts'
 import type { FinanceData } from '../../types.ts'
 
@@ -39,9 +38,6 @@ export function AddTaskModal({
 }) {
   const { addTask } = useFinanceMutations()
   const form = useTaskForm()
-  const goals = referenceable(
-    data.goals.filter((g) => g.status === 'planned' || g.status === 'active'),
-  )
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
@@ -66,7 +62,7 @@ export function AddTaskModal({
             onChange={(e) => form.setTitle(e.target.value)}
           />
         </BrutalField>
-        <TaskScheduleFields form={form} goals={goals} idPrefix="add-task" />
+        <TaskRepeatsField form={form} idPrefix="add-task" />
 
         <div className="flex items-center gap-3 border-t-2 border-black pt-4">
           <BrutalSecondaryButton type="button" onClick={onClose}>

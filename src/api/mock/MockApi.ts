@@ -26,8 +26,6 @@ import type {
   NotePatch,
   NewNoteItem,
   NoteItemPatch,
-  NewGoal,
-  GoalPatch,
 } from '../FinanceApi.ts'
 import type {
   FinanceData,
@@ -45,7 +43,6 @@ import type {
   TaskColumn,
   Note,
   NoteItem,
-  Goal,
 } from '../../types.ts'
 import { createSeed } from './seed.ts'
 import { backfillArrays } from '../../lib/financeShape.ts'
@@ -54,7 +51,6 @@ import { normalizeUsername, isValidUsername, USERNAME_RULE } from '../../auth/pa
 import { signedAmount, isPaymentKind } from '../../lib/savings.ts'
 import { isoDate, isoDateTime } from '../../lib/currentMonth.ts'
 import { nextSortOrder } from '../../lib/notes.ts'
-import { isValidGoalTransition } from '../../lib/goals.ts'
 import { DEFAULT_TASK_COLUMNS, firstColumn } from '../../lib/taskColumns.ts'
 
 const KEY = 'finance-mock-db'
@@ -952,7 +948,6 @@ export class MockApi implements FinanceApi {
   async addTask(input: NewTask): Promise<FinanceData> {
     const data = this.load()
     if (!input.title.trim()) throw new Error('A task needs a title')
-    if (input.goal_id !== undefined) this.ownedGoal(data, input.goal_id)
     if (input.note_id !== undefined) this.ownedNote(data, input.note_id)
     const task: Task = { id: nextId(data.tasks), ...input, created_at: isoDateTime() }
     data.tasks.push(task)
@@ -966,15 +961,12 @@ export class MockApi implements FinanceApi {
     if (Object.prototype.hasOwnProperty.call(patch, 'title') && !(patch.title ?? '').trim()) {
       throw new Error('A task needs a title')
     }
-    if (Object.prototype.hasOwnProperty.call(patch, 'goal_id') && patch.goal_id != null) {
-      this.ownedGoal(data, patch.goal_id)
-    }
     if (Object.prototype.hasOwnProperty.call(patch, 'note_id') && patch.note_id != null) {
       this.ownedNote(data, patch.note_id)
     }
     Object.assign(task, patch)
     // null is the wire's "clear this"; the stored model uses undefined.
-    for (const key of ['notes', 'recurrence', 'goal_id', 'note_id'] as const) {
+    for (const key of ['notes', 'recurrence', 'note_id'] as const) {
       if (patch[key] === null) task[key] = undefined
     }
     this.save(data)
@@ -1024,7 +1016,6 @@ export class MockApi implements FinanceApi {
           date: input.next_date,
           recurrence: task.recurrence,
           column_id: firstColumn(columns).id,
-          goal_id: task.goal_id,
           note_id: task.note_id,
           created_at: isoDateTime(),
         }
@@ -1121,66 +1112,6 @@ export class MockApi implements FinanceApi {
     const data = this.load()
     this.ownedNoteItem(data, id)
     data.note_items = data.note_items.filter((i) => i.id !== id)
-    this.save(data)
-    return this.delay(data)
-  }
-
-  private ownedGoal(data: FinanceData, id: number): Goal {
-    const goal = data.goals.find((g) => g.id === id)
-    if (!goal) throw new Error(`Goal ${id} not found`)
-    return goal
-  }
-
-  /** Mirrors assertGoalDepth in Code.gs. */
-  private assertGoalDepth(data: FinanceData, parentGoalId: number | undefined): void {
-    if (parentGoalId === undefined) return
-    const parent = this.ownedGoal(data, parentGoalId)
-    if (parent.parent_goal_id !== undefined) {
-      throw new Error('A subgoal cannot itself have subgoals.')
-    }
-  }
-
-  async addGoal(input: NewGoal): Promise<FinanceData> {
-    const data = this.load()
-    if (!input.title.trim()) throw new Error('A goal needs a title')
-    this.assertGoalDepth(data, input.parent_goal_id)
-    const goal: Goal = { id: nextId(data.goals), ...input, status: 'planned' }
-    data.goals.push(goal)
-    this.save(data)
-    return this.delay(data)
-  }
-
-  async updateGoal(id: number, patch: GoalPatch): Promise<FinanceData> {
-    const data = this.load()
-    const goal = this.ownedGoal(data, id)
-    if (Object.prototype.hasOwnProperty.call(patch, 'title') && !(patch.title ?? '').trim()) {
-      throw new Error('A goal needs a title')
-    }
-    if (
-      Object.prototype.hasOwnProperty.call(patch, 'status') &&
-      patch.status !== undefined &&
-      !isValidGoalTransition(goal.status, patch.status)
-    ) {
-      throw new Error('Not a valid status transition')
-    }
-    Object.assign(goal, patch)
-    // null is the wire's "clear this"; the stored model uses undefined.
-    for (const key of ['target_date', 'notes'] as const) {
-      if (patch[key] === null) goal[key] = undefined
-    }
-    this.save(data)
-    return this.delay(data)
-  }
-
-  async deleteGoal(id: number): Promise<FinanceData> {
-    const data = this.load()
-    this.ownedGoal(data, id)
-    const subgoalIds = data.goals.filter((g) => g.parent_goal_id === id).map((g) => g.id)
-    const allIds = new Set([...subgoalIds, id])
-    data.tasks = data.tasks.map((t) =>
-      t.goal_id !== undefined && allIds.has(t.goal_id) ? { ...t, goal_id: undefined } : t,
-    )
-    data.goals = data.goals.filter((g) => g.id !== id && g.parent_goal_id !== id)
     this.save(data)
     return this.delay(data)
   }

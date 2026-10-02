@@ -16,11 +16,13 @@ var SHEETS = {
   income: ['id', 'user_id', 'source_id', 'amount', 'date', 'notes'],
   income_sources: ['id', 'user_id', 'name', 'archived'],
   savings_ledger: ['id', 'user_id', 'date', 'amount', 'kind', 'ref_type', 'ref_id', 'notes'],
+  // goal_id is a retired column (Goals was removed) kept only so the tasks
+  // tab's shape still matches: a header change makes rebuildSheets DISCARD
+  // and recreate the tab, wiping every task. Nothing reads or writes it.
   tasks: ['id', 'user_id', 'title', 'notes', 'date', 'recurrence', 'column_id', 'completed_date', 'goal_id', 'note_id', 'created_at', 'recurred'],
   task_columns: ['id', 'user_id', 'name', 'sort_order', 'is_done'],
   notes: ['id', 'user_id', 'title', 'body'],
   note_items: ['id', 'user_id', 'note_id', 'text', 'done', 'sort_order'],
-  goals: ['id', 'user_id', 'title', 'target_date', 'parent_goal_id', 'status', 'notes'],
   invites: ['code', 'used_by', 'used_at']
 };
 
@@ -37,9 +39,9 @@ var SCHEMA_VERSION = 17;
  * and password hash on the next request, re-seed fresh codes, and lock everyone
  * out with no recovery path.
  */
-var REBUILDABLE_SHEETS = ['debts', 'debt_schedule', 'debt_statements', 'bills', 'bill_payables', 'income', 'income_sources', 'savings_ledger', 'tasks', 'task_columns', 'notes', 'note_items', 'goals'];
+var REBUILDABLE_SHEETS = ['debts', 'debt_schedule', 'debt_statements', 'bills', 'bill_payables', 'income', 'income_sources', 'savings_ledger', 'tasks', 'task_columns', 'notes', 'note_items'];
 
-var DATA_SHEETS = ['bills', 'bill_payables', 'debts', 'debt_schedule', 'debt_statements', 'income', 'income_sources', 'savings_ledger', 'tasks', 'task_columns', 'notes', 'note_items', 'goals'];
+var DATA_SHEETS = ['bills', 'bill_payables', 'debts', 'debt_schedule', 'debt_statements', 'income', 'income_sources', 'savings_ledger', 'tasks', 'task_columns', 'notes', 'note_items'];
 
 /**
  * Sheets getAll actually reads. Every sheet read is a separate round trip, so
@@ -49,7 +51,7 @@ var DATA_SHEETS = ['bills', 'bill_payables', 'debts', 'debt_schedule', 'debt_sta
  * the same change. A sheet in DATA_SHEETS but not here is reported as an empty
  * array, so its page renders blank even though the rows exist.
  */
-var ACTIVE_SHEETS = ['debts', 'debt_schedule', 'debt_statements', 'bills', 'bill_payables', 'income', 'income_sources', 'savings_ledger', 'tasks', 'task_columns', 'notes', 'note_items', 'goals'];
+var ACTIVE_SHEETS = ['debts', 'debt_schedule', 'debt_statements', 'bills', 'bill_payables', 'income', 'income_sources', 'savings_ledger', 'tasks', 'task_columns', 'notes', 'note_items'];
 
 /** Actions that return the full dataset instead of the affected row. */
 var RETURNS_DATA = {
@@ -65,8 +67,7 @@ var RETURNS_DATA = {
   addTask: true, updateTask: true, deleteTask: true, moveTask: true,
   updateTaskColumn: true,
   addNote: true, updateNote: true, deleteNote: true,
-  addNoteItem: true, updateNoteItem: true, deleteNoteItem: true,
-  addGoal: true, updateGoal: true, deleteGoal: true
+  addNoteItem: true, updateNoteItem: true, deleteNoteItem: true
 };
 
 function doGet() {
@@ -510,7 +511,7 @@ function coerce(name, r) {
     id: num(r.id), title: String(r.title), notes: optStr(r.notes), date: optDate(r.date),
     recurrence: optStr(r.recurrence),
     column_id: num(r.column_id), completed_date: optDate(r.completed_date),
-    goal_id: optNum(r.goal_id), note_id: optNum(r.note_id), created_at: optDateTime(r.created_at),
+    note_id: optNum(r.note_id), created_at: optDateTime(r.created_at),
     recurred: bool(r.recurred)
   };
   if (name === 'task_columns') return {
@@ -522,10 +523,6 @@ function coerce(name, r) {
   if (name === 'note_items') return {
     id: num(r.id), note_id: num(r.note_id), text: String(r.text), done: bool(r.done),
     sort_order: num(r.sort_order)
-  };
-  if (name === 'goals') return {
-    id: num(r.id), title: String(r.title), target_date: optDate(r.target_date),
-    parent_goal_id: optNum(r.parent_goal_id), status: String(r.status), notes: optStr(r.notes)
   };
   return r;
 }
@@ -779,9 +776,6 @@ function dispatch(action, p, uid) {
     case 'addNoteItem': return addNoteItem(p, uid);
     case 'updateNoteItem': return updateNoteItem(p, uid);
     case 'deleteNoteItem': return deleteNoteItem(p, uid);
-    case 'addGoal': return addGoal(p, uid);
-    case 'updateGoal': return updateGoal(p, uid);
-    case 'deleteGoal': return deleteGoal(p, uid);
     default: throw new Error('Unknown action: ' + action);
   }
 }
@@ -1683,7 +1677,6 @@ function addTask(p, uid) {
   if (blank(input.title)) throw new Error('A task needs a title');
   if (blank(input.column_id)) throw new Error('A task needs a column');
   assertOwned('task_columns', input.column_id, uid);
-  if (!blank(input.goal_id)) assertOwned('goals', input.goal_id, uid);
   if (!blank(input.note_id)) assertOwned('notes', input.note_id, uid);
   appendRow('tasks', {
     id: nextId('tasks'),
@@ -1694,7 +1687,6 @@ function addTask(p, uid) {
     recurrence: input.recurrence,
     column_id: input.column_id,
     completed_date: '',
-    goal_id: input.goal_id,
     note_id: input.note_id,
     created_at: isoNow()
   });
@@ -1711,10 +1703,6 @@ function updateTask(p, uid) {
   }
   if (Object.prototype.hasOwnProperty.call(given, 'notes')) patch.notes = given.notes;
   if (Object.prototype.hasOwnProperty.call(given, 'recurrence')) patch.recurrence = given.recurrence;
-  if (Object.prototype.hasOwnProperty.call(given, 'goal_id')) {
-    if (!blank(given.goal_id)) assertOwned('goals', given.goal_id, uid);
-    patch.goal_id = given.goal_id;
-  }
   if (Object.prototype.hasOwnProperty.call(given, 'note_id')) {
     if (!blank(given.note_id)) assertOwned('notes', given.note_id, uid);
     patch.note_id = given.note_id;
@@ -1774,7 +1762,6 @@ function moveTask(p, uid) {
         recurrence: current.recurrence,
         column_id: firstCol.id,
         completed_date: '',
-        goal_id: current.goal_id,
         note_id: current.note_id,
         created_at: isoNow()
       });
@@ -1879,121 +1866,5 @@ function updateNoteItem(p, uid) {
 function deleteNoteItem(p, uid) {
   var rowIndex = ownedRowIndex('note_items', p.id, uid);
   sheet('note_items').deleteRow(rowIndex);
-  return null;
-}
-
-/*
- * Depth is fixed at 2: a row that is ITSELF a subgoal (has its own
- * parent_goal_id set) may never be chosen as someone else's parent. One read
- * is enough — there is no deeper chain to walk, as long as this check never
- * has an exception. assertOwned runs first so a nonexistent or unowned
- * parent throws a clear ownership error before its parent_goal_id is read.
- */
-function assertGoalDepth(parentGoalId, uid) {
-  if (blank(parentGoalId)) return;
-  assertOwned('goals', parentGoalId, uid);
-  var parent = getById('goals', parentGoalId);
-  if (!blank(parent.parent_goal_id)) {
-    throw new Error('A subgoal cannot itself have subgoals.');
-  }
-}
-
-var GOAL_STATUSES = { planned: true, active: true, achieved: true, not_achieved: true, abandoned: true };
-
-/**
- * Mirrors the action set GoalDetail's own JSX renders (Start, Mark
- * achieved/not achieved, Abandon) — enforced here too so a raw API call
- * can't set an illegal transition the UI never offers.
- */
-function isValidGoalTransition(from, to) {
-  if (from === to) return true;
-  if (to === 'abandoned') return from !== 'abandoned';
-  if (from === 'planned' && to === 'active') return true;
-  if (from === 'active' && (to === 'achieved' || to === 'not_achieved')) return true;
-  return false;
-}
-
-function addGoal(p, uid) {
-  var input = p.input || {};
-  if (blank(input.title)) throw new Error('A goal needs a title');
-  assertGoalDepth(input.parent_goal_id, uid);
-  appendRow('goals', {
-    id: nextId('goals'),
-    user_id: uid,
-    title: input.title,
-    target_date: input.target_date,
-    parent_goal_id: input.parent_goal_id,
-    status: 'planned',
-    notes: input.notes
-  });
-  return null;
-}
-
-/*
- * parent_goal_id is never in this whitelist — set once at creation, never
- * patched. Re-parenting would need to re-validate depth-2 for the new parent
- * AND confirm this goal has no subgoals of its own (which would become a
- * 3-level chain once moved) — real validation for a feature this ticket
- * does not build.
- */
-function updateGoal(p, uid) {
-  var rowIndex = ownedRowIndex('goals', p.id, uid);
-  var given = p.patch || {};
-  var patch = {};
-  if (Object.prototype.hasOwnProperty.call(given, 'title')) {
-    if (blank(given.title)) throw new Error('A goal needs a title');
-    patch.title = given.title;
-  }
-  if (Object.prototype.hasOwnProperty.call(given, 'target_date')) patch.target_date = given.target_date;
-  if (Object.prototype.hasOwnProperty.call(given, 'notes')) patch.notes = given.notes;
-  if (Object.prototype.hasOwnProperty.call(given, 'status')) {
-    if (!GOAL_STATUSES[given.status]) throw new Error('Not a valid status');
-    var current = getById('goals', p.id);
-    if (!isValidGoalTransition(String(current.status), given.status)) {
-      throw new Error('Not a valid status transition');
-    }
-    patch.status = given.status;
-  }
-  return patchRowAt('goals', rowIndex, patch);
-}
-
-/**
- * Blanks goal_id on every task row pointing at any of these goal ids, in ONE
- * read — the same batched shape clearIncomeFundingFor already established
- * in this file (FT-8) for the identical problem: don't read the child sheet
- * once per parent id.
- */
-function detachTasksFromGoals(uid, goalIds) {
-  if (!goalIds.length) return;
-  var sh = sheet('tasks');
-  var last = sh.getLastRow();
-  if (last < 2) return;
-  var headers = SHEETS.tasks;
-  var values = sh.getRange(2, 1, last - 1, headers.length).getValues();
-  var userCol = headers.indexOf('user_id');
-  var goalCol = headers.indexOf('goal_id');
-  var wanted = {};
-  for (var i = 0; i < goalIds.length; i++) wanted[String(num(goalIds[i]))] = true;
-  for (var r = 0; r < values.length; r++) {
-    if (num(values[r][userCol]) !== num(uid)) continue;
-    if (blank(values[r][goalCol])) continue;
-    if (!wanted[String(num(values[r][goalCol]))]) continue;
-    sh.getRange(r + 2, goalCol + 1).setValue('');
-  }
-}
-
-function deleteGoal(p, uid) {
-  var rowIndex = ownedRowIndex('goals', p.id, uid);
-  var subgoalIds = ownedIdsWhere('goals', uid, 'parent_goal_id', p.id);
-  var allIds = subgoalIds.concat([num(p.id)]);
-  // Detach before the cascade deletes the rows themselves, so a failure here
-  // cannot leave a task pointing at a goal id that no longer exists.
-  detachTasksFromGoals(uid, allIds);
-  // Delete the parent row first, while rowIndex is still fresh, then let
-  // deleteRowsWhere re-read the sheet's current state for the subgoal
-  // cascade — avoids a second ownedRowIndex scan just to re-find a row
-  // whose position deleteRowsWhere's own cascade might have shifted.
-  sheet('goals').deleteRow(rowIndex);
-  deleteRowsWhere('goals', 'parent_goal_id', p.id);
   return null;
 }

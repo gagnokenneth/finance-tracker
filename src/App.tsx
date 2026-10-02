@@ -11,8 +11,6 @@ import { Dashboard } from './pages/Dashboard.tsx'
 import { Tasks } from './pages/Tasks.tsx'
 import { Notes } from './pages/Notes.tsx'
 import { NoteDetail } from './pages/NoteDetail.tsx'
-import { Goals } from './pages/Goals.tsx'
-import { GoalDetail } from './pages/GoalDetail.tsx'
 import { Debts } from './pages/Debts.tsx'
 import { DebtDetail } from './pages/DebtDetail.tsx'
 import { Bills } from './pages/Bills.tsx'
@@ -25,7 +23,7 @@ import { SignIn } from './pages/SignIn.tsx'
 function AuthedApp() {
   const { user } = useAuth()
   if (!user) return <SignIn />
-  // Dashboard, Tasks, Notes, Goals, Debts, Bills, Income, Savings and
+  // Dashboard, Tasks, Notes, Debts, Bills, Income, Savings and
   // Settings are exposed. The other module pages still exist in
   // src/pages/ but are deliberately unregistered; unknown paths land on
   // the Dashboard. Calendar has no route of its own — it's embedded
@@ -41,8 +39,6 @@ function AuthedApp() {
         <Route element={<LegacyColumn />}>
           <Route path="notes" element={<Notes />} />
           <Route path="notes/:id" element={<NoteDetail />} />
-          <Route path="goals" element={<Goals />} />
-          <Route path="goals/:id" element={<GoalDetail />} />
           <Route path="debts" element={<Debts />} />
           <Route path="debts/:id" element={<DebtDetail />} />
           <Route path="bills" element={<Bills />} />

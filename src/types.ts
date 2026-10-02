@@ -116,8 +116,8 @@ export interface TaskColumn {
   id: number
   name: string
   sort_order: number
-  /** Exactly one column per user has this true, always — see isValidGoalTransition's
-   *  sibling check in lib/taskColumns.ts / Code.gs for the enforcement. */
+  /** Exactly one column per user has this true, always — enforced in
+   *  lib/taskColumns.ts and Code.gs. */
   is_done: boolean
 }
 
@@ -159,8 +159,6 @@ export interface Task {
    * Meaningless for a non-recurring task.
    */
   recurred?: boolean
-  /** At most one goal per task. */
-  goal_id?: number
   note_id?: number
   /**
    * Full ISO 8601 datetime (unlike every other date field in this app,
@@ -175,7 +173,7 @@ export interface Task {
  * A note: a title plus an optional WYSIWYG body, and optionally a checklist
  * (its items live in NoteItem — present only once "Add checklist" has been
  * used on this note). Deliberately dateless — the moment something needs a
- * due date it is a Task, not a Note (see the design spec's Notes/Goals/Task
+ * due date it is a Task, not a Note (see the design spec's Notes/Task
  * boundary).
  */
 export interface Note {
@@ -193,28 +191,6 @@ export interface NoteItem {
   done: boolean
   /** Insertion order today — no reorder UI in this ticket, see the plan. */
   sort_order: number
-}
-
-export type GoalStatus = 'planned' | 'active' | 'achieved' | 'not_achieved' | 'abandoned'
-
-/**
- * An outcome tracked over time, with at most one level of subgoals. Progress
- * is a manual check-in (status): planned -> active (Start) -> achieved /
- * not_achieved (the outcome), or abandoned at any point.
- */
-export interface Goal {
-  id: number
-  title: string
-  /** Unset is a valid, open-ended "someday" goal. */
-  target_date?: string
-  /**
-   * Fixed depth of 2: a row with this set may never itself be pointed at by
-   * another row's parent_goal_id. Set only at creation — never patchable,
-   * see GoalPatch.
-   */
-  parent_goal_id?: number
-  status: GoalStatus
-  notes?: string
 }
 
 export interface Settings {
@@ -236,6 +212,5 @@ export interface FinanceData {
   task_columns: TaskColumn[]
   notes: Note[]
   note_items: NoteItem[]
-  goals: Goal[]
   settings: Settings
 }

@@ -21,7 +21,6 @@ export function createSeed(): FinanceData {
     task_columns: [],
     notes: [],
     note_items: [],
-    goals: [],
     settings: {
       currency: 'PHP',
     },

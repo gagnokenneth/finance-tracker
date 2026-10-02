@@ -12,8 +12,8 @@ const WEEKDAY_LABEL = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 /** An event chip's monochrome look per status, chip and square marker kept
  *  together: 'late' is the one that inverts the whole chip to black, which
- *  is why its marker is the white one. An event with no status (an
- *  open-ended goal) reads as upcoming. */
+ *  is why its marker is the white one. An event with no status (income,
+ *  savings) reads as upcoming. */
 const CHIP_STYLE: Record<RowStatus, { chip: string; marker: string; label?: string }> = {
   late: { chip: 'border-neutral-900 bg-neutral-900 text-white', marker: 'bg-white', label: 'font-semibold' },
   'due-soon': { chip: 'border-neutral-300 bg-neutral-100 text-neutral-800', marker: 'bg-black' },

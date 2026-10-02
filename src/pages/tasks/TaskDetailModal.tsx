@@ -2,7 +2,6 @@ import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useFinanceMutations } from '../../hooks/useFinanceMutations.ts'
 import { useTaskForm } from '../../hooks/useTaskForm.ts'
-import { referenceable } from '../../lib/tempId.ts'
 import { buildMoveInput } from '../../lib/tasks.ts'
 import { sortedColumns, doneColumn } from '../../lib/taskColumns.ts'
 import { RichTextEditor } from '../../components/RichTextEditor.tsx'
@@ -17,7 +16,7 @@ import {
   smallButtonClass,
 } from '../../components/brutal.tsx'
 import { brutalEditorLook } from '../../components/brutalEditorLook.ts'
-import { TaskScheduleFields } from './TaskScheduleFields.tsx'
+import { TaskRepeatsField } from './TaskRepeatsField.tsx'
 import type { FinanceData, Task } from '../../types.ts'
 
 /** `created_at` is a full ISO 8601 datetime (see Task's own doc comment) —
@@ -50,7 +49,6 @@ export function TaskDetailModal({
   const { updateTask, moveTask, deleteTask } = useFinanceMutations()
   const form = useTaskForm(task)
   const [deleting, setDeleting] = useState(false)
-  const goals = referenceable(data.goals.filter((g) => g.status === 'planned' || g.status === 'active' || g.id === task.goal_id))
   const columns = sortedColumns(data.task_columns)
   const done = doneColumn(data.task_columns)
 
@@ -63,7 +61,6 @@ export function TaskDetailModal({
         title: form.values.title,
         notes: form.values.notes ?? null,
         recurrence: form.values.recurrence ?? null,
-        goal_id: form.values.goal_id ?? null,
       },
     })
     onClose()
@@ -101,7 +98,7 @@ export function TaskDetailModal({
           <BrutalField label="Description">
             <RichTextEditor look={brutalEditorLook} value={form.notes} onChange={form.setNotes} />
           </BrutalField>
-          <TaskScheduleFields form={form} goals={goals} idPrefix="edit-task" />
+          <TaskRepeatsField form={form} idPrefix="edit-task" />
         </div>
 
         <div className="flex items-center justify-between gap-3 border-t border-black px-6 py-4">

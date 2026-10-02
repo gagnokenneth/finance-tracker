@@ -42,9 +42,6 @@ import {
   addNoteItemTo,
   applyNoteItemPatch,
   removeNoteItem,
-  addGoalTo,
-  applyGoalPatch,
-  removeGoal,
 } from '../lib/optimistic.ts'
 import type { Currency, FinanceData } from '../types.ts'
 import type {
@@ -71,8 +68,6 @@ import type {
   NotePatch,
   NewNoteItem,
   NoteItemPatch,
-  NewGoal,
-  GoalPatch,
 } from '../api/FinanceApi.ts'
 
 export function useFinanceMutations() {
@@ -284,18 +279,6 @@ export function useFinanceMutations() {
     ...optimistic(removeNoteItem, 'That item could not be deleted. It has been restored.'),
   })
 
-  const addGoal = useMutation({
-    mutationFn: (i: NewGoal) => getApi().addGoal(i),
-    ...optimistic(addGoalTo, 'That goal did not save. It has been removed.'),
-  })
-  const updateGoal = useMutation({
-    mutationFn: (v: { id: number; patch: GoalPatch }) => getApi().updateGoal(v.id, v.patch),
-    ...optimistic(applyGoalPatch, 'That goal did not save. It is back as it was.'),
-  })
-  const deleteGoal = useMutation({
-    mutationFn: (id: number) => getApi().deleteGoal(id),
-    ...optimistic(removeGoal, 'That goal could not be deleted. It has been restored.'),
-  })
 
   const setCurrency = useMutation({
     mutationFn: (c: Currency) => getApi().setCurrency(c),
@@ -391,8 +374,5 @@ export function useFinanceMutations() {
     addNoteItem,
     updateNoteItem,
     deleteNoteItem,
-    addGoal,
-    updateGoal,
-    deleteGoal,
   }
 }

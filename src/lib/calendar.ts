@@ -2,9 +2,9 @@ import { dueStatus } from './debts.ts'
 import type { RowStatus } from './debts.ts'
 import { sourceName } from './income.ts'
 import { doneColumn } from './taskColumns.ts'
-import type { FinanceData, Goal, Task } from '../types.ts'
+import type { FinanceData, Task } from '../types.ts'
 
-export type CalendarSource = 'bill' | 'debt' | 'income' | 'savings' | 'task' | 'goal'
+export type CalendarSource = 'bill' | 'debt' | 'income' | 'savings' | 'task'
 
 /**
  * One dated row from any module, flattened to what the calendar needs to
@@ -128,28 +128,7 @@ function taskEvents(data: FinanceData, start: string, end: string): CalendarEven
 }
 
 /**
- * Goal and subgoal target dates, read-only markers exactly like every other
- * non-Task source — editing a goal's date happens on the Goals page, never
- * inline on the calendar. A goal with no target_date is not an event at all.
- */
-function goalEvents(data: FinanceData, start: string, end: string): CalendarEvent[] {
-  return data.goals
-    .filter((g): g is Goal & { target_date: string } => g.target_date !== undefined)
-    .filter((g) => g.status !== 'abandoned')
-    .filter((g) => inRange(g.target_date, start, end))
-    .map((g) => ({
-      id: g.id,
-      source: 'goal' as const,
-      label: g.title,
-      date: g.target_date,
-      to: `/goals/${g.id}`,
-      editable: false,
-      status: g.status === 'achieved' ? ('paid' as const) : g.status === 'not_achieved' ? ('late' as const) : undefined,
-    }))
-}
-
-/**
- * Every dated row from Bills, Debts, Income, Savings, Tasks and Goals whose
+ * Every dated row from Bills, Debts, Income, Savings and Tasks whose
  * date falls within [start, end] (inclusive, both ISO yyyy-mm-dd). This is
  * the calendar's full source list — all four modules the design spec named.
  */
@@ -160,6 +139,5 @@ export function eventsInRange(data: FinanceData, start: string, end: string): Ca
     ...incomeEvents(data, start, end),
     ...savingsEvents(data, start, end),
     ...taskEvents(data, start, end),
-    ...goalEvents(data, start, end),
   ]
 }

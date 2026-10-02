@@ -13,7 +13,6 @@ import type {
   Task,
   Note,
   NoteItem,
-  Goal,
 } from '../types.ts'
 import type {
   BillPatch,
@@ -39,8 +38,6 @@ import type {
   NotePatch,
   NewNoteItem,
   NoteItemPatch,
-  NewGoal,
-  GoalPatch,
 } from '../api/FinanceApi.ts'
 import { tempId } from './tempId.ts'
 import { signedAmount } from './savings.ts'
@@ -530,7 +527,7 @@ export function addTaskTo(data: FinanceData, vars: NewTask): FinanceData {
 
 /** See TaskPatch — the wire's null becomes the model's undefined. */
 function clearedTaskFields(patch: TaskPatch): Partial<Task> {
-  return clearNulls(patch, ['notes', 'recurrence', 'goal_id', 'note_id']) as Partial<Task>
+  return clearNulls(patch, ['notes', 'recurrence', 'note_id']) as Partial<Task>
 }
 
 export function applyTaskPatch(
@@ -588,7 +585,6 @@ export function moveTaskIn(
     date: vars.input.next_date,
     recurrence: task.recurrence,
     column_id: firstColumn(data.task_columns).id,
-    goal_id: task.goal_id,
     note_id: task.note_id,
   }
   return { ...data, tasks: [...moved, next] }
@@ -659,40 +655,4 @@ export function applyNoteItemPatch(
 
 export function removeNoteItem(data: FinanceData, id: number): FinanceData {
   return { ...data, note_items: data.note_items.filter((i) => i.id !== id) }
-}
-
-/** See GoalPatch — the wire's null becomes the model's undefined. */
-function clearedGoalFields(patch: GoalPatch): Partial<Goal> {
-  return clearNulls(patch, ['target_date', 'notes']) as Partial<Goal>
-}
-
-export function addGoalTo(data: FinanceData, vars: NewGoal): FinanceData {
-  const goal: Goal = { id: tempId(), ...vars, status: 'planned' }
-  return { ...data, goals: [...data.goals, goal] }
-}
-
-export function applyGoalPatch(
-  data: FinanceData,
-  vars: { id: number; patch: GoalPatch },
-): FinanceData {
-  return {
-    ...data,
-    goals: data.goals.map((g) => (g.id === vars.id ? { ...g, ...clearedGoalFields(vars.patch) } : g)),
-  }
-}
-
-/**
- * Cascades subgoals and detaches tasks — mirrors deleteGoal's own two side
- * effects in both backends, computed here rather than left for the real
- * response so the list doesn't show a stale subgoal or a task still
- * pointing at a goal id that is about to stop existing.
- */
-export function removeGoal(data: FinanceData, id: number): FinanceData {
-  const subgoalIds = data.goals.filter((g) => g.parent_goal_id === id).map((g) => g.id)
-  const allIds = new Set([...subgoalIds, id])
-  return {
-    ...data,
-    tasks: data.tasks.map((t) => (t.goal_id !== undefined && allIds.has(t.goal_id) ? { ...t, goal_id: undefined } : t)),
-    goals: data.goals.filter((g) => g.id !== id && g.parent_goal_id !== id),
-  }
 }
