@@ -1,7 +1,15 @@
 import type { FormEvent } from 'react'
 import { useFinanceMutations } from '../../hooks/useFinanceMutations.ts'
 import { useTaskForm } from '../../hooks/useTaskForm.ts'
-import { BrutalModal, BrutalField, BrutalInput, BrutalButton, BrutalSecondaryButton } from '../../components/brutal.tsx'
+import {
+  BrutalModal,
+  BrutalField,
+  BrutalInput,
+  BrutalButton,
+  BrutalSecondaryButton,
+  BrutalModalBody,
+  BrutalModalFooter,
+} from '../../components/brutal.tsx'
 import { TaskRepeatsField } from './TaskRepeatsField.tsx'
 import { firstColumn } from '../../lib/taskColumns.ts'
 import type { FinanceData } from '../../types.ts'
@@ -52,26 +60,28 @@ export function AddTaskModal({
 
   return (
     <BrutalModal open={open} title="Add task" onClose={onClose}>
-      <form onSubmit={submit} className="space-y-5 p-6">
-        <BrutalField label="Title" htmlFor="add-task-title" required>
-          <BrutalInput
-            id="add-task-title"
-            required
-            autoFocus
-            value={form.title}
-            onChange={(e) => form.setTitle(e.target.value)}
-          />
-        </BrutalField>
-        <TaskRepeatsField form={form} idPrefix="add-task" />
+      <form onSubmit={submit}>
+        <BrutalModalBody>
+          <BrutalField label="Title" htmlFor="add-task-title" required>
+            <BrutalInput
+              id="add-task-title"
+              required
+              autoFocus
+              value={form.title}
+              onChange={(e) => form.setTitle(e.target.value)}
+            />
+          </BrutalField>
+          <TaskRepeatsField form={form} idPrefix="add-task" />
+        </BrutalModalBody>
 
-        <div className="flex items-center gap-3 border-t-2 border-black pt-4">
+        <BrutalModalFooter>
           <BrutalSecondaryButton type="button" onClick={onClose}>
             Cancel
           </BrutalSecondaryButton>
-          <BrutalButton type="submit" disabled={form.values === null}>
+          <BrutalButton type="submit">
             Add task
           </BrutalButton>
-        </div>
+        </BrutalModalFooter>
       </form>
     </BrutalModal>
   )

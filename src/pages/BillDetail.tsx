@@ -17,7 +17,7 @@ import { EmptyState } from '../components/EmptyState.tsx'
 import { LoadError } from '../components/LoadError.tsx'
 import { LoadingScreen } from '../components/LoadingScreen.tsx'
 import { PayModal } from '../components/PayModal.tsx'
-import type { PayResult } from '../components/PayModal.tsx'
+import type { PayResult } from '../hooks/usePayForm.ts'
 import {
   SecondaryButton,
   RowButton,

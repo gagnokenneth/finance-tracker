@@ -1,7 +1,17 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import { Modal } from '../../components/Modal.tsx'
-import { Field, TextInput, Button, SecondaryButton } from '../../components/ui.tsx'
+import {
+  BrutalModal,
+  BrutalField,
+  BrutalMoneyInput,
+  BrutalButton,
+  BrutalSecondaryButton,
+  checkboxClass,
+  labelClass,
+  BrutalModalBody,
+  BrutalModalFooter,
+} from '../../components/brutal.tsx'
+import { BrutalDatePicker } from '../../components/BrutalDatePicker.tsx'
 import { isoDate } from '../../lib/currentMonth.ts'
 import type { DebtScheduleRow, DebtStatement } from '../../types.ts'
 import type { NewScheduleRow, NewStatement } from '../../api/FinanceApi.ts'
@@ -86,95 +96,64 @@ export function RowFormModal({
   const noun = kind === 'schedule' ? 'payment' : 'statement'
 
   return (
-    <Modal open={open} title={title ?? `${isEdit ? 'Edit' : 'Add'} ${noun}`} onClose={onClose}>
-      <form onSubmit={submit} className="flex flex-col gap-3">
-        <Field label={kind === 'schedule' ? 'Due date' : 'Payment due date'} required>
-          <TextInput
-            type="date"
-            value={dueDate}
-            onChange={(e) => setDueDate(e.target.value)}
-            required
-          />
-        </Field>
+    <BrutalModal open={open} title={title ?? `${isEdit ? 'Edit' : 'Add'} ${noun}`} onClose={onClose} look="plain">
+      <form onSubmit={submit}>
+        <BrutalModalBody>
+          <BrutalField label={kind === 'schedule' ? 'Due date' : 'Payment due date'} htmlFor="row-due" required>
+            <BrutalDatePicker id="row-due" value={dueDate} onChange={setDueDate} />
+          </BrutalField>
 
-        {kind === 'schedule' ? (
-          <Field label="Amount" required>
-            <TextInput
-              type="number"
-              step="0.01"
-              min="0"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              required
-            />
-          </Field>
-        ) : (
-          <>
-            <Field label="Minimum amount due">
-              <TextInput
-                type="number"
-                step="0.01"
-                min="0"
-                value={minDue}
-                onChange={(e) => setMinDue(e.target.value)}
-              />
-            </Field>
-            <Field label="Total amount due">
-              <TextInput
-                type="number"
-                step="0.01"
-                min="0"
-                value={totalDue}
-                onChange={(e) => setTotalDue(e.target.value)}
-              />
-            </Field>
-            <Field label="Outstanding balance">
-              <TextInput
-                type="number"
-                step="0.01"
-                min="0"
-                value={outstanding}
-                onChange={(e) => setOutstanding(e.target.value)}
-              />
-            </Field>
-          </>
-        )}
+          {kind === 'schedule' ? (
+            <BrutalField label="Amount" htmlFor="row-amount" required>
+              <BrutalMoneyInput id="row-amount" value={amount} onChange={(e) => setAmount(e.target.value)} required />
+            </BrutalField>
+          ) : (
+            <>
+              <BrutalField label="Minimum amount due" htmlFor="row-min">
+                <BrutalMoneyInput id="row-min" value={minDue} onChange={(e) => setMinDue(e.target.value)} />
+              </BrutalField>
+              <BrutalField label="Total amount due" htmlFor="row-total">
+                <BrutalMoneyInput id="row-total" value={totalDue} onChange={(e) => setTotalDue(e.target.value)} />
+              </BrutalField>
+              <BrutalField label="Outstanding balance" htmlFor="row-outstanding">
+                <BrutalMoneyInput
+                  id="row-outstanding"
+                  value={outstanding}
+                  onChange={(e) => setOutstanding(e.target.value)}
+                />
+              </BrutalField>
+            </>
+          )}
 
-        <label className="flex items-center gap-2 text-sm text-ink">
-          <input type="checkbox" checked={paid} onChange={(e) => setPaid(e.target.checked)} />
-          Paid
-        </label>
+          <label className={`flex items-center gap-2.5 ${labelClass}`}>
+            <input type="checkbox" className={checkboxClass} checked={paid} onChange={(e) => setPaid(e.target.checked)} />
+            Paid
+          </label>
 
-        {paid && (
-          <>
-            <Field label="Paid date" required>
-              <TextInput
-                type="date"
-                value={paidDate}
-                onChange={(e) => setPaidDate(e.target.value)}
-                required
-              />
-            </Field>
-            <Field label="Paid amount" required>
-              <TextInput
-                type="number"
-                step="0.01"
-                min="0"
-                value={paidAmount}
-                onChange={(e) => setPaidAmount(e.target.value)}
-                required
-              />
-            </Field>
-          </>
-        )}
+          {paid && (
+            <>
+              <BrutalField label="Paid date" htmlFor="row-paid-date" required>
+                <BrutalDatePicker id="row-paid-date" value={paidDate} onChange={setPaidDate} />
+              </BrutalField>
+              <BrutalField label="Paid amount" htmlFor="row-paid-amount" required>
+                <BrutalMoneyInput
+                  id="row-paid-amount"
+                  value={paidAmount}
+                  onChange={(e) => setPaidAmount(e.target.value)}
+                  required
+                />
+              </BrutalField>
+            </>
+          )}
+        </BrutalModalBody>
 
-        <div className="mt-1 flex justify-end gap-2">
-          <SecondaryButton type="button" onClick={onClose}>
+        <BrutalModalFooter>
+          <BrutalSecondaryButton type="button" onClick={onClose}>
             Cancel
-          </SecondaryButton>
-          <Button type="submit">Save</Button>
-        </div>
+          </BrutalSecondaryButton>
+          <BrutalButton type="submit">Save</BrutalButton>
+        </BrutalModalFooter>
       </form>
-    </Modal>
+    </BrutalModal>
   )
 }

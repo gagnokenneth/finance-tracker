@@ -5,8 +5,18 @@ import { buildSchedule, MAX_GENERATED_MONTHS, ScheduleInputError } from '../../l
 import { formatMoney } from '../../lib/money.ts'
 import { useCurrency } from '../../hooks/useCurrency.ts'
 import { isoDate } from '../../lib/currentMonth.ts'
-import { Modal } from '../../components/Modal.tsx'
-import { Field, TextInput, SelectInput, Button, SecondaryButton } from '../../components/ui.tsx'
+import {
+  BrutalModal,
+  BrutalField,
+  BrutalInput,
+  BrutalMoneyInput,
+  BrutalSelect,
+  BrutalButton,
+  BrutalSecondaryButton,
+  BrutalModalBody,
+  BrutalModalFooter,
+} from '../../components/brutal.tsx'
+import { BrutalDatePicker } from '../../components/BrutalDatePicker.tsx'
 import type { DebtType } from '../../types.ts'
 
 export function AddDebtModal({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -79,106 +89,76 @@ export function AddDebtModal({ open, onClose }: { open: boolean; onClose: () => 
   }
 
   return (
-    <Modal open={open} title="Add debt" onClose={onClose}>
-      <form onSubmit={submit} className="flex flex-col gap-3">
-        <Field label="Name" required>
-          <TextInput value={name} onChange={(e) => setName(e.target.value)} required />
-        </Field>
-        <Field label="Type">
-          <SelectInput value={type} onChange={(e) => setType(e.target.value as DebtType)}>
-            <option value="fixed">Fixed</option>
-            <option value="revolving">Revolving</option>
-          </SelectInput>
-        </Field>
+    <BrutalModal open={open} title="Add debt" onClose={onClose}>
+      <form onSubmit={submit}>
+        <BrutalModalBody>
+          <BrutalField label="Name" htmlFor="debt-name" required>
+            <BrutalInput id="debt-name" autoFocus value={name} onChange={(e) => setName(e.target.value)} required />
+          </BrutalField>
+          <BrutalField label="Type" htmlFor="debt-type">
+            <BrutalSelect id="debt-type" value={type} onChange={(e) => setType(e.target.value as DebtType)}>
+              <option value="fixed">Fixed</option>
+              <option value="revolving">Revolving</option>
+            </BrutalSelect>
+          </BrutalField>
 
-        {type === 'fixed' ? (
-          <>
-            <Field label="First due date" required>
-              <TextInput
-                type="date"
-                value={firstDue}
-                onChange={(e) => setFirstDue(e.target.value)}
-                required
-              />
-            </Field>
-            <Field label="Total balance" required>
-              <TextInput
-                type="number"
-                step="0.01"
-                min="0"
-                value={total}
-                onChange={(e) => setTotal(e.target.value)}
-                required
-              />
-            </Field>
-            <Field label="Number of months" required>
-              <TextInput
-                type="number"
-                step="1"
-                min="1"
-                max={MAX_GENERATED_MONTHS}
-                value={months}
-                onChange={(e) => setMonths(e.target.value)}
-                required
-              />
-            </Field>
-            {preview && <p className="text-xs text-ink-soft">→ {preview}</p>}
-            {previewError && <p className="text-xs text-overdue">{previewError}</p>}
-          </>
-        ) : (
-          <>
-            <Field label="Payment due date" required>
-              <TextInput
-                type="date"
-                value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
-                required
-              />
-            </Field>
-            <Field label="Minimum amount due" required>
-              <TextInput
-                type="number"
-                step="0.01"
-                min="0"
-                value={minDue}
-                onChange={(e) => setMinDue(e.target.value)}
-                required
-              />
-            </Field>
-            <Field label="Total amount due" required>
-              <TextInput
-                type="number"
-                step="0.01"
-                min="0"
-                value={totalDue}
-                onChange={(e) => setTotalDue(e.target.value)}
-                required
-              />
-            </Field>
-            <Field label="Outstanding balance" required>
-              <TextInput
-                type="number"
-                step="0.01"
-                min="0"
-                value={outstanding}
-                onChange={(e) => setOutstanding(e.target.value)}
-                required
-              />
-            </Field>
-          </>
-        )}
+          {type === 'fixed' ? (
+            <>
+              <BrutalField label="First due date" htmlFor="debt-first-due" required>
+                <BrutalDatePicker id="debt-first-due" value={firstDue} onChange={setFirstDue} />
+              </BrutalField>
+              <BrutalField label="Total balance" htmlFor="debt-total" required>
+                <BrutalMoneyInput id="debt-total" required value={total} onChange={(e) => setTotal(e.target.value)} />
+              </BrutalField>
+              <BrutalField label="Number of months" htmlFor="debt-months" required>
+                <BrutalInput
+                  id="debt-months"
+                  type="number"
+                  step="1"
+                  min="1"
+                  max={MAX_GENERATED_MONTHS}
+                  value={months}
+                  onChange={(e) => setMonths(e.target.value)}
+                  required
+                />
+              </BrutalField>
+              {preview && <p className="font-mono text-xs text-neutral-600">→ {preview}</p>}
+              {previewError && <p className="font-mono text-xs font-bold text-black">{previewError}</p>}
+            </>
+          ) : (
+            <>
+              <BrutalField label="Payment due date" htmlFor="debt-due" required>
+                <BrutalDatePicker id="debt-due" value={dueDate} onChange={setDueDate} />
+              </BrutalField>
+              <BrutalField label="Minimum amount due" htmlFor="debt-min" required>
+                <BrutalMoneyInput id="debt-min" required value={minDue} onChange={(e) => setMinDue(e.target.value)} />
+              </BrutalField>
+              <BrutalField label="Total amount due" htmlFor="debt-total-due" required>
+                <BrutalMoneyInput id="debt-total-due" required value={totalDue} onChange={(e) => setTotalDue(e.target.value)} />
+              </BrutalField>
+              <BrutalField label="Outstanding balance" htmlFor="debt-outstanding" required>
+                <BrutalMoneyInput
+                  id="debt-outstanding"
+                  required
+                  value={outstanding}
+                  onChange={(e) => setOutstanding(e.target.value)}
+                />
+              </BrutalField>
+            </>
+          )}
+        </BrutalModalBody>
 
-        <div className="mt-1 flex justify-end gap-2">
-          <SecondaryButton type="button" onClick={onClose}>
+        <BrutalModalFooter>
+          <BrutalSecondaryButton type="button" onClick={onClose}>
             Cancel
-          </SecondaryButton>
+          </BrutalSecondaryButton>
           {/* previewError stays: that is validation, which fires before any
               write and so has nothing to do with waiting. */}
-          <Button type="submit" disabled={previewError !== null}>
+          <BrutalButton type="submit" disabled={previewError !== null}>
             Add debt
-          </Button>
-        </div>
+          </BrutalButton>
+        </BrutalModalFooter>
       </form>
-    </Modal>
+    </BrutalModal>
   )
 }

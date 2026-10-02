@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useIsFetching, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../auth/useAuth.ts'
 import { financeKey } from '../hooks/useFinanceData.ts'
+import { useClickOutside } from '../hooks/useClickOutside.ts'
 import { useEscape } from '../hooks/useEscape.ts'
 import { invertOnHover } from './brutal.tsx'
 
@@ -45,14 +46,7 @@ export function AppShell() {
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    if (!menuOpen) return
-    const onClickOutside = (e: MouseEvent) => {
-      if (!menuRef.current?.contains(e.target as Node)) setMenuOpen(false)
-    }
-    document.addEventListener('mousedown', onClickOutside)
-    return () => document.removeEventListener('mousedown', onClickOutside)
-  }, [menuOpen])
+  useClickOutside(menuOpen, [menuRef], () => setMenuOpen(false))
   useEscape(menuOpen, () => setMenuOpen(false))
 
   const linkClass = ({ isActive }: { isActive: boolean }) =>

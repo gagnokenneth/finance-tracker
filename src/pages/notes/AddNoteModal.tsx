@@ -1,7 +1,15 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useFinanceMutations } from '../../hooks/useFinanceMutations.ts'
-import { BrutalModal, BrutalField, BrutalInput, BrutalButton, BrutalSecondaryButton } from '../../components/brutal.tsx'
+import {
+  BrutalModal,
+  BrutalField,
+  BrutalInput,
+  BrutalButton,
+  BrutalSecondaryButton,
+  BrutalModalBody,
+  BrutalModalFooter,
+} from '../../components/brutal.tsx'
 
 /**
  * Creation is just Title — a note's body is written afterward via the
@@ -22,19 +30,21 @@ export function AddNoteModal({ open, onClose }: { open: boolean; onClose: () => 
 
   return (
     <BrutalModal open={open} title="Add note" onClose={onClose}>
-      <form onSubmit={submit} className="space-y-5 p-6">
-        <BrutalField label="Title" htmlFor="add-note-title" required>
-          <BrutalInput id="add-note-title" required autoFocus value={title} onChange={(e) => setTitle(e.target.value)} />
-        </BrutalField>
+      <form onSubmit={submit}>
+        <BrutalModalBody>
+          <BrutalField label="Title" htmlFor="add-note-title" required>
+            <BrutalInput id="add-note-title" required autoFocus value={title} onChange={(e) => setTitle(e.target.value)} />
+          </BrutalField>
+        </BrutalModalBody>
 
-        <div className="flex items-center gap-3 border-t-2 border-black pt-4">
+        <BrutalModalFooter>
           <BrutalSecondaryButton type="button" onClick={onClose}>
             Cancel
           </BrutalSecondaryButton>
-          <BrutalButton type="submit" disabled={!title.trim()}>
+          <BrutalButton type="submit">
             Add note
           </BrutalButton>
-        </div>
+        </BrutalModalFooter>
       </form>
     </BrutalModal>
   )

@@ -1,7 +1,7 @@
 /**
  * The app's one recurring mark: a row of small ticks, first drawn as the
- * fixed-debt payoff strip (InstallmentStrip) and reused on the sign-in screen
- * as "the state this app exists to get you to." Shared here so the sidebar's
+ * fixed-debt payoff strip (now brutalData's BrutalInstallmentStrip) and
+ * reused on the sign-in screen as "the state this app exists to get you to." Shared here so the sidebar's
  * wordmark and every empty state can carry the same motif instead of each
  * page inventing its own decoration.
  */

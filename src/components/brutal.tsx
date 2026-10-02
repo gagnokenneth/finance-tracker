@@ -1,7 +1,8 @@
-import { createContext, useContext } from 'react'
 import { Link } from 'react-router-dom'
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from 'react'
 import { useEscape } from '../hooks/useEscape.ts'
+import { LOOKS, LookContext, controlClass, useLook } from './brutalLook.tsx'
+import type { LookName } from './brutalLook.tsx'
 
 /*
  * The monochrome "architectural" controls from the UI revamp. Kept apart from
@@ -13,11 +14,17 @@ import { useEscape } from '../hooks/useEscape.ts'
  *  black on hover. Shared by the nav, the calendar and every control here. */
 export const invertOnHover = 'transition-colors hover:bg-black hover:text-white'
 
+/** A small button's shape and type, without its colours. */
+const smallButtonShape = 'border border-black font-mono text-[11px] font-bold uppercase'
+
 /** Bordered mono text-button, unpadded — sized by its caller. */
-export const smallButtonBase = `border border-black bg-white font-mono text-[11px] font-bold uppercase ${invertOnHover}`
+export const smallButtonBase = `${smallButtonShape} bg-white ${invertOnHover}`
 
 /** Small bordered mono action — "Move to…", a checklist item's Remove. */
 export const smallButtonClass = `${smallButtonBase} px-2.5 py-1`
+
+/** The solid black counterpart — a ledger row's Pay. */
+export const smallPrimaryButtonClass = `${smallButtonShape} bg-black px-3 py-1 text-white transition-colors hover:bg-neutral-800 disabled:cursor-not-allowed disabled:border-neutral-300 disabled:bg-neutral-200 disabled:text-neutral-500`
 
 /** A clickable row's surface — a task card, a Backlog row, a note. */
 export const cardClass =
@@ -29,64 +36,11 @@ export const panelClass = 'border border-black bg-white shadow-hard-sm'
 /** A migrated page's main title, and the smaller one a detail page uses. */
 export const pageTitleClass = 'text-5xl font-bold tracking-tight text-black uppercase md:text-6xl'
 export const detailTitleClass = 'text-4xl font-bold tracking-tight text-black uppercase md:text-5xl'
+/** A record's name heading its own bordered summary panel (a debt). */
+export const panelTitleClass = 'text-3xl font-bold tracking-tight text-black'
 
 /** The box an inline rename swaps in for a title — sized by its text classes. */
 export const inlineEditClass = 'rounded-none border border-black bg-white focus:outline-2 focus:-outline-offset-2 focus:outline-black'
-
-/**
- * The two looks the designs use, as one table so a look is changed in one
- * place: 'grid' (Add Task — hairline-gridded frame, grey fields with a hard
- * shadow, boxed ▼) and 'plain' (Edit Task — white and flat, a square marker
- * before the title, bare chevrons, shorter buttons). A modal sets the look
- * and every control inside it inherits it.
- */
-const LOOKS = {
-  grid: {
-    panel:
-      'max-w-xl border-2 bg-[length:16px_16px] bg-[linear-gradient(to_right,rgba(0,0,0,0.03)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.03)_1px,transparent_1px)] shadow-hard-lg',
-    header: 'py-4',
-    marker: false,
-    title: 'text-2xl',
-    close: 'h-8 px-3 text-xs tracking-wider',
-    closeGlyph: 'text-base leading-none',
-    requiredNote: 'Required field',
-    input: 'h-11 bg-neutral-50 px-3 text-sm shadow-hard-xs placeholder:text-neutral-600',
-    select: 'h-10 bg-neutral-50 pr-8 pl-3',
-    caret: (
-      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center border-l border-black bg-neutral-200 px-2 text-black">
-        <span className="font-mono text-[10px] font-bold">▼</span>
-      </div>
-    ),
-    primary: 'h-11 flex-1 px-8 tracking-widest shadow-hard-muted sm:flex-initial',
-    secondary: 'h-11 flex-1 bg-transparent px-6 tracking-wider sm:flex-initial',
-  },
-  plain: {
-    panel: 'max-w-[620px] border shadow-hard-md',
-    header: 'py-5',
-    marker: true,
-    title: 'text-xl',
-    close: 'px-2 py-1 text-[11px]',
-    closeGlyph: '',
-    requiredNote: 'Required',
-    input: 'bg-white px-3.5 py-2.5 text-sm',
-    select: 'bg-white py-2.5 pr-8 pl-3.5',
-    caret: (
-      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-black">
-        <svg aria-hidden className="size-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-          <path d="M19 9l-7 7-7-7" strokeLinecap="square" />
-        </svg>
-      </div>
-    ),
-    primary: 'px-5 py-2 tracking-wider',
-    secondary: 'bg-white px-4 py-2 tracking-wider',
-  },
-}
-
-type LookName = keyof typeof LOOKS
-
-/** Pages get 'plain'; a modal sets its own look for what it contains. */
-const LookContext = createContext<LookName>('plain')
-const useLook = () => LOOKS[useContext(LookContext)]
 
 export function BrutalModal({
   open,
@@ -141,20 +95,44 @@ export function BrutalModal({
   )
 }
 
-/** A bordered square icon action with a hard shadow — a page's Delete. */
+/** A modal's field area, padded for the modal's look. */
+export function BrutalModalBody({ children }: { children: ReactNode }) {
+  return <div className={useLook().body}>{children}</div>
+}
+
+/** A modal's ruled action row. `spread` pushes the first child (a Delete)
+ *  to the far side from the rest. */
+export function BrutalModalFooter({ spread, children }: { spread?: boolean; children: ReactNode }) {
+  const ui = useLook()
+  return (
+    <div className={`flex items-center gap-3 border-black ${ui.footer} ${spread ? 'justify-between' : ui.footerAlign}`}>
+      {children}
+    </div>
+  )
+}
+
+/** A bordered square icon action. */
+const ICON_BUTTON_SIZE = {
+  /** A page's own action — a detail page's Delete. */
+  md: 'size-10 shadow-hard-xs',
+  /** A row's action inside a table — Edit / Delete. */
+  sm: 'size-7',
+}
+
 export function BrutalIconButton({
   label,
+  size = 'md',
   className = '',
   children,
   ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & { label: string }) {
+}: ButtonHTMLAttributes<HTMLButtonElement> & { label: string; size?: keyof typeof ICON_BUTTON_SIZE }) {
   return (
     <button
       type="button"
       title={label}
       aria-label={label}
       {...props}
-      className={`flex size-10 shrink-0 items-center justify-center border border-black bg-white shadow-hard-xs ${invertOnHover} ${className}`}
+      className={`flex shrink-0 items-center justify-center border border-black bg-white ${ICON_BUTTON_SIZE[size]} ${invertOnHover} ${className}`}
     >
       {children}
     </button>
@@ -250,12 +228,14 @@ export function BrutalField({
   )
 }
 
-const controlClass =
-  'w-full rounded-none border border-black font-mono text-black transition-all focus:bg-white focus:outline-2 focus:-outline-offset-2 focus:outline-black'
-
 export function BrutalInput({ className = '', ...props }: InputHTMLAttributes<HTMLInputElement>) {
   const ui = useLook()
   return <input {...props} className={`${controlClass} ${ui.input} ${className}`} />
+}
+
+/** A currency amount: non-negative, to the cent. Any prop can override. */
+export function BrutalMoneyInput(props: InputHTMLAttributes<HTMLInputElement>) {
+  return <BrutalInput type="number" step="0.01" min="0" {...props} />
 }
 
 export function BrutalSelect({ className = '', children, ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
@@ -273,8 +253,10 @@ export function BrutalSelect({ className = '', children, ...props }: SelectHTMLA
   )
 }
 
+/** A disabled button fades and stops reacting to hover, so it can't pass for
+ *  a live one. */
 const buttonBase =
-  'flex items-center justify-center gap-1.5 border border-black font-mono text-xs font-bold uppercase transition-colors disabled:cursor-not-allowed'
+  'flex items-center justify-center gap-1.5 border border-black font-mono text-xs font-bold uppercase transition-colors disabled:pointer-events-none disabled:opacity-50'
 
 export function BrutalButton({ className = '', ...props }: ButtonHTMLAttributes<HTMLButtonElement>) {
   const ui = useLook()
@@ -309,15 +291,17 @@ export function BrutalConfirm({
 }) {
   return (
     <BrutalModal open={open} title={title} onClose={onClose} look="plain">
-      <p className="p-6 font-mono text-sm text-black">{message}</p>
-      <div className="flex justify-end gap-3 border-t border-black px-6 py-4">
+      <BrutalModalBody>
+        <p className="font-mono text-sm text-black">{message}</p>
+      </BrutalModalBody>
+      <BrutalModalFooter>
         <BrutalSecondaryButton type="button" onClick={onClose}>
           Cancel
         </BrutalSecondaryButton>
         <BrutalButton type="button" onClick={onConfirm}>
           {confirmLabel}
         </BrutalButton>
-      </div>
+      </BrutalModalFooter>
     </BrutalModal>
   )
 }

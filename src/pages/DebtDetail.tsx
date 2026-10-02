@@ -15,26 +15,32 @@ import { nextMonthOn } from '../lib/currentMonth.ts'
 import { isTemp } from '../lib/tempId.ts'
 import { balanceAsOf, paymentsByRef, refKey } from '../lib/savings.ts'
 import { Money } from '../components/Money.tsx'
-import { Table } from '../components/Table.tsx'
-import { DueBadge } from '../components/DueBadge.tsx'
-import { StatusBadge } from '../components/StatusBadge.tsx'
 import { PendingBadge } from '../components/PendingBadge.tsx'
-import { InstallmentStrip } from '../components/InstallmentStrip.tsx'
-import { ConfirmDialog } from '../components/ConfirmDialog.tsx'
-import { EmptyState } from '../components/EmptyState.tsx'
+import { DeleteIcon, EditIcon } from '../components/icons.tsx'
 import { LoadError } from '../components/LoadError.tsx'
 import { LoadingScreen } from '../components/LoadingScreen.tsx'
 import {
-  Button,
-  SecondaryButton,
-  RowButton,
-  EditRowButton,
-  DeleteRowButton,
-  DeleteButton,
-} from '../components/ui.tsx'
+  BrutalButton,
+  BrutalConfirm,
+  BrutalEmptyState,
+  BrutalIconButton,
+  BrutalSecondaryButton,
+  labelClass,
+  panelTitleClass,
+  smallButtonClass,
+  smallPrimaryButtonClass,
+} from '../components/brutal.tsx'
+import {
+  BrutalDueBadge,
+  BrutalInstallmentStrip,
+  BrutalStatusBadge,
+  BrutalTable,
+  cellClass,
+} from '../components/brutalData.tsx'
+import type { BrutalColumn } from '../components/brutalData.tsx'
+import { BrutalPayModal } from '../components/BrutalPayModal.tsx'
 import { EditDebtModal } from './debts/EditDebtModal.tsx'
-import { PayModal } from '../components/PayModal.tsx'
-import type { PayResult } from '../components/PayModal.tsx'
+import type { PayResult } from '../hooks/usePayForm.ts'
 import { RowFormModal } from './debts/RowFormModal.tsx'
 import type { StatementFormValues } from './debts/RowFormModal.tsx'
 import type { DebtScheduleRow, DebtStatement } from '../types.ts'
@@ -45,11 +51,19 @@ type RowForm = { mode: 'add' } | { mode: 'edit'; row: AnyRow }
 
 /** An unpriced statement shows a dash, not a zero it does not mean. */
 function figureCell(value: number | undefined) {
-  return value === undefined ? <span className="text-sm text-ink-faint">—</span> : <Money value={value} />
+  return value === undefined ? <span className="font-mono text-neutral-400">—</span> : <Money value={value} tone="inherit" className="font-bold" />
 }
 
-const FIXED_HEADERS = ['Due date', 'Amount', 'Status', '']
-const REVOLVING_HEADERS = ['Due date', 'Min due', 'Total due', 'Outstanding', 'Status', '']
+const ACTIONS: BrutalColumn = { label: 'Actions', align: 'right' }
+const FIXED_COLUMNS: BrutalColumn[] = [{ label: 'Due date' }, { label: 'Amount' }, { label: 'Status' }, ACTIONS]
+const REVOLVING_COLUMNS: BrutalColumn[] = [
+  { label: 'Due date' },
+  { label: 'Min due' },
+  { label: 'Total due' },
+  { label: 'Outstanding' },
+  { label: 'Status' },
+  ACTIONS,
+]
 
 export function DebtDetail() {
   const { id } = useParams()
@@ -79,9 +93,9 @@ export function DebtDetail() {
   const debt = data.debts.find((d) => d.id === debtId)
   if (!debt) {
     return (
-      <p className="text-ink-soft">
+      <p className="font-mono text-sm text-neutral-600">
         That debt no longer exists.{' '}
-        <Link to="/debts" className="font-medium text-brand underline underline-offset-2">
+        <Link to="/debts" className="font-bold text-black underline underline-offset-2">
           Back to debts
         </Link>
       </p>
@@ -168,22 +182,22 @@ export function DebtDetail() {
   const statusCell = (row: AnyRow) =>
     row.paid ? (
       <span className="inline-flex flex-wrap items-center gap-2">
-        <StatusBadge status="paid" />
-        <span className="tnum font-mono text-xs text-ink-faint">
+        <BrutalStatusBadge status="paid" />
+        <span className="tnum font-mono text-xs text-neutral-500">
           {row.paid_date}
           {row.paid_amount !== undefined && (
             <>
               {' · '}
-              <Money value={row.paid_amount} className="text-xs !text-ink-faint" />
+              <Money value={row.paid_amount} tone="inherit" className="text-xs" />
             </>
           )}
         </span>
         {fundedByRef.has(refKey('amount' in row ? 'debt_schedule' : 'debt_statement', row.id)) && (
-          <span className="text-xs text-ink-faint">from savings</span>
+          <span className="font-mono text-xs text-neutral-500">from savings</span>
         )}
       </span>
     ) : (
-      <StatusBadge status={dueStatus(row.due_date)} />
+      <BrutalStatusBadge status={dueStatus(row.due_date)} />
     )
 
   const rowActions = (row: AnyRow) => {
@@ -191,24 +205,28 @@ export function DebtDetail() {
     // against an id the backend has never seen.
     if (isTemp(row.id)) return <PendingBadge />
     return (
-      <div className="flex flex-wrap justify-end gap-1.5">
+      <div className="flex flex-wrap items-center justify-end gap-2">
         {!row.paid && !isRowPriced(row) && (
-          <RowButton tone="primary" type="button" onClick={() => setRowForm({ mode: 'edit', row })}>
+          <button type="button" className={smallButtonClass} onClick={() => setRowForm({ mode: 'edit', row })}>
             Set amount
-          </RowButton>
+          </button>
         )}
         {!row.paid && (
-          <RowButton
-            tone={isRowPriced(row) ? 'primary' : 'neutral'}
+          <button
             type="button"
+            className={smallPrimaryButtonClass}
             disabled={!isRowPriced(row)}
             onClick={() => setPayRow(row)}
           >
             Pay
-          </RowButton>
+          </button>
         )}
-        <EditRowButton type="button" onClick={() => setRowForm({ mode: 'edit', row })} />
-        <DeleteRowButton type="button" onClick={() => setDeletingRow(row)} />
+        <BrutalIconButton size="sm" label="Edit" onClick={() => setRowForm({ mode: 'edit', row })}>
+          <EditIcon />
+        </BrutalIconButton>
+        <BrutalIconButton size="sm" label="Delete" onClick={() => setDeletingRow(row)}>
+          <DeleteIcon />
+        </BrutalIconButton>
       </div>
     )
   }
@@ -216,104 +234,95 @@ export function DebtDetail() {
   const rowNoun = isFixed ? 'scheduled payments' : 'statements'
 
   return (
-    <div className="space-y-6">
-      <Link
-        to="/debts"
-        className="inline-block text-sm text-ink-soft underline-offset-2 hover:text-ink hover:underline"
-      >
+    <div className="space-y-8">
+      <Link to="/debts" className="inline-block font-mono text-sm text-black underline-offset-4 hover:underline">
         ← Debts
       </Link>
 
       {/* Hero: the payoff strip leads, because "how close am I to done" is the
           question this page exists to answer. */}
-      <section className="rounded-2xl border border-edge bg-white p-6">
+      <section className="border border-black bg-white p-8">
         <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-ink">{debt.name}</h1>
-            <p className="mt-1 text-xs font-semibold tracking-wide text-ink-faint uppercase">
+          <div className="space-y-2">
+            <h1 className={panelTitleClass}>{debt.name}</h1>
+            <p className="font-mono text-xs font-bold tracking-wider text-neutral-500 uppercase">
               {isFixed ? 'Fixed term' : 'Revolving'}
             </p>
           </div>
-          <div className="flex gap-2">
-            <SecondaryButton type="button" onClick={() => setEditingDebt(true)}>
+          <div className="flex items-center gap-3">
+            <BrutalSecondaryButton type="button" className="h-10" onClick={() => setEditingDebt(true)}>
               Rename
-            </SecondaryButton>
-            <DeleteButton
-              type="button"
-              onClick={() => setDeletingDebt(true)}
-              className="!text-overdue hover:!bg-overdue-wash"
-            />
+            </BrutalSecondaryButton>
+            <BrutalIconButton label="Delete debt" onClick={() => setDeletingDebt(true)}>
+              <DeleteIcon className="size-4" />
+            </BrutalIconButton>
           </div>
         </div>
 
-        <div className="mt-6">
+        <div className="mt-8">
           {isFixed ? (
-            <InstallmentStrip kind="fixed" paid={paidCount} total={rows.length} />
+            <BrutalInstallmentStrip kind="fixed" paid={paidCount} total={rows.length} />
           ) : (
-            <InstallmentStrip kind="revolving" paid={paidCount} />
+            <BrutalInstallmentStrip kind="revolving" paid={paidCount} />
           )}
         </div>
 
-        <dl className="mt-6 flex flex-wrap gap-x-10 gap-y-4 border-t border-edge pt-5">
-          <div>
-            <dt className="text-xs font-semibold tracking-wide text-ink-faint uppercase">
-              Balance left
-            </dt>
-            <dd className="mt-1">
-              <Money value={balance} className="text-xl font-semibold" />
+        <dl className="mt-8 grid gap-6 border-t border-dashed border-neutral-400 pt-6 sm:grid-cols-2">
+          <div className="space-y-2">
+            <dt className={`${labelClass} text-neutral-500`}>Balance left</dt>
+            <dd>
+              <Money value={balance} tone="inherit" className="text-4xl font-bold" />
             </dd>
           </div>
-          <div>
-            <dt className="text-xs font-semibold tracking-wide text-ink-faint uppercase">
-              Next payment
-            </dt>
-            <dd className="mt-1.5">
-              <DueBadge dueDate={next} />
+          <div className="space-y-2">
+            <dt className={`${labelClass} text-neutral-500`}>Next payment</dt>
+            <dd>
+              <BrutalDueBadge dueDate={next} className="text-xl font-bold" />
             </dd>
           </div>
         </dl>
       </section>
 
       {rows.length === 0 ? (
-        <EmptyState title={`No ${rowNoun} yet`}>
+        <BrutalEmptyState title={`No ${rowNoun} yet`}>
           {isFixed
             ? 'Add the payments you owe on this loan.'
             : 'Start the statement you are waiting on, then set its amounts when it arrives.'}
-        </EmptyState>
+        </BrutalEmptyState>
       ) : (
-        <Table headers={isFixed ? FIXED_HEADERS : REVOLVING_HEADERS}>
+        <BrutalTable columns={isFixed ? FIXED_COLUMNS : REVOLVING_COLUMNS}>
           {rows.map((row) => (
-            <tr key={row.id} className={row.paid ? 'bg-settled-wash/40' : undefined}>
-              <td className="tnum px-4 py-3 font-mono text-sm">{row.due_date}</td>
+            <tr key={row.id} className={row.paid ? 'bg-neutral-50' : undefined}>
+              <td className={`tnum ${cellClass} font-mono`}>{row.due_date}</td>
               {'amount' in row ? (
-                <td className="px-4 py-3">
-                  <Money value={row.amount} />
+                <td className={cellClass}>
+                  <Money value={row.amount} tone="inherit" className="font-bold" />
                 </td>
               ) : (
                 <>
-                  <td className="px-4 py-3">{figureCell(row.min_due)}</td>
-                  <td className="px-4 py-3">{figureCell(row.total_due)}</td>
-                  <td className="px-4 py-3">{figureCell(row.outstanding)}</td>
+                  <td className={cellClass}>{figureCell(row.min_due)}</td>
+                  <td className={cellClass}>{figureCell(row.total_due)}</td>
+                  <td className={cellClass}>{figureCell(row.outstanding)}</td>
                 </>
               )}
-              <td className="px-4 py-3">{statusCell(row)}</td>
-              <td className="px-4 py-3">{rowActions(row)}</td>
+              <td className={cellClass}>{statusCell(row)}</td>
+              <td className={cellClass}>{rowActions(row)}</td>
             </tr>
           ))}
-        </Table>
+        </BrutalTable>
       )}
 
       {isFixed && (
-        <Button type="button" onClick={() => setRowForm({ mode: 'add' })}>
-          Add payment
-        </Button>
+        <BrutalButton type="button" onClick={() => setRowForm({ mode: 'add' })}>
+          + Add payment
+        </BrutalButton>
       )}
 
       {/* A payment in flight can optimistically clear the last unpaid row
           before its own success handler starts the next statement — showing
           the button in that window would let a click mint a duplicate month. */}
       {!isFixed && !rows.some((row) => !row.paid) && !updateStatement.isPending && (
-        <Button
+        <BrutalButton
           type="button"
           onClick={() => startStatement(nextStatementDate(statements))}
           /* The prediction hides this button by filling the unpaid row, but
@@ -321,8 +330,8 @@ export function DebtDetail() {
              still mounted and a second click would mint a duplicate month. */
           disabled={addStatement.isPending}
         >
-          Start next statement
-        </Button>
+          + Start next statement
+        </BrutalButton>
       )}
 
       {editingDebt && (
@@ -337,7 +346,7 @@ export function DebtDetail() {
         />
       )}
 
-      <ConfirmDialog
+      <BrutalConfirm
         open={deletingDebt}
         title="Delete debt"
         message={`Delete ${debt.name} and its ${rows.length} ${rowNoun}?`}
@@ -353,7 +362,7 @@ export function DebtDetail() {
       />
 
       {payRow && isRowPriced(payRow) && (
-        <PayModal
+        <BrutalPayModal
           open
           defaultAmount={'amount' in payRow ? payRow.amount : (payRow.min_due ?? 0)}
           savingsBalance={balanceAsOf(data.savings_ledger)}
@@ -373,7 +382,7 @@ export function DebtDetail() {
         />
       )}
 
-      <ConfirmDialog
+      <BrutalConfirm
         open={deletingRow !== null}
         title={isFixed ? 'Delete payment' : 'Delete statement'}
         message={`Delete the ${deletingRow?.due_date ?? ''} ${isFixed ? 'payment' : 'statement'}?`}

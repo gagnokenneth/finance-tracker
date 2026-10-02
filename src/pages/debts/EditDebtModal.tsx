@@ -1,7 +1,14 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import { Modal } from '../../components/Modal.tsx'
-import { Field, TextInput, Button, SecondaryButton } from '../../components/ui.tsx'
+import {
+  BrutalModal,
+  BrutalField,
+  BrutalInput,
+  BrutalButton,
+  BrutalSecondaryButton,
+  BrutalModalBody,
+  BrutalModalFooter,
+} from '../../components/brutal.tsx'
 
 /**
  * Renames a debt. Type is fixed at creation — changing it would invalidate
@@ -26,20 +33,20 @@ export function EditDebtModal({
   }
 
   return (
-    <Modal open={open} title="Rename debt" onClose={onClose}>
-      <form onSubmit={submit} className="flex flex-col gap-3">
-        <Field label="Name" required>
-          <TextInput value={name} onChange={(e) => setName(e.target.value)} required />
-        </Field>
-        <div className="mt-1 flex justify-end gap-2">
-          <SecondaryButton type="button" onClick={onClose}>
+    <BrutalModal open={open} title="Rename debt" onClose={onClose} look="plain">
+      <form onSubmit={submit}>
+        <BrutalModalBody>
+          <BrutalField label="Name" htmlFor="rename-debt" required>
+            <BrutalInput id="rename-debt" autoFocus value={name} onChange={(e) => setName(e.target.value)} required />
+          </BrutalField>
+        </BrutalModalBody>
+        <BrutalModalFooter>
+          <BrutalSecondaryButton type="button" onClick={onClose}>
             Cancel
-          </SecondaryButton>
-          <Button type="submit">
-            Rename
-          </Button>
-        </div>
+          </BrutalSecondaryButton>
+          <BrutalButton type="submit">Rename</BrutalButton>
+        </BrutalModalFooter>
       </form>
-    </Modal>
+    </BrutalModal>
   )
 }

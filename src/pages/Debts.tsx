@@ -3,12 +3,9 @@ import { useFinanceData } from '../hooks/useFinanceData.ts'
 import { nextDueDate, scheduleFor, statementsFor, totalBalance } from '../lib/debts.ts'
 import { isTemp } from '../lib/tempId.ts'
 import { Money } from '../components/Money.tsx'
-import { CardRow } from '../components/CardRow.tsx'
-import { DueBadge } from '../components/DueBadge.tsx'
 import { PendingBadge } from '../components/PendingBadge.tsx'
-import { InstallmentStrip } from '../components/InstallmentStrip.tsx'
-import { Button } from '../components/ui.tsx'
-import { EmptyState } from '../components/EmptyState.tsx'
+import { BrutalButton, BrutalCardRow, BrutalEmptyState, pageTitleClass } from '../components/brutal.tsx'
+import { BrutalDueBadge, BrutalInstallmentStrip } from '../components/brutalData.tsx'
 import { LoadError } from '../components/LoadError.tsx'
 import { LoadingScreen } from '../components/LoadingScreen.tsx'
 import { AddDebtModal } from './debts/AddDebtModal.tsx'
@@ -16,41 +13,38 @@ import type { Debt, FinanceData } from '../types.ts'
 
 function DebtRow({ debt, data }: { debt: Debt; data: FinanceData }) {
   const rows =
-    debt.type === 'fixed'
-      ? scheduleFor(data.debt_schedule, debt.id)
-      : statementsFor(data.debt_statements, debt.id)
+    debt.type === 'fixed' ? scheduleFor(data.debt_schedule, debt.id) : statementsFor(data.debt_statements, debt.id)
   const paid = rows.filter((r) => r.paid).length
   const pending = isTemp(debt.id)
 
   return (
-    <CardRow to={`/debts/${debt.id}`} pending={pending}>
+    <BrutalCardRow to={`/debts/${debt.id}`} pending={pending} className="block space-y-5 p-6">
       <div className="flex items-start justify-between gap-4">
-        <span className="font-semibold tracking-tight text-ink">{debt.name}</span>
+        <span className="text-lg font-bold tracking-tight text-black">{debt.name}</span>
         <Money
           value={totalBalance(debt, data.debt_schedule, data.debt_statements)}
-          className="text-base font-semibold"
+          tone="inherit"
+          className="text-lg font-bold text-black"
         />
       </div>
 
-      <div className="mt-4">
-        {debt.type === 'fixed' ? (
-          <InstallmentStrip kind="fixed" paid={paid} total={rows.length} />
-        ) : (
-          <InstallmentStrip kind="revolving" paid={paid} />
-        )}
-      </div>
+      {debt.type === 'fixed' ? (
+        <BrutalInstallmentStrip kind="fixed" paid={paid} total={rows.length} />
+      ) : (
+        <BrutalInstallmentStrip kind="revolving" paid={paid} />
+      )}
 
-      <div className="mt-4 flex items-center gap-2 text-xs text-ink-faint">
+      <div className="flex items-center gap-3 font-mono text-xs text-neutral-500">
         {pending ? (
           <PendingBadge />
         ) : (
           <>
             <span>Next</span>
-            <DueBadge dueDate={nextDueDate(debt, data.debt_schedule, data.debt_statements)} />
+            <BrutalDueBadge dueDate={nextDueDate(debt, data.debt_schedule, data.debt_statements)} />
           </>
         )}
       </div>
-    </CardRow>
+    </BrutalCardRow>
   )
 }
 
@@ -61,33 +55,29 @@ export function Debts() {
   if (isPending) return <LoadingScreen />
   if (isError || !data) return <LoadError error={error} />
 
-  const owed = data.debts.reduce(
-    (sum, d) => sum + totalBalance(d, data.debt_schedule, data.debt_statements),
-    0,
-  )
+  const owed = data.debts.reduce((sum, d) => sum + totalBalance(d, data.debt_schedule, data.debt_statements), 0)
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-ink">Debts</h1>
+    <div className="space-y-10">
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-black pb-8">
+        <div className="space-y-3">
+          <h1 className={pageTitleClass}>Debts</h1>
           {data.debts.length > 0 && (
-            <p className="mt-1 text-sm text-ink-soft">
-              <Money value={owed} className="font-semibold" /> left across{' '}
-              <span className="tnum font-mono">{data.debts.length}</span>{' '}
-              {data.debts.length === 1 ? 'debt' : 'debts'}
+            <p className="text-xl text-neutral-500">
+              <Money value={owed} tone="inherit" className="font-bold" /> left across{' '}
+              <span className="tnum font-mono">{data.debts.length}</span> {data.debts.length === 1 ? 'debt' : 'debts'}
             </p>
           )}
         </div>
-        <Button type="button" onClick={() => setAdding(true)}>
-          Add debt
-        </Button>
+        <BrutalButton type="button" onClick={() => setAdding(true)}>
+          + Add debt
+        </BrutalButton>
       </div>
 
       {data.debts.length === 0 ? (
-        <EmptyState title="Nothing tracked yet">
+        <BrutalEmptyState title="Nothing tracked yet">
           Add a loan or a credit card to start counting down payments.
-        </EmptyState>
+        </BrutalEmptyState>
       ) : (
         <div className="space-y-3">
           {data.debts.map((d) => (

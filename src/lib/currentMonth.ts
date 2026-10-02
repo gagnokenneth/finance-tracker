@@ -111,3 +111,29 @@ export function weekWindow(weekStart: string): { start: string; end: string } {
 export function addWeeks(weekStart: string, n: number): string {
   return shiftDays(weekStart, n * 7)
 }
+
+/**
+ * Every ISO date the grid needs to render, in order — the visible month
+ * plus enough of the neighboring months to fill whole weeks. Uses shiftDays,
+ * not dateOn's own arithmetic directly: dateOn clamps a day number above the
+ * month's length (by design, for bill-recurrence callers), which silently
+ * produced duplicate trailing dates here instead of rolling into next month.
+ */
+export function monthGrid(year: number, monthNum: number): string[] {
+  const firstWeekday = new Date(year, monthNum - 1, 1).getDay()
+  const total = daysInMonth(year, monthNum)
+  const cellCount = Math.ceil((firstWeekday + total) / 7) * 7
+  const firstOfMonth = dateOn(year, monthNum, 1)
+  return Array.from({ length: cellCount }, (_, i) => shiftDays(firstOfMonth, i - firstWeekday))
+}
+
+/** Sunday-first, matching monthGrid's columns. */
+export const WEEKDAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+const MONTH_LABEL = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' })
+
+/** A yyyy-mm month as it is shown, e.g. "October 2026". */
+export function monthLabel(month: string): string {
+  const [year, monthNum] = month.split('-').map(Number)
+  return MONTH_LABEL.format(new Date(year, monthNum - 1, 1))
+}

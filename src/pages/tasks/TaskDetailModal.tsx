@@ -14,6 +14,8 @@ import {
   BrutalButton,
   BrutalSecondaryButton,
   smallButtonClass,
+  BrutalModalBody,
+  BrutalModalFooter,
 } from '../../components/brutal.tsx'
 import { brutalEditorLook } from '../../components/brutalEditorLook.ts'
 import { TaskRepeatsField } from './TaskRepeatsField.tsx'
@@ -91,7 +93,7 @@ export function TaskDetailModal({
       </div>
 
       <form onSubmit={submit}>
-        <div className="flex flex-col gap-5 p-6">
+        <BrutalModalBody>
           <BrutalField label="Title" htmlFor="edit-task-title" required>
             <BrutalInput id="edit-task-title" required value={form.title} onChange={(e) => form.setTitle(e.target.value)} />
           </BrutalField>
@@ -99,9 +101,9 @@ export function TaskDetailModal({
             <RichTextEditor look={brutalEditorLook} value={form.notes} onChange={form.setNotes} />
           </BrutalField>
           <TaskRepeatsField form={form} idPrefix="edit-task" />
-        </div>
+        </BrutalModalBody>
 
-        <div className="flex items-center justify-between gap-3 border-t border-black px-6 py-4">
+        <BrutalModalFooter spread>
           <BrutalSecondaryButton type="button" onClick={() => setDeleting(true)}>
             <DeleteIcon />
             Delete
@@ -114,7 +116,7 @@ export function TaskDetailModal({
               Save
             </BrutalButton>
           </div>
-        </div>
+        </BrutalModalFooter>
       </form>
 
       <BrutalConfirm
