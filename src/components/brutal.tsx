@@ -168,6 +168,39 @@ export function BrutalCardRow({
 export const checkboxClass =
   'size-4 shrink-0 cursor-pointer appearance-none rounded-none border border-black bg-white checked:bg-black disabled:cursor-not-allowed disabled:opacity-50'
 
+/** One segment of a stepper; the middle (label) segment shares its frame but
+ *  drops the hover and keeps only its top and bottom rules. */
+const stepFrame = 'flex h-10 items-center border-black bg-white font-mono text-xs font-bold'
+const stepButtonClass = `${stepFrame} gap-1.5 border px-4 tracking-wider uppercase ${invertOnHover}`
+
+/** ← PREV | label | NEXT → — the joined control that pages a period (the
+ *  Tasks week, the Income month). `unit` names it for screen readers. */
+export function BrutalStepper({
+  label,
+  unit,
+  onPrev,
+  onNext,
+}: {
+  label: ReactNode
+  unit: string
+  onPrev: () => void
+  onNext: () => void
+}) {
+  return (
+    <div className="flex items-center">
+      <button type="button" aria-label={`Previous ${unit}`} className={stepButtonClass} onClick={onPrev}>
+        ← Prev
+      </button>
+      <div className={`tnum ${stepFrame} justify-center border-y px-3 tracking-widest text-black uppercase sm:px-6`}>
+        {label}
+      </div>
+      <button type="button" aria-label={`Next ${unit}`} className={stepButtonClass} onClick={onNext}>
+        Next →
+      </button>
+    </div>
+  )
+}
+
 /** A list page's header: big title, an optional summary line under it, its
  *  primary action, and the black rule beneath. */
 export function BrutalPageHeader({ title, summary, action }: { title: string; summary?: ReactNode; action: ReactNode }) {

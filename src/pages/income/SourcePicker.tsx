@@ -1,4 +1,4 @@
-import { Field, SelectInput } from '../../components/ui.tsx'
+import { BrutalField, BrutalSelect } from '../../components/brutal.tsx'
 import { activeSources } from '../../lib/income.ts'
 import type { IncomeSource } from '../../types.ts'
 
@@ -8,11 +8,13 @@ import type { IncomeSource } from '../../types.ts'
  * id the backend has never seen.
  */
 export function SourcePicker({
+  id,
   sources,
   value,
   onChange,
   includeId,
 }: {
+  id: string
   sources: IncomeSource[]
   value: number | null
   onChange: (id: number | null) => void
@@ -32,8 +34,9 @@ export function SourcePicker({
   const shown = current ? [...options, current] : options
 
   return (
-    <Field label="Source" required>
-      <SelectInput
+    <BrutalField label="Source" htmlFor={id} required>
+      <BrutalSelect
+        id={id}
         required
         value={value ?? ''}
         onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}
@@ -44,12 +47,10 @@ export function SourcePicker({
             {s.archived ? `${s.name} (archived)` : s.name}
           </option>
         ))}
-      </SelectInput>
+      </BrutalSelect>
       {shown.length === 0 && (
-        <p className="mt-1 text-xs text-ink-faint">
-          No sources yet — add one from Manage sources first.
-        </p>
+        <p className="mt-2 font-mono text-xs text-neutral-500">No sources yet — add one from Manage sources first.</p>
       )}
-    </Field>
+    </BrutalField>
   )
 }

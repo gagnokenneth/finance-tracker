@@ -1,9 +1,21 @@
-import { useState } from 'react'
-import type { FormEvent } from 'react'
-import { Modal } from '../../components/Modal.tsx'
-import { Field, TextInput, Button, RowButton, DeleteRowButton } from '../../components/ui.tsx'
+import { useRef, useState } from 'react'
+import type { FormEvent, MouseEvent } from 'react'
+import {
+  BrutalModal,
+  BrutalModalBody,
+  BrutalField,
+  BrutalInput,
+  BrutalButton,
+  BrutalIconButton,
+  inlineEditClass,
+  smallButtonClass,
+  smallPrimaryButtonClass,
+} from '../../components/brutal.tsx'
+import { BrutalTag } from '../../components/brutalData.tsx'
+import { DeleteIcon } from '../../components/icons.tsx'
 import { PendingBadge } from '../../components/PendingBadge.tsx'
 import { useFinanceMutations } from '../../hooks/useFinanceMutations.ts'
+import { useInlineRename } from '../../hooks/useInlineRename.ts'
 import { sourceUsage } from '../../lib/income.ts'
 import { isTemp } from '../../lib/tempId.ts'
 import type { IncomeEntry, IncomeSource } from '../../types.ts'
@@ -19,10 +31,8 @@ export function ManageSourcesModal({
   entries: IncomeEntry[]
   onClose: () => void
 }) {
-  const { addIncomeSource, updateIncomeSource, deleteIncomeSource } = useFinanceMutations()
+  const { addIncomeSource } = useFinanceMutations()
   const [name, setName] = useState('')
-  const [renamingId, setRenamingId] = useState<number | null>(null)
-  const [renameValue, setRenameValue] = useState('')
   const usage = sourceUsage(entries)
 
   const submit = (e: FormEvent) => {
@@ -33,81 +43,104 @@ export function ManageSourcesModal({
     setName('')
   }
 
-  const startRename = (source: IncomeSource) => {
-    setRenamingId(source.id)
-    setRenameValue(source.name)
-  }
+  return (
+    <BrutalModal open={open} title="Manage sources" onClose={onClose} look="plain">
+      <BrutalModalBody>
+        <form onSubmit={submit}>
+          <BrutalField label="New source" htmlFor="new-source" required>
+            {/* One row, stretched, so the button takes the field's own height. */}
+            <div className="flex items-stretch gap-3">
+              <BrutalInput
+                id="new-source"
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="min-w-0 flex-1"
+              />
+              <BrutalButton type="submit">Add</BrutalButton>
+            </div>
+          </BrutalField>
+        </form>
 
-  const submitRename = (e: FormEvent) => {
-    e.preventDefault()
-    const trimmed = renameValue.trim()
-    if (!trimmed || renamingId === null) return
-    updateIncomeSource.mutate({ id: renamingId, patch: { name: trimmed } })
-    setRenamingId(null)
-  }
+        {sources.length > 0 && (
+          <ul className="divide-y divide-neutral-200 border-y border-black">
+            {sources.map((s) => (
+              <SourceRow key={s.id} source={s} used={usage.get(s.id) ?? 0} />
+            ))}
+          </ul>
+        )}
+      </BrutalModalBody>
+    </BrutalModal>
+  )
+}
+
+/** One source: its name (or the rename box), and Rename / Archive / Delete. */
+function SourceRow({ source, used }: { source: IncomeSource; used: number }) {
+  const { updateIncomeSource, deleteIncomeSource } = useFinanceMutations()
+  const rename = useInlineRename(source.name, (name) => updateIncomeSource.mutate({ id: source.id, patch: { name } }))
+  const inputRef = useRef<HTMLInputElement>(null)
+  const pending = isTemp(source.id)
+
+  // The buttons keep focus in the input (onMouseDown), so Save can save the
+  // hook's one way — by blurring it — and Cancel can cancel without a blur
+  // saving first.
+  const keepFocus = (e: MouseEvent) => e.preventDefault()
 
   return (
-    <Modal open={open} title="Manage sources" onClose={onClose}>
-      <form onSubmit={submit} className="flex items-end gap-2">
-        <div className="flex-1">
-          <Field label="New source" required>
-            <TextInput required value={name} onChange={(e) => setName(e.target.value)} />
-          </Field>
+    <li className="flex items-center justify-between gap-3 py-3">
+      {rename.renaming ? (
+        <div className="flex flex-1 items-center gap-2">
+          <input
+            ref={inputRef}
+            autoFocus
+            aria-label={`Rename ${source.name}`}
+            value={rename.draft}
+            onChange={(e) => rename.setDraft(e.target.value)}
+            onBlur={rename.save}
+            onKeyDown={rename.onKeyDown}
+            className={`${inlineEditClass} h-7 min-w-0 flex-1 px-2 font-mono text-sm`}
+          />
+          <button
+            type="button"
+            className={smallPrimaryButtonClass}
+            onMouseDown={keepFocus}
+            onClick={() => inputRef.current?.blur()}
+          >
+            Save
+          </button>
+          <button type="button" className={smallButtonClass} onMouseDown={keepFocus} onClick={rename.cancel}>
+            Cancel
+          </button>
         </div>
-        <Button type="submit">Add</Button>
-      </form>
-
-      <ul className="mt-4 divide-y divide-edge">
-        {sources.map((s) => {
-          const used = usage.get(s.id) ?? 0
-          const pending = isTemp(s.id)
-          return (
-            <li key={s.id} className="flex items-center justify-between gap-3 py-2">
-              {renamingId === s.id ? (
-                <form onSubmit={submitRename} className="flex flex-1 items-center gap-2">
-                  <TextInput
-                    autoFocus
-                    value={renameValue}
-                    onChange={(e) => setRenameValue(e.target.value)}
-                  />
-                  <RowButton type="submit" tone="primary">
-                    Save
-                  </RowButton>
-                  <RowButton type="button" onClick={() => setRenamingId(null)}>
-                    Cancel
-                  </RowButton>
-                </form>
-              ) : (
-                <>
-                  <span className="text-sm text-ink">
-                    {s.name}
-                    {s.archived && <span className="ml-2 text-xs text-ink-faint">Archived</span>}
-                    {pending && <PendingBadge />}
-                  </span>
-                  <span className="flex items-center gap-2">
-                    <RowButton onClick={() => startRename(s)} disabled={pending}>
-                      Rename
-                    </RowButton>
-                    <RowButton
-                      onClick={() =>
-                        updateIncomeSource.mutate({ id: s.id, patch: { archived: !s.archived } })
-                      }
-                      disabled={pending}
-                    >
-                      {s.archived ? 'Restore' : 'Archive'}
-                    </RowButton>
-                    {/* Offered only when unused. Both backends refuse otherwise, so
-                        this hides an action that would only ever fail. */}
-                    {used === 0 && (
-                      <DeleteRowButton onClick={() => deleteIncomeSource.mutate(s.id)} disabled={pending} />
-                    )}
-                  </span>
-                </>
-              )}
-            </li>
-          )
-        })}
-      </ul>
-    </Modal>
+      ) : (
+        <>
+          <span className="flex min-w-0 items-center gap-2 font-mono text-sm text-black">
+            <span className="truncate">{source.name}</span>
+            {source.archived && <BrutalTag muted>Archived</BrutalTag>}
+            {pending && <PendingBadge />}
+          </span>
+          <span className="flex shrink-0 items-center gap-2">
+            <button type="button" className={smallButtonClass} onClick={rename.start} disabled={pending}>
+              Rename
+            </button>
+            <button
+              type="button"
+              className={smallButtonClass}
+              onClick={() => updateIncomeSource.mutate({ id: source.id, patch: { archived: !source.archived } })}
+              disabled={pending}
+            >
+              {source.archived ? 'Restore' : 'Archive'}
+            </button>
+            {/* Offered only when unused. Both backends refuse otherwise, so
+                this hides an action that would only ever fail. */}
+            {used === 0 && (
+              <BrutalIconButton size="sm" label="Delete" onClick={() => deleteIncomeSource.mutate(source.id)} disabled={pending}>
+                <DeleteIcon />
+              </BrutalIconButton>
+            )}
+          </span>
+        </>
+      )}
+    </li>
   )
 }

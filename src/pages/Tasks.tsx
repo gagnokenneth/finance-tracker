@@ -6,7 +6,7 @@ import { useFinanceMutations } from '../hooks/useFinanceMutations.ts'
 import { backlogTasks, tasksInWeek, groupByColumn, buildMoveInput } from '../lib/tasks.ts'
 import { sortedColumns, doneColumn } from '../lib/taskColumns.ts'
 import { isoDate, startOfWeek, addWeeks, weekWindow } from '../lib/currentMonth.ts'
-import { BrutalAddButton, invertOnHover, labelClass, pageTitleClass } from '../components/brutal.tsx'
+import { BrutalAddButton, BrutalStepper, labelClass, pageTitleClass } from '../components/brutal.tsx'
 import { LoadError } from '../components/LoadError.tsx'
 import { LoadingScreen } from '../components/LoadingScreen.tsx'
 import { AddTaskModal } from './tasks/AddTaskModal.tsx'
@@ -27,11 +27,6 @@ type AddTarget = 'backlog' | number
 // on this object's identity, and a fresh literal every render would defeat
 // that memoization on every single render of the page.
 const POINTER_ACTIVATION = { activationConstraint: { distance: 8 } }
-
-/** One segment of the week stepper; the middle (date range) segment shares
- *  its frame but drops the hover and keeps only top/bottom rules. */
-const stepFrame = 'flex h-10 items-center border-black bg-white font-mono text-xs font-bold'
-const stepButtonClass = `${stepFrame} gap-1.5 border px-4 tracking-wider uppercase ${invertOnHover}`
 
 export function Tasks() {
   const { data, isPending, isError, error } = useFinanceData()
@@ -74,27 +69,12 @@ export function Tasks() {
       <h1 className={pageTitleClass}>Tasks</h1>
 
       <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-        <div className="flex items-center">
-          <button
-            type="button"
-            aria-label="Previous week"
-            className={stepButtonClass}
-            onClick={() => setWeekStart((w) => addWeeks(w, -1))}
-          >
-            ← Prev
-          </button>
-          <div className={`tnum ${stepFrame} justify-center border-y px-3 tracking-widest text-black sm:px-6`}>
-            {start} – {end}
-          </div>
-          <button
-            type="button"
-            aria-label="Next week"
-            className={stepButtonClass}
-            onClick={() => setWeekStart((w) => addWeeks(w, 1))}
-          >
-            Next →
-          </button>
-        </div>
+        <BrutalStepper
+          label={`${start} – ${end}`}
+          unit="week"
+          onPrev={() => setWeekStart((w) => addWeeks(w, -1))}
+          onNext={() => setWeekStart((w) => addWeeks(w, 1))}
+        />
 
         {/* gap-px over a black ground draws the 1px rules between lanes. Lanes
             are user-defined, so their count isn't fixed: equal-width auto

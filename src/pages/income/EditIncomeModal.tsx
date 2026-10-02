@@ -1,20 +1,13 @@
-import { useState } from 'react'
-import type { FormEvent } from 'react'
-import { Modal } from '../../components/Modal.tsx'
-import { Field, TextInput, Button, SecondaryButton } from '../../components/ui.tsx'
 import { useFinanceMutations } from '../../hooks/useFinanceMutations.ts'
-import { activeSources } from '../../lib/income.ts'
-import { SourcePicker } from './SourcePicker.tsx'
+import { IncomeFormModal } from './IncomeFormModal.tsx'
 import type { IncomeEntry, IncomeSource } from '../../types.ts'
 
 export function EditIncomeModal({
-  open,
   entry,
   sources,
   onClose,
   onMonthChange,
 }: {
-  open: boolean
   entry: IncomeEntry
   sources: IncomeSource[]
   onClose: () => void
@@ -22,73 +15,24 @@ export function EditIncomeModal({
   onMonthChange: (month: string) => void
 }) {
   const { updateIncome } = useFinanceMutations()
-  const [sourceId, setSourceId] = useState<number | null>(entry.source_id)
-  const [amount, setAmount] = useState(String(entry.amount))
-  const [date, setDate] = useState(entry.date)
-  const [notes, setNotes] = useState(entry.notes ?? '')
-
-  const submit = (e: FormEvent) => {
-    e.preventDefault()
-    // The entry's existing source counts as valid even once archived, matching
-    // what the picker offers — otherwise archiving would strand this entry.
-    const valid =
-      sourceId === entry.source_id || activeSources(sources).some((s) => s.id === sourceId)
-    if (!valid || !amount) return
-    updateIncome.mutate({
-      id: entry.id,
-      patch: {
-        source_id: sourceId as number,
-        amount: Number(amount),
-        date,
-        notes: notes.trim() || null,
-      },
-    })
-    // An entry moved to another month would otherwise disappear with no
-    // explanation, which reads as data loss. Compared as yyyy-mm string
-    // prefixes, not via `new Date(iso)` — that parses as UTC midnight, which
-    // is the previous day's month anywhere west of UTC.
-    const moved = date.slice(0, 7) !== entry.date.slice(0, 7)
-    if (moved) onMonthChange(date.slice(0, 7))
-    onClose()
-  }
-
   return (
-    <Modal open={open} title="Edit income" onClose={onClose}>
-      <form onSubmit={submit} className="space-y-4">
-        <SourcePicker
-          sources={sources}
-          value={sourceId}
-          onChange={setSourceId}
-          includeId={entry.source_id}
-        />
-        <Field label="Amount" required>
-          <TextInput
-            required
-            type="number"
-            step="0.01"
-            min="0"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-          />
-        </Field>
-        <Field label="Date" required>
-          <TextInput
-            required
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-          />
-        </Field>
-        <Field label="Notes">
-          <TextInput value={notes} onChange={(e) => setNotes(e.target.value)} />
-        </Field>
-        <div className="flex justify-end gap-2">
-          <SecondaryButton type="button" onClick={onClose}>
-            Cancel
-          </SecondaryButton>
-          <Button type="submit">Save</Button>
-        </div>
-      </form>
-    </Modal>
+    <IncomeFormModal
+      title="Edit income"
+      submitLabel="Save"
+      look="plain"
+      sources={sources}
+      initial={entry}
+      onSubmit={({ notes, ...values }) => {
+        // null is the wire's "clear this" for a patch.
+        updateIncome.mutate({ id: entry.id, patch: { ...values, notes: notes || null } })
+        // An entry moved to another month would otherwise disappear with no
+        // explanation, which reads as data loss. Compared as yyyy-mm string
+        // prefixes, not via `new Date(iso)` — that parses as UTC midnight, which
+        // is the previous day's month anywhere west of UTC.
+        if (values.date.slice(0, 7) !== entry.date.slice(0, 7)) onMonthChange(values.date.slice(0, 7))
+        onClose()
+      }}
+      onClose={onClose}
+    />
   )
 }

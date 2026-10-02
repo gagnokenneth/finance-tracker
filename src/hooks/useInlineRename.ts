@@ -4,9 +4,10 @@ import type { KeyboardEvent } from 'react'
 /**
  * Shared click-to-rename state machine: click the label to start editing,
  * blur or Enter saves (skipped if the draft is empty or unchanged), Escape
- * cancels without saving. Used by NoteDetail (note title) and
- * TaskColumnLane (column name) — both render their own input/label markup,
- * this hook only owns the state and the save/cancel rules.
+ * cancels without saving — and only the rename: it is marked handled, so a
+ * modal around the input (useEscape) stays open. Used by NoteDetail (note
+ * title), TaskColumnLane (column name) and ManageSourcesModal (a source) —
+ * each renders its own markup; this hook owns the state and the rules.
  */
 export function useInlineRename(currentValue: string, onSave: (trimmed: string) => void) {
   const [renaming, setRenaming] = useState(false)
@@ -23,14 +24,19 @@ export function useInlineRename(currentValue: string, onSave: (trimmed: string) 
     if (trimmed && trimmed !== currentValue) onSave(trimmed)
   }
 
+  const cancel = () => setRenaming(false)
+
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     // Blur (not a direct save() call) so onBlur remains the single place a
     // save happens — calling both would unmount the input mid-render and
     // let the resulting native blur fire a second, stale save with the same
     // value.
     if (e.key === 'Enter') e.currentTarget.blur()
-    if (e.key === 'Escape') setRenaming(false)
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      cancel()
+    }
   }
 
-  return { renaming, draft, setDraft, start, save, onKeyDown }
+  return { renaming, draft, setDraft, start, save, cancel, onKeyDown }
 }

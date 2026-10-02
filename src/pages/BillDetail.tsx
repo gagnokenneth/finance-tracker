@@ -22,7 +22,7 @@ import {
   BrutalDetailHero,
   BrutalDueBadge,
   BrutalFigure,
-  BrutalRowActions,
+  BrutalLedgerRowActions,
   BrutalRowStatus,
   BrutalStat,
   BrutalTable,
@@ -151,7 +151,7 @@ export function BillDetail() {
               <td className={cellClass}>
                 {/* A closed bill is history: readable, and frozen. */}
                 {!bill.closed && (
-                  <BrutalRowActions
+                  <BrutalLedgerRowActions
                     pending={isTemp(row.id)}
                     paid={row.paid}
                     priced={row.amount !== undefined}

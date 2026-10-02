@@ -41,9 +41,9 @@ function AuthedApp() {
           <Route path="debts/:id" element={<DebtDetail />} />
           <Route path="bills" element={<Bills />} />
           <Route path="bills/:id" element={<BillDetail />} />
+          <Route path="income" element={<Income />} />
         </Route>
         <Route element={<LegacyColumn />}>
-          <Route path="income" element={<Income />} />
           <Route path="savings" element={<Savings />} />
           <Route path="settings" element={<Settings />} />
         </Route>

@@ -177,13 +177,48 @@ export function BrutalRowStatus({
 }
 
 /**
- * A ledger row's actions. A pending row has no backend id yet, so every
- * action would be sent against an id the backend has never seen — it gets the
- * pending badge instead. An unpriced unpaid row leads with Set amount, its
- * actual next step, and keeps Pay visible but inert so the sequence stays
- * legible.
+ * A table row's actions: any leading ones a page adds (`children`), then
+ * Edit and Delete. A pending row has no backend id yet, so every action would
+ * be sent against an id the backend has never seen — it gets the pending
+ * badge instead.
  */
 export function BrutalRowActions({
+  pending,
+  onEdit,
+  onDelete,
+  children,
+}: {
+  pending: boolean
+  onEdit: () => void
+  onDelete: () => void
+  children?: ReactNode
+}) {
+  if (pending) {
+    return (
+      <div className="flex justify-end">
+        <PendingBadge />
+      </div>
+    )
+  }
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-2">
+      {children}
+      <BrutalIconButton size="sm" label="Edit" onClick={onEdit}>
+        <EditIcon />
+      </BrutalIconButton>
+      <BrutalIconButton size="sm" label="Delete" onClick={onDelete}>
+        <DeleteIcon />
+      </BrutalIconButton>
+    </div>
+  )
+}
+
+/**
+ * A ledger row's (debt row, bill payable) actions: Set amount / Pay ahead of
+ * Edit / Delete. An unpriced unpaid row leads with Set amount, its actual next
+ * step, and keeps Pay visible but inert so the sequence stays legible.
+ */
+export function BrutalLedgerRowActions({
   pending,
   paid,
   priced,
@@ -200,9 +235,8 @@ export function BrutalRowActions({
   onEdit: () => void
   onDelete: () => void
 }) {
-  if (pending) return <PendingBadge />
   return (
-    <div className="flex flex-wrap items-center justify-end gap-2">
+    <BrutalRowActions pending={pending} onEdit={onEdit} onDelete={onDelete}>
       {!paid && !priced && (
         <button type="button" className={smallButtonClass} onClick={onSetAmount}>
           Set amount
@@ -213,13 +247,7 @@ export function BrutalRowActions({
           Pay
         </button>
       )}
-      <BrutalIconButton size="sm" label="Edit" onClick={onEdit}>
-        <EditIcon />
-      </BrutalIconButton>
-      <BrutalIconButton size="sm" label="Delete" onClick={onDelete}>
-        <DeleteIcon />
-      </BrutalIconButton>
-    </div>
+    </BrutalRowActions>
   )
 }
 

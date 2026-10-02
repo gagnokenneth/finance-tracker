@@ -2,14 +2,18 @@ import { useState } from 'react'
 import { useFinanceData } from '../hooks/useFinanceData.ts'
 import { useFinanceMutations } from '../hooks/useFinanceMutations.ts'
 import { monthTotal, sourceName } from '../lib/income.ts'
-import { monthKey, addMonths, inMonth } from '../lib/currentMonth.ts'
+import { monthKey, monthLabel, addMonths, inMonth } from '../lib/currentMonth.ts'
 import { isTemp } from '../lib/tempId.ts'
 import { Money } from '../components/Money.tsx'
-import { Table } from '../components/Table.tsx'
-import { Button, SecondaryButton, EditRowButton, DeleteRowButton } from '../components/ui.tsx'
-import { ConfirmDialog } from '../components/ConfirmDialog.tsx'
-import { PendingBadge } from '../components/PendingBadge.tsx'
-import { EmptyState } from '../components/EmptyState.tsx'
+import {
+  BrutalButton,
+  BrutalConfirm,
+  BrutalEmptyState,
+  BrutalPageHeader,
+  BrutalSecondaryButton,
+  BrutalStepper,
+} from '../components/brutal.tsx'
+import { BrutalFigure, BrutalRowActions, BrutalTable, cellClass } from '../components/brutalData.tsx'
 import { LoadError } from '../components/LoadError.tsx'
 import { LoadingScreen } from '../components/LoadingScreen.tsx'
 import { AddIncomeModal } from './income/AddIncomeModal.tsx'
@@ -31,64 +35,64 @@ export function Income() {
 
   const rows = inMonth(data.income, month)
   const total = monthTotal(rows)
+  const label = monthLabel(month)
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-ink">Income</h1>
-          <p className="mt-1 text-sm text-ink-soft">
-            <Money value={total} className="font-semibold" /> in{' '}
-            <span className="tnum font-mono">{month}</span>
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <SecondaryButton type="button" onClick={() => setMonth(addMonths(month, -1))}>
-            ←
-          </SecondaryButton>
-          <SecondaryButton type="button" onClick={() => setMonth(addMonths(month, 1))}>
-            →
-          </SecondaryButton>
-          <SecondaryButton type="button" onClick={() => setManaging(true)}>
-            Manage sources
-          </SecondaryButton>
-          <Button type="button" onClick={() => setAdding(true)}>
-            Add income
-          </Button>
-        </div>
-      </div>
+    <div className="space-y-10">
+      <BrutalPageHeader
+        title="Income"
+        summary={
+          <>
+            <Money value={total} tone="inherit" className="font-bold" /> in {label}
+          </>
+        }
+        action={
+          <div className="flex flex-wrap items-center gap-3">
+            <BrutalSecondaryButton type="button" onClick={() => setManaging(true)}>
+              Manage sources
+            </BrutalSecondaryButton>
+            <BrutalButton type="button" onClick={() => setAdding(true)}>
+              + Add income
+            </BrutalButton>
+          </div>
+        }
+      />
+
+      <BrutalStepper
+        label={label}
+        unit="month"
+        onPrev={() => setMonth(addMonths(month, -1))}
+        onNext={() => setMonth(addMonths(month, 1))}
+      />
 
       {rows.length === 0 ? (
-        <EmptyState title={`Nothing logged for ${month}`}>
+        <BrutalEmptyState title={`Nothing logged for ${label}`}>
           Add a payday, or step back a month to see earlier entries.
-        </EmptyState>
+        </BrutalEmptyState>
       ) : (
-        <Table headers={['Date', 'Source', 'Amount', 'Notes', '']}>
-          {rows.map((row) => (
-            <tr key={row.id}>
-              <td className="px-4 py-3">{row.date}</td>
-              <td className="px-4 py-3">
-                {sourceName(data.income_sources, row.source_id)}
-                {isTemp(row.id) && <PendingBadge />}
-              </td>
-              <td className="px-4 py-3">
-                <Money value={row.amount} />
-              </td>
-              <td className="px-4 py-3 text-ink-faint">{row.notes ?? ''}</td>
-              <td className="px-4 py-3 text-right">
-                <span className="flex justify-end gap-2">
-                  <EditRowButton onClick={() => setEditing(row)} disabled={isTemp(row.id)} />
-                  <DeleteRowButton onClick={() => setDeleting(row)} disabled={isTemp(row.id)} />
-                </span>
-              </td>
-            </tr>
-          ))}
-        </Table>
+        <BrutalTable columns={['Date', 'Source', 'Amount', 'Notes']} actions>
+          {rows.map((row) => {
+            const pending = isTemp(row.id)
+            return (
+              <tr key={row.id}>
+                <td className={`tnum ${cellClass} font-mono`}>{row.date}</td>
+                <td className={`${cellClass} font-bold`}>{sourceName(data.income_sources, row.source_id)}</td>
+                <td className={cellClass}>
+                  <BrutalFigure value={row.amount} />
+                </td>
+                <td className={`${cellClass} font-mono text-xs text-neutral-500`}>{row.notes ?? ''}</td>
+                <td className={cellClass}>
+                  <BrutalRowActions pending={pending} onEdit={() => setEditing(row)} onDelete={() => setDeleting(row)} />
+                </td>
+              </tr>
+            )
+          })}
+        </BrutalTable>
       )}
 
       {/* Mounted only while open, so each form resets without a manual reset(). */}
       {adding && (
-        <AddIncomeModal open sources={data.income_sources} onClose={() => setAdding(false)} />
+        <AddIncomeModal sources={data.income_sources} onClose={() => setAdding(false)} />
       )}
       {managing && (
         <ManageSourcesModal
@@ -100,16 +104,15 @@ export function Income() {
       )}
       {editing && (
         <EditIncomeModal
-          open
           entry={editing}
           sources={data.income_sources}
           onClose={() => setEditing(null)}
           onMonthChange={setMonth}
         />
       )}
-      <ConfirmDialog
+      <BrutalConfirm
         open={deleting !== null}
-        title="Delete income?"
+        title="Delete income"
         message={
           deleting
             ? `${sourceName(data.income_sources, deleting.source_id)} on ${deleting.date}. This cannot be undone.`

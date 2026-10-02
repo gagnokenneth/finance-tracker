@@ -31,7 +31,7 @@ import {
   BrutalDueBadge,
   BrutalFigure,
   BrutalInstallmentStrip,
-  BrutalRowActions,
+  BrutalLedgerRowActions,
   BrutalRowStatus,
   BrutalStat,
   BrutalTable,
@@ -229,7 +229,7 @@ export function DebtDetail() {
                 />
               </td>
               <td className={cellClass}>
-                <BrutalRowActions
+                <BrutalLedgerRowActions
                   pending={isTemp(row.id)}
                   paid={row.paid}
                   priced={isRowPriced(row)}
