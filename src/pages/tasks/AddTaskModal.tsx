@@ -2,17 +2,10 @@ import type { FormEvent } from 'react'
 import { useFinanceMutations } from '../../hooks/useFinanceMutations.ts'
 import { useTaskForm } from '../../hooks/useTaskForm.ts'
 import { referenceable } from '../../lib/tempId.ts'
-import {
-  BrutalModal,
-  BrutalField,
-  BrutalInput,
-  BrutalSelect,
-  BrutalButton,
-  BrutalSecondaryButton,
-} from '../../components/brutal.tsx'
-import { RECURRENCES, RECURRENCE_LABEL } from '../../lib/tasks.ts'
+import { BrutalModal, BrutalField, BrutalInput, BrutalButton, BrutalSecondaryButton } from '../../components/brutal.tsx'
+import { TaskScheduleFields } from './TaskScheduleFields.tsx'
 import { firstColumn } from '../../lib/taskColumns.ts'
-import type { FinanceData, TaskRecurrence } from '../../types.ts'
+import type { FinanceData } from '../../types.ts'
 
 /**
  * `data` is passed down from the parent page rather than fetched here — no
@@ -73,36 +66,7 @@ export function AddTaskModal({
             onChange={(e) => form.setTitle(e.target.value)}
           />
         </BrutalField>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <BrutalField label="Repeats" htmlFor="add-task-repeats">
-            <BrutalSelect
-              id="add-task-repeats"
-              value={form.recurrence}
-              onChange={(e) => form.setRecurrence(e.target.value as TaskRecurrence | '')}
-            >
-              <option value="">Does not repeat</option>
-              {RECURRENCES.map((r) => (
-                <option key={r} value={r}>
-                  {RECURRENCE_LABEL[r]}
-                </option>
-              ))}
-            </BrutalSelect>
-          </BrutalField>
-          <BrutalField label="Part of a goal" htmlFor="add-task-goal">
-            <BrutalSelect
-              id="add-task-goal"
-              value={form.goalId}
-              onChange={(e) => form.setGoalId(e.target.value ? Number(e.target.value) : '')}
-            >
-              <option value="">Nothing</option>
-              {goals.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.title}
-                </option>
-              ))}
-            </BrutalSelect>
-          </BrutalField>
-        </div>
+        <TaskScheduleFields form={form} goals={goals} idPrefix="add-task" />
 
         <div className="flex items-center gap-3 border-t-2 border-black pt-4">
           <BrutalSecondaryButton type="button" onClick={onClose}>

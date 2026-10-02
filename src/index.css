@@ -30,6 +30,13 @@
   --color-overdue-wash: #fef3f2;
   --color-soon-wash: #fffaeb;
   --color-settled-wash: #ecfdf3;
+
+  /* The revamp's hard, unblurred offset shadows (components/brutal.tsx). */
+  --shadow-hard-xs: 2px 2px 0 0 var(--color-black);
+  --shadow-hard-sm: 4px 4px 0 0 var(--color-black);
+  --shadow-hard-md: 6px 6px 0 0 var(--color-black);
+  --shadow-hard-lg: 8px 8px 0 0 var(--color-black);
+  --shadow-hard-muted: 3px 3px 0 0 var(--color-neutral-500);
 }
 
 /* Money and dates must align in columns; Plex Mono is tabular by default,
@@ -79,7 +86,7 @@
     border-radius: 0;
     padding: 0;
     background: var(--color-white);
-    box-shadow: 4px 4px 0 0 var(--color-black);
+    box-shadow: var(--shadow-hard-sm);
   }
   .brutal-select option {
     padding: 0.625rem 0.75rem;

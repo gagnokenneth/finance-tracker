@@ -6,7 +6,7 @@ import { useFinanceMutations } from '../hooks/useFinanceMutations.ts'
 import { backlogTasks, tasksInWeek, groupByColumn, buildMoveInput } from '../lib/tasks.ts'
 import { sortedColumns, doneColumn } from '../lib/taskColumns.ts'
 import { isoDate, startOfWeek, addWeeks, weekWindow } from '../lib/currentMonth.ts'
-import { RowButton, SecondaryButton } from '../components/ui.tsx'
+import { BrutalAddButton, invertOnHover, labelClass } from '../components/brutal.tsx'
 import { LoadError } from '../components/LoadError.tsx'
 import { LoadingScreen } from '../components/LoadingScreen.tsx'
 import { AddTaskModal } from './tasks/AddTaskModal.tsx'
@@ -28,6 +28,11 @@ type AddTarget = 'backlog' | number
 // that memoization on every single render of the page.
 const POINTER_ACTIVATION = { activationConstraint: { distance: 8 } }
 
+/** One segment of the week stepper; the middle (date range) segment shares
+ *  its frame but drops the hover and keeps only top/bottom rules. */
+const stepFrame = 'flex h-10 items-center border-black bg-white font-mono text-xs font-bold'
+const stepButtonClass = `${stepFrame} gap-1.5 border px-4 tracking-wider uppercase ${invertOnHover}`
+
 export function Tasks() {
   const { data, isPending, isError, error } = useFinanceData()
   const { updateTaskColumn, moveTask } = useFinanceMutations()
@@ -45,7 +50,6 @@ export function Tasks() {
   const weekTasks = tasksInWeek(data.tasks, weekStart)
   const grouped = groupByColumn(weekTasks, columns)
   const backlog = backlogTasks(data.tasks)
-  const columnsById = new Map(data.task_columns.map((c) => [c.id, c]))
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event
@@ -66,63 +70,67 @@ export function Tasks() {
   const targetColumnId = typeof addTarget === 'number' ? addTarget : undefined
 
   return (
-    <div className="space-y-8">
-      <h1 className="text-2xl font-semibold tracking-tight text-ink">Tasks</h1>
+    <div className="space-y-10">
+      <h1 className="text-5xl font-bold tracking-tight text-black uppercase md:text-6xl">Tasks</h1>
 
       <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-        <div className="space-y-3">
-          <div className="flex items-center gap-2">
-            <SecondaryButton type="button" onClick={() => setWeekStart((w) => addWeeks(w, -1))}>
-              ← Prev
-            </SecondaryButton>
-            <span className="tnum font-mono text-sm text-ink-soft">
-              {start} – {end}
-            </span>
-            <SecondaryButton type="button" onClick={() => setWeekStart((w) => addWeeks(w, 1))}>
-              Next →
-            </SecondaryButton>
+        <div className="flex items-center">
+          <button
+            type="button"
+            aria-label="Previous week"
+            className={stepButtonClass}
+            onClick={() => setWeekStart((w) => addWeeks(w, -1))}
+          >
+            ← Prev
+          </button>
+          <div className={`tnum ${stepFrame} justify-center border-y px-3 tracking-widest text-black sm:px-6`}>
+            {start} – {end}
           </div>
+          <button
+            type="button"
+            aria-label="Next week"
+            className={stepButtonClass}
+            onClick={() => setWeekStart((w) => addWeeks(w, 1))}
+          >
+            Next →
+          </button>
+        </div>
 
-          <div className="w-fit max-w-full overflow-x-auto rounded-2xl border border-edge bg-white p-3">
-            <div className="flex gap-3">
-              {columns.map((column) => (
-                <TaskColumnLane
-                  key={column.id}
-                  column={column}
-                  tasks={grouped.get(column.id) ?? []}
-                  dayGrouped
-                  onOpenTask={setOpened}
-                  onRename={(name) => updateTaskColumn.mutate({ id: column.id, patch: { name } })}
-                  onAddTask={column.is_done ? undefined : () => setAddTarget(column.id)}
-                />
-              ))}
-            </div>
+        {/* gap-px over a black ground draws the 1px rules between lanes. Lanes
+            are user-defined, so their count isn't fixed: equal-width auto
+            columns, scrolling sideways once there are too many to fit. */}
+        <div className="overflow-x-auto">
+          <div className="grid grid-cols-1 gap-px border border-black bg-black md:auto-cols-[minmax(16rem,1fr)] md:grid-flow-col md:grid-cols-none">
+            {columns.map((column) => (
+              <TaskColumnLane
+                key={column.id}
+                column={column}
+                tasks={grouped.get(column.id) ?? []}
+                dayGrouped
+                onOpenTask={setOpened}
+                onRename={(name) => updateTaskColumn.mutate({ id: column.id, patch: { name } })}
+                onAddTask={column.is_done ? undefined : () => setAddTarget(column.id)}
+              />
+            ))}
           </div>
         </div>
 
-        <div className="space-y-3">
-          <div className="flex items-baseline gap-2">
-            <h2 className="text-sm font-semibold tracking-wide text-ink-faint uppercase">Backlog</h2>
-            <span className="tnum font-mono text-xs text-ink-faint">{backlog.length}</span>
-            <RowButton type="button" tone="primary" title="Add task" aria-label="Add task" onClick={() => setAddTarget('backlog')}>
-              +
-            </RowButton>
+        <section className="space-y-4 pt-6">
+          <div className="flex items-center gap-3">
+            <h2 className={labelClass}>Backlog</h2>
+            <span className="tnum font-mono text-xs font-bold text-neutral-500">{backlog.length}</span>
+            <BrutalAddButton aria-label="Add task to Backlog" className="size-5 text-xs" onClick={() => setAddTarget('backlog')} />
           </div>
           {backlog.length === 0 ? (
-            <p className="text-sm text-ink-faint">No backlog tasks.</p>
+            <p className="font-mono text-xs text-neutral-400">No backlog tasks.</p>
           ) : (
-            <div className="divide-y divide-edge overflow-hidden rounded-2xl border border-edge bg-white">
+            <div className="space-y-2">
               {backlog.map((task) => (
-                <BacklogTaskRow
-                  key={task.id}
-                  task={task}
-                  column={columnsById.get(task.column_id)}
-                  onClick={() => setOpened(task)}
-                />
+                <BacklogTaskRow key={task.id} task={task} onClick={() => setOpened(task)} />
               ))}
             </div>
           )}
-        </div>
+        </section>
       </DndContext>
 
       {addTarget !== null && (

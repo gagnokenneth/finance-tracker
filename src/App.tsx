@@ -36,9 +36,9 @@ function AuthedApp() {
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route element={<FullWidthFrame />}>
           <Route path="dashboard" element={<Dashboard />} />
+          <Route path="tasks" element={<Tasks />} />
         </Route>
         <Route element={<LegacyColumn />}>
-          <Route path="tasks" element={<Tasks />} />
           <Route path="notes" element={<Notes />} />
           <Route path="notes/:id" element={<NoteDetail />} />
           <Route path="goals" element={<Goals />} />

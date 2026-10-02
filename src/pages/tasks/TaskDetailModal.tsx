@@ -3,12 +3,21 @@ import type { FormEvent } from 'react'
 import { useFinanceMutations } from '../../hooks/useFinanceMutations.ts'
 import { useTaskForm } from '../../hooks/useTaskForm.ts'
 import { referenceable } from '../../lib/tempId.ts'
-import { buildMoveInput, RECURRENCES, RECURRENCE_LABEL } from '../../lib/tasks.ts'
+import { buildMoveInput } from '../../lib/tasks.ts'
 import { sortedColumns, doneColumn } from '../../lib/taskColumns.ts'
-import { Modal } from '../../components/Modal.tsx'
-import { ConfirmDialog } from '../../components/ConfirmDialog.tsx'
 import { RichTextEditor } from '../../components/RichTextEditor.tsx'
-import { Field, TextInput, SelectInput, Button, SecondaryButton, RowButton, DeleteButton } from '../../components/ui.tsx'
+import { DeleteIcon } from '../../components/icons.tsx'
+import {
+  BrutalModal,
+  BrutalConfirm,
+  BrutalField,
+  BrutalInput,
+  BrutalButton,
+  BrutalSecondaryButton,
+  smallButtonClass,
+} from '../../components/brutal.tsx'
+import { brutalEditorLook } from '../../components/brutalEditorLook.ts'
+import { TaskScheduleFields } from './TaskScheduleFields.tsx'
 import type { FinanceData, Task } from '../../types.ts'
 
 /** `created_at` is a full ISO 8601 datetime (see Task's own doc comment) —
@@ -70,63 +79,48 @@ export function TaskDetailModal({
   }
 
   return (
-    <Modal open={open} title={task.title} onClose={onClose} wide>
-      <div className="flex flex-wrap items-center gap-1.5">
-        {columns
-          .filter((c) => c.id !== task.column_id)
-          .map((c) => (
-            <RowButton key={c.id} tone={c.is_done ? 'primary' : 'neutral'} onClick={() => move(c.id)}>
-              Move to {c.name}
-            </RowButton>
-          ))}
+    <BrutalModal open={open} title="Edit task" onClose={onClose} look="plain">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black bg-neutral-50 px-6 py-3.5">
+        <div className="flex flex-wrap items-center gap-2">
+          {columns
+            .filter((c) => c.id !== task.column_id)
+            .map((c) => (
+              <button key={c.id} type="button" className={smallButtonClass} onClick={() => move(c.id)}>
+                Move to {c.name}
+              </button>
+            ))}
+        </div>
+        <p className="font-mono text-[11px] text-neutral-500 uppercase">Created {formatCreatedAt(task.created_at)}</p>
       </div>
 
-      <p className="mt-2 text-xs text-ink-faint">Created {formatCreatedAt(task.created_at)}</p>
-
-      <form onSubmit={submit} className="mt-3 flex flex-col gap-3">
-        <Field label="Title" required>
-          <TextInput required value={form.title} onChange={(e) => form.setTitle(e.target.value)} />
-        </Field>
-        <Field label="Description">
-          <RichTextEditor value={form.notes} onChange={form.setNotes} />
-        </Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Repeats">
-            <SelectInput value={form.recurrence} onChange={(e) => form.setRecurrence(e.target.value as typeof form.recurrence)}>
-              <option value="">Does not repeat</option>
-              {RECURRENCES.map((r) => (
-                <option key={r} value={r}>
-                  {RECURRENCE_LABEL[r]}
-                </option>
-              ))}
-            </SelectInput>
-          </Field>
-          <Field label="Part of a goal">
-            <SelectInput value={form.goalId} onChange={(e) => form.setGoalId(e.target.value ? Number(e.target.value) : '')}>
-              <option value="">Nothing</option>
-              {goals.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.title}
-                </option>
-              ))}
-            </SelectInput>
-          </Field>
+      <form onSubmit={submit}>
+        <div className="flex flex-col gap-5 p-6">
+          <BrutalField label="Title" htmlFor="edit-task-title" required>
+            <BrutalInput id="edit-task-title" required value={form.title} onChange={(e) => form.setTitle(e.target.value)} />
+          </BrutalField>
+          <BrutalField label="Description">
+            <RichTextEditor look={brutalEditorLook} value={form.notes} onChange={form.setNotes} />
+          </BrutalField>
+          <TaskScheduleFields form={form} goals={goals} idPrefix="edit-task" />
         </div>
 
-        <div className="mt-1 flex justify-between gap-2">
-          <DeleteButton type="button" onClick={() => setDeleting(true)} />
-          <div className="flex gap-2">
-            <SecondaryButton type="button" onClick={onClose}>
+        <div className="flex items-center justify-between gap-3 border-t border-black px-6 py-4">
+          <BrutalSecondaryButton type="button" onClick={() => setDeleting(true)}>
+            <DeleteIcon />
+            Delete
+          </BrutalSecondaryButton>
+          <div className="flex gap-3">
+            <BrutalSecondaryButton type="button" onClick={onClose}>
               Cancel
-            </SecondaryButton>
-            <Button type="submit" disabled={form.values === null}>
+            </BrutalSecondaryButton>
+            <BrutalButton type="submit" disabled={form.values === null}>
               Save
-            </Button>
+            </BrutalButton>
           </div>
         </div>
       </form>
 
-      <ConfirmDialog
+      <BrutalConfirm
         open={deleting}
         title="Delete task"
         message={`Delete "${task.title}"? This cannot be undone.`}
@@ -138,6 +132,6 @@ export function TaskDetailModal({
         }}
         onClose={() => setDeleting(false)}
       />
-    </Modal>
+    </BrutalModal>
   )
 }

@@ -2,7 +2,7 @@ import { useDroppable } from '@dnd-kit/core'
 import { TaskCard } from './TaskCard.tsx'
 import { groupByDay } from '../../lib/tasks.ts'
 import { useInlineRename } from '../../hooks/useInlineRename.ts'
-import { TextInput, RowButton } from '../../components/ui.tsx'
+import { BrutalAddButton } from '../../components/brutal.tsx'
 import type { Task, TaskColumn } from '../../types.ts'
 
 /**
@@ -40,61 +40,61 @@ export function TaskColumnLane({
   return (
     <div
       ref={setNodeRef}
-      className={`flex w-64 shrink-0 flex-col gap-3 rounded-xl bg-paper pb-3 ${isOver ? 'ring-2 ring-brand/40' : ''}`}
+      className={`flex min-h-[220px] min-w-0 flex-col bg-white ${isOver ? 'outline-2 -outline-offset-2 outline-black' : ''}`}
     >
-      <div
-        className={`flex items-center justify-between gap-2 rounded-t-xl border-b-2 px-3 pt-3 pb-2.5 ${
-          column.is_done ? 'border-settled/50' : 'border-edge'
-        }`}
-      >
-        <div className="flex min-w-0 items-center gap-1.5">
+      <div className="flex items-center justify-between gap-2 border-b border-black bg-neutral-50 p-4">
+        <div className="flex min-w-0 items-center gap-2">
           {column.is_done && (
-            <span className="text-settled" aria-hidden>
+            <span className="font-mono text-xs font-bold text-black" aria-hidden>
               ✓
             </span>
           )}
           {rename.renaming ? (
-            <TextInput
+            <input
               autoFocus
               value={rename.draft}
               onChange={(e) => rename.setDraft(e.target.value)}
               onBlur={rename.save}
               onKeyDown={rename.onKeyDown}
-              className="!w-auto text-sm font-semibold tracking-tight text-ink"
+              className="h-6 w-full min-w-0 rounded-none border border-black bg-white px-1.5 text-sm font-bold tracking-tight text-black uppercase focus:outline-none"
             />
           ) : (
             <h3
-              className="cursor-text truncate text-sm font-semibold tracking-tight text-ink hover:underline"
+              className="h-6 cursor-text truncate text-sm leading-6 font-bold tracking-tight text-black uppercase hover:underline"
               onClick={rename.start}
             >
               {column.name}
             </h3>
           )}
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <span className="tnum font-mono text-xs text-ink-faint">{tasks.length}</span>
+        <div className="flex shrink-0 items-center gap-2.5">
+          <span className="tnum font-mono text-xs font-bold text-neutral-500">{tasks.length}</span>
           {onAddTask && (
-            <RowButton type="button" tone="primary" title="Add task" aria-label="Add task" onClick={onAddTask}>
-              +
-            </RowButton>
+            <BrutalAddButton
+              aria-label={`Add task to ${column.name}`}
+              className="size-6 text-sm"
+              onClick={onAddTask}
+            />
           )}
         </div>
       </div>
 
-      {tasks.length === 0 ? (
-        <p className="px-3 text-xs text-ink-faint">No tasks.</p>
-      ) : days ? (
-        <div className="space-y-3 px-3">
-          {days.map(([date, dayTasks]) => (
-            <div key={date} className="space-y-2">
-              <p className="text-xs font-semibold tracking-wide text-ink-faint uppercase">{date}</p>
-              {dayTasks.map(card)}
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="space-y-2 px-3">{tasks.map(card)}</div>
-      )}
+      <div className="flex-1 p-4">
+        {tasks.length === 0 ? (
+          <p className="font-mono text-xs text-neutral-400">No tasks.</p>
+        ) : days ? (
+          <div className="space-y-4">
+            {days.map(([date, dayTasks]) => (
+              <div key={date} className="space-y-3">
+                <p className="tnum font-mono text-[11px] tracking-wider text-neutral-500 uppercase">{date}</p>
+                {dayTasks.map(card)}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-3">{tasks.map(card)}</div>
+        )}
+      </div>
     </div>
   )
 }
