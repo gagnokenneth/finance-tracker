@@ -1,13 +1,25 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { eventsInRange, STATUS_DOT } from '../lib/calendar.ts'
+import { eventsInRange } from '../lib/calendar.ts'
 import type { CalendarEvent } from '../lib/calendar.ts'
 import { monthKey, addMonths, monthWindow, dateOn, daysInMonth, isoDate, shiftDays } from '../lib/currentMonth.ts'
-import { SecondaryButton } from './ui.tsx'
 import { AddTaskModal } from '../pages/tasks/AddTaskModal.tsx'
+import type { RowStatus } from '../lib/debts.ts'
+import { invertOnHover } from './brutal.tsx'
 import type { FinanceData } from '../types.ts'
 
 const WEEKDAY_LABEL = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+/** An event chip's monochrome look per status, chip and square marker kept
+ *  together: 'late' is the one that inverts the whole chip to black, which
+ *  is why its marker is the white one. An event with no status (an
+ *  open-ended goal) reads as upcoming. */
+const CHIP_STYLE: Record<RowStatus, { chip: string; marker: string; label?: string }> = {
+  late: { chip: 'border-neutral-900 bg-neutral-900 text-white', marker: 'bg-white', label: 'font-semibold' },
+  'due-soon': { chip: 'border-neutral-300 bg-neutral-100 text-neutral-800', marker: 'bg-black' },
+  upcoming: { chip: 'border-neutral-300 bg-neutral-100 text-neutral-800', marker: 'border border-black' },
+  paid: { chip: 'border-neutral-300 bg-neutral-100 text-neutral-800', marker: 'bg-neutral-500' },
+}
 
 /**
  * Every ISO date the grid needs to render, in order — the visible month
@@ -24,6 +36,19 @@ function monthGrid(year: number, monthNum: number): string[] {
   return Array.from({ length: cellCount }, (_, i) => shiftDays(firstOfMonth, i - firstWeekday))
 }
 
+function EventChip({ event }: { event: CalendarEvent }) {
+  const style = CHIP_STYLE[event.status ?? 'upcoming']
+  return (
+    <Link
+      to={event.to}
+      className={`flex items-center gap-1.5 border px-1.5 py-1 font-mono text-[11px] leading-none ${invertOnHover} ${style.chip}`}
+    >
+      <span aria-hidden className={`inline-block size-1.5 shrink-0 ${style.marker}`} />
+      <span className={`truncate ${style.label ?? ''}`}>{event.label}</span>
+    </Link>
+  )
+}
+
 function CalendarDay({
   date,
   inMonth,
@@ -37,45 +62,42 @@ function CalendarDay({
   events: CalendarEvent[]
   onAddTask: (date: string) => void
 }) {
-  const day = Number(date.slice(8, 10))
+  const day = date.slice(8, 10)
   return (
     <div
-      className={`group min-h-16 rounded-lg border p-1 sm:min-h-24 sm:p-1.5 ${
-        isToday ? 'border-brand bg-brand/5' : 'border-edge'
-      } ${inMonth ? 'bg-white' : 'bg-paper/60'}`}
+      className={`group flex min-h-24 min-w-0 flex-col border-r border-b border-black p-1 transition-colors sm:min-h-[148px] sm:p-2 [&:nth-child(7n)]:border-r-0 [&:nth-last-child(-n+7)]:border-b-0 ${
+        isToday ? 'relative z-10 bg-neutral-50 shadow-md outline-2 -outline-offset-1 outline-black' : 'hover:bg-neutral-50'
+      }`}
     >
-      <div className="flex items-center justify-between">
-        <span
-          className={`tnum flex size-5 items-center justify-center rounded-full font-mono text-xs ${
-            isToday ? 'bg-brand text-white' : inMonth ? 'text-ink-soft' : 'text-ink-faint'
-          }`}
-        >
-          {day}
-        </span>
-        {/* Always present, not hover-revealed: a hover-only affordance is
-            unreachable on touch, where there is no hover state at all. */}
+      <div className="flex items-center justify-between font-mono text-xs">
+        {isToday ? (
+          <div className="flex items-center gap-1.5">
+            <span className="tnum bg-black px-1 py-0.5 text-xs leading-none font-bold text-white sm:px-2 sm:text-sm">{day}</span>
+            <span className="hidden text-[10px] font-bold tracking-widest text-neutral-900 uppercase sm:inline">Today</span>
+          </div>
+        ) : inMonth ? (
+          <span className="tnum text-sm font-bold text-neutral-900">{day}</span>
+        ) : (
+          <span className="tnum text-neutral-400">{Number(day)}</span>
+        )}
+        {/* Hover-revealed only where hover exists: on touch there is no hover
+            state, so an opacity-0 button there would be unreachable. */}
         <button
           type="button"
           aria-label={`Add task on ${date}`}
           onClick={() => onAddTask(date)}
-          className="rounded px-1 text-xs text-ink-faint/70 hover:bg-paper hover:text-ink"
+          className={`flex size-4 shrink-0 items-center justify-center text-xs ${invertOnHover} ${
+            isToday
+              ? 'border border-black'
+              : 'group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:hover)]:opacity-0'
+          }`}
         >
           +
         </button>
       </div>
-      <div className="mt-1 space-y-0.5">
+      <div className="mt-2 flex-1 space-y-1.5">
         {events.map((e) => (
-          <Link
-            key={`${e.source}-${e.to}-${e.id}`}
-            to={e.to}
-            className="flex items-center gap-1 rounded px-1 py-0.5 text-xs hover:bg-paper"
-          >
-            <span
-              aria-hidden
-              className={`size-1.5 shrink-0 rounded-full ${e.status ? STATUS_DOT[e.status] : 'bg-ink-faint'}`}
-            />
-            <span className="truncate text-ink-soft">{e.label}</span>
-          </Link>
+          <EventChip key={`${e.source}-${e.to}-${e.id}`} event={e} />
         ))}
       </div>
     </div>
@@ -111,45 +133,70 @@ export function MonthCalendar({ data }: { data: FinanceData }) {
   // the wrong day depending on the viewer's timezone — this codebase has
   // isoDate specifically to avoid that class of bug.
   const today = monthKey() === month ? isoDate() : ''
+  const todayWeekday = today ? new Date().getDay() : -1
   const monthLabel = new Date(year, monthNum - 1, 1).toLocaleDateString('en-US', {
     month: 'long',
     year: 'numeric',
   })
 
   return (
-    <div>
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <h2 className="text-lg font-semibold tracking-tight text-ink">{monthLabel}</h2>
-        <div className="flex items-center gap-2">
-          <SecondaryButton type="button" aria-label="Previous month" onClick={() => setMonth(addMonths(month, -1))}>
+    <div className="flex flex-col">
+      <div className="mb-2 flex flex-col items-start justify-between gap-4 border-b border-black pb-6 sm:flex-row sm:items-center">
+        <h1 className="text-3xl font-bold tracking-tight text-black uppercase sm:text-4xl md:text-5xl">
+          {monthLabel}
+        </h1>
+        <div className="inline-flex border border-black font-mono text-xs">
+          <button
+            type="button"
+            aria-label="Previous month"
+            onClick={() => setMonth(addMonths(month, -1))}
+            className={`px-3 py-1.5 ${invertOnHover}`}
+          >
             ←
-          </SecondaryButton>
-          <SecondaryButton type="button" onClick={() => setMonth(monthKey())}>
+          </button>
+          <button
+            type="button"
+            onClick={() => setMonth(monthKey())}
+            className={`border-x border-black px-4 py-1.5 font-bold tracking-wider uppercase ${invertOnHover}`}
+          >
             Today
-          </SecondaryButton>
-          <SecondaryButton type="button" aria-label="Next month" onClick={() => setMonth(addMonths(month, 1))}>
+          </button>
+          <button
+            type="button"
+            aria-label="Next month"
+            onClick={() => setMonth(addMonths(month, 1))}
+            className={`px-3 py-1.5 ${invertOnHover}`}
+          >
             →
-          </SecondaryButton>
+          </button>
         </div>
       </div>
 
-      <div className="mt-4 grid grid-cols-7 gap-1 sm:gap-2">
-        {WEEKDAY_LABEL.map((label) => (
-          <div key={label} className="text-center text-[11px] font-semibold text-ink-faint uppercase sm:text-xs">
-            <span className="sm:hidden">{label.slice(0, 1)}</span>
-            <span className="hidden sm:inline">{label}</span>
-          </div>
-        ))}
-        {grid.map((date) => (
-          <CalendarDay
-            key={date}
-            date={date}
-            inMonth={date >= monthStart && date <= monthEnd}
-            isToday={date === today}
-            events={byDate.get(date) ?? []}
-            onAddTask={setAddingTaskOn}
-          />
-        ))}
+      <div className="w-full border border-black bg-white shadow-sm">
+        <div className="grid grid-cols-7 divide-x divide-black border-b border-black bg-neutral-100 font-mono text-xs font-bold tracking-wider uppercase">
+          {WEEKDAY_LABEL.map((label, i) => (
+            <div
+              key={label}
+              className={`px-1.5 py-2.5 sm:px-3 ${i === 0 || i === 6 ? 'text-neutral-500' : 'text-neutral-900'} ${
+                i === todayWeekday ? 'bg-neutral-200' : ''
+              }`}
+            >
+              {label}
+            </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-7 text-xs">
+          {grid.map((date) => (
+            <CalendarDay
+              key={date}
+              date={date}
+              inMonth={date >= monthStart && date <= monthEnd}
+              isToday={date === today}
+              events={byDate.get(date) ?? []}
+              onAddTask={setAddingTaskOn}
+            />
+          ))}
+        </div>
       </div>
 
       {addingTaskOn && (

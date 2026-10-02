@@ -2,8 +2,14 @@ import type { FormEvent } from 'react'
 import { useFinanceMutations } from '../../hooks/useFinanceMutations.ts'
 import { useTaskForm } from '../../hooks/useTaskForm.ts'
 import { referenceable } from '../../lib/tempId.ts'
-import { Modal } from '../../components/Modal.tsx'
-import { Field, TextInput, SelectInput, Button, SecondaryButton } from '../../components/ui.tsx'
+import {
+  BrutalModal,
+  BrutalField,
+  BrutalInput,
+  BrutalSelect,
+  BrutalButton,
+  BrutalSecondaryButton,
+} from '../../components/brutal.tsx'
 import { RECURRENCES, RECURRENCE_LABEL } from '../../lib/tasks.ts'
 import { firstColumn } from '../../lib/taskColumns.ts'
 import type { FinanceData, TaskRecurrence } from '../../types.ts'
@@ -56,47 +62,57 @@ export function AddTaskModal({
   }
 
   return (
-    <Modal open={open} title="Add task" onClose={onClose}>
-      <form onSubmit={submit} className="flex flex-col gap-3">
-        <Field label="Title" required>
-          <TextInput required value={form.title} onChange={(e) => form.setTitle(e.target.value)} />
-        </Field>
-        <Field label="Repeats">
-          <SelectInput
-            value={form.recurrence}
-            onChange={(e) => form.setRecurrence(e.target.value as TaskRecurrence | '')}
-          >
-            <option value="">Does not repeat</option>
-            {RECURRENCES.map((r) => (
-              <option key={r} value={r}>
-                {RECURRENCE_LABEL[r]}
-              </option>
-            ))}
-          </SelectInput>
-        </Field>
-        <Field label="Part of a goal">
-          <SelectInput
-            value={form.goalId}
-            onChange={(e) => form.setGoalId(e.target.value ? Number(e.target.value) : '')}
-          >
-            <option value="">Nothing</option>
-            {goals.map((g) => (
-              <option key={g.id} value={g.id}>
-                {g.title}
-              </option>
-            ))}
-          </SelectInput>
-        </Field>
+    <BrutalModal open={open} title="Add task" onClose={onClose}>
+      <form onSubmit={submit} className="space-y-5 p-6">
+        <BrutalField label="Title" htmlFor="add-task-title" required>
+          <BrutalInput
+            id="add-task-title"
+            required
+            autoFocus
+            value={form.title}
+            onChange={(e) => form.setTitle(e.target.value)}
+          />
+        </BrutalField>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <BrutalField label="Repeats" htmlFor="add-task-repeats">
+            <BrutalSelect
+              id="add-task-repeats"
+              value={form.recurrence}
+              onChange={(e) => form.setRecurrence(e.target.value as TaskRecurrence | '')}
+            >
+              <option value="">Does not repeat</option>
+              {RECURRENCES.map((r) => (
+                <option key={r} value={r}>
+                  {RECURRENCE_LABEL[r]}
+                </option>
+              ))}
+            </BrutalSelect>
+          </BrutalField>
+          <BrutalField label="Part of a goal" htmlFor="add-task-goal">
+            <BrutalSelect
+              id="add-task-goal"
+              value={form.goalId}
+              onChange={(e) => form.setGoalId(e.target.value ? Number(e.target.value) : '')}
+            >
+              <option value="">Nothing</option>
+              {goals.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.title}
+                </option>
+              ))}
+            </BrutalSelect>
+          </BrutalField>
+        </div>
 
-        <div className="mt-1 flex justify-end gap-2">
-          <SecondaryButton type="button" onClick={onClose}>
+        <div className="flex items-center gap-3 border-t-2 border-black pt-4">
+          <BrutalSecondaryButton type="button" onClick={onClose}>
             Cancel
-          </SecondaryButton>
-          <Button type="submit" disabled={form.values === null}>
+          </BrutalSecondaryButton>
+          <BrutalButton type="submit" disabled={form.values === null}>
             Add task
-          </Button>
+          </BrutalButton>
         </div>
       </form>
-    </Modal>
+    </BrutalModal>
   )
 }

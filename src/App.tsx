@@ -5,7 +5,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthContext.tsx'
 import { useAuth } from './auth/useAuth.ts'
 import { makeQueryClient, persistOptionsFor } from './lib/queryClient.ts'
-import { AppShell } from './components/AppShell.tsx'
+import { AppShell, FullWidthFrame, LegacyColumn } from './components/AppShell.tsx'
 import { ToastProvider } from './components/ToastProvider.tsx'
 import { Dashboard } from './pages/Dashboard.tsx'
 import { Tasks } from './pages/Tasks.tsx'
@@ -34,19 +34,23 @@ function AuthedApp() {
     <Routes>
       <Route element={<AppShell />}>
         <Route index element={<Navigate to="/dashboard" replace />} />
-        <Route path="dashboard" element={<Dashboard />} />
-        <Route path="tasks" element={<Tasks />} />
-        <Route path="notes" element={<Notes />} />
-        <Route path="notes/:id" element={<NoteDetail />} />
-        <Route path="goals" element={<Goals />} />
-        <Route path="goals/:id" element={<GoalDetail />} />
-        <Route path="debts" element={<Debts />} />
-        <Route path="debts/:id" element={<DebtDetail />} />
-        <Route path="bills" element={<Bills />} />
-        <Route path="bills/:id" element={<BillDetail />} />
-        <Route path="income" element={<Income />} />
-        <Route path="savings" element={<Savings />} />
-        <Route path="settings" element={<Settings />} />
+        <Route element={<FullWidthFrame />}>
+          <Route path="dashboard" element={<Dashboard />} />
+        </Route>
+        <Route element={<LegacyColumn />}>
+          <Route path="tasks" element={<Tasks />} />
+          <Route path="notes" element={<Notes />} />
+          <Route path="notes/:id" element={<NoteDetail />} />
+          <Route path="goals" element={<Goals />} />
+          <Route path="goals/:id" element={<GoalDetail />} />
+          <Route path="debts" element={<Debts />} />
+          <Route path="debts/:id" element={<DebtDetail />} />
+          <Route path="bills" element={<Bills />} />
+          <Route path="bills/:id" element={<BillDetail />} />
+          <Route path="income" element={<Income />} />
+          <Route path="savings" element={<Savings />} />
+          <Route path="settings" element={<Settings />} />
+        </Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Route>
     </Routes>

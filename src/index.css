@@ -54,3 +54,50 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* BrutalSelect's open list (components/brutal.tsx). A native <select>'s
+   option highlight is drawn by the OS — blue on most systems — and only the
+   customizable base-select mode lets CSS reach it. Browsers without it keep
+   the native list, which still works, just in the OS's colors. */
+@supports (appearance: base-select) {
+  .brutal-select,
+  .brutal-select::picker(select) {
+    appearance: base-select;
+  }
+  .brutal-select {
+    display: flex;
+    align-items: center;
+  }
+  .brutal-select::picker-icon {
+    display: none;
+  }
+  .brutal-select::picker(select) {
+    position-area: block-end span-inline-end;
+    position-try-order: normal;
+    position-try-fallbacks: flip-block;
+    border: 1px solid var(--color-black);
+    border-radius: 0;
+    padding: 0;
+    background: var(--color-white);
+    box-shadow: 4px 4px 0 0 var(--color-black);
+  }
+  .brutal-select option {
+    padding: 0.625rem 0.75rem;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    color: var(--color-black);
+  }
+  .brutal-select option::checkmark {
+    display: none;
+  }
+  .brutal-select option:checked {
+    font-weight: 700;
+  }
+  .brutal-select option:hover,
+  .brutal-select option:focus-visible {
+    background: var(--color-black);
+    color: var(--color-white);
+    outline: none;
+  }
+}

@@ -27,16 +27,6 @@ export interface CalendarEvent {
   status?: RowStatus
 }
 
-/** The calendar's own color vocabulary for a status dot — small and
- *  separate from ROW_STATUS_CLASS (a full badge treatment) rather than
- *  parsing that string apart to pull one color out of it. */
-export const STATUS_DOT: Record<RowStatus, string> = {
-  late: 'bg-overdue',
-  'due-soon': 'bg-soon',
-  upcoming: 'bg-ink-faint',
-  paid: 'bg-settled',
-}
-
 function inRange(date: string, start: string, end: string): boolean {
   return date >= start && date <= end
 }
