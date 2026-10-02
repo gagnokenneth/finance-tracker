@@ -103,33 +103,10 @@ export function AppShell() {
         </div>
       </header>
 
-      <main>
+      {/* Full width, capped for very wide screens, with the page gutter. */}
+      <main className="mx-auto flex w-full max-w-[1720px] flex-col p-4 sm:p-6 lg:p-8">
         <Outlet />
       </main>
-    </div>
-  )
-}
-
-/*
- * Page frames, as layout routes (see App.tsx) rather than a route check in
- * the shell: a redesigned page moves its route from the legacy group to the
- * full-width one, and the shell itself never has to know which is which.
- */
-export function FullWidthFrame() {
-  return (
-    <div className="mx-auto flex w-full max-w-[1720px] flex-col p-4 sm:p-6 lg:p-8">
-      <Outlet />
-    </div>
-  )
-}
-
-/** The narrow reading column every page not yet redesigned still uses. */
-export function LegacyColumn() {
-  return (
-    <div className="px-4 py-8 md:px-8">
-      <div className="mx-auto max-w-4xl">
-        <Outlet />
-      </div>
     </div>
   )
 }

@@ -1,34 +1,20 @@
 @import "tailwindcss";
 
 /*
- * Design tokens for the debt tracker.
+ * Design tokens for the finance tracker.
  *
  * The app is ~80% figures, so the numerals carry the personality: Space
  * Mono for every amount, date and count, IBM Plex Sans for everything else.
- * Paper is a cool grey rather than a warm cream, so the ink and the money
- * stay the only warm-neutral contrast on screen.
+ * Colour is strictly monochrome — Tailwind's black, white and neutral scale
+ * (see components/brutal*.tsx) — so the only tokens kept here are the fonts
+ * and the hard offset shadows.
  */
 @theme {
   --font-sans:
     "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "Space Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
 
-  --color-ink: #101828;
-  --color-ink-soft: #475467;
-  --color-ink-faint: #98a2b3;
-
-  --color-paper: #f6f7f9;
-  --color-edge: #e4e7ec;
-
-  --color-brand: #4338ca;
-  --color-brand-dark: #372fa8;
-
-  --color-overdue: #b42318;
-  --color-settled: #067647;
-
-  --color-overdue-wash: #fef3f2;
-
-  /* The revamp's hard, unblurred offset shadows (components/brutal.tsx). */
+  /* Hard, unblurred offset shadows (components/brutal.tsx). */
   --shadow-hard-xs: 2px 2px 0 0 var(--color-black);
   --shadow-hard-sm: 4px 4px 0 0 var(--color-black);
   --shadow-hard-md: 6px 6px 0 0 var(--color-black);
@@ -36,7 +22,7 @@
   --shadow-hard-muted: 3px 3px 0 0 var(--color-neutral-500);
 }
 
-/* Money and dates must align in columns; Plex Mono is tabular by default,
+/* Money and dates must align in columns; Space Mono is tabular by default,
    but lining figures are forced here so mixed contexts stay aligned too. */
 .tnum {
   font-variant-numeric: tabular-nums lining-nums;

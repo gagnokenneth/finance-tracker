@@ -4,7 +4,14 @@ import { useFinanceMutations } from '../hooks/useFinanceMutations.ts'
 import { useCurrency } from '../hooks/useCurrency.ts'
 import { CURRENCY_LABELS } from '../lib/currency.ts'
 import { errorDetail } from '../lib/errorText.ts'
-import { ConfirmDialog } from '../components/ConfirmDialog.tsx'
+import {
+  BrutalConfirm,
+  BrutalFormError,
+  BrutalPageHeader,
+  labelClass,
+  panelClass,
+  squareControlShape,
+} from '../components/brutal.tsx'
 import { LoadError } from '../components/LoadError.tsx'
 import { LoadingScreen } from '../components/LoadingScreen.tsx'
 import { PendingBadge } from '../components/PendingBadge.tsx'
@@ -39,28 +46,29 @@ export function Settings() {
   if (isError) return <LoadError error={error} />
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-semibold tracking-tight text-ink">Settings</h1>
+    <div className="space-y-10">
+      <BrutalPageHeader title="Settings" />
 
-      <section className="rounded-2xl border border-edge bg-white p-6">
-        <div className="flex items-center gap-2">
-          <h2 className="text-xs font-semibold tracking-wide text-ink-soft uppercase">Currency</h2>
-          {setCurrency.isPending && <PendingBadge />}
+      <section className={`${panelClass} space-y-5 p-8`}>
+        <div className="space-y-2">
+          <div className="flex items-center gap-3">
+            <h2 className={labelClass}>Currency</h2>
+            {setCurrency.isPending && <PendingBadge />}
+          </div>
+          <p className="font-mono text-xs text-neutral-500">Changes the symbol on every amount. Nothing is converted.</p>
         </div>
-        <p className="mt-1 text-sm text-ink-soft">
-          Changes the symbol on every amount. Nothing is converted.
-        </p>
 
-        <div className="mt-4 grid gap-2 sm:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-2">
           {OPTIONS.map((c) => {
             const active = currency === c
             return (
               <label
                 key={c}
-                className={`flex cursor-pointer items-center gap-3 rounded-xl border p-4 transition-colors ${
-                  active ? 'border-brand bg-brand/5' : 'border-edge hover:bg-paper'
+                className={`flex cursor-pointer items-center gap-4 border border-black p-5 transition-colors has-[:disabled]:cursor-not-allowed ${
+                  active ? 'bg-black text-white' : 'bg-white text-black hover:bg-neutral-50'
                 }`}
               >
+                {/* Square, like every checkbox; white on the chosen (black) tile. */}
                 <input
                   type="radio"
                   name="currency"
@@ -68,13 +76,13 @@ export function Settings() {
                   checked={active}
                   disabled={setCurrency.isPending}
                   onChange={() => setPending(c)}
-                  className="accent-brand"
+                  className={`${squareControlShape} bg-white ${active ? 'border-white' : 'border-black'}`}
                 />
                 <span>
-                  <span className="block font-mono text-lg text-ink">
-                    {c === 'PHP' ? '₱' : '$'}
+                  <span className="block font-mono text-2xl font-bold">{c === 'PHP' ? '₱' : '$'}</span>
+                  <span className={`block font-mono text-xs uppercase ${active ? 'text-neutral-300' : 'text-neutral-500'}`}>
+                    {CURRENCY_LABELS[c]}
                   </span>
-                  <span className="block text-sm text-ink-soft">{CURRENCY_LABELS[c]}</span>
                 </span>
               </label>
             )
@@ -82,22 +90,20 @@ export function Settings() {
         </div>
 
         {unconfirmed && (
-          <div className="mt-3 space-y-1">
-            <p className="text-sm text-overdue">
-              That switch didn&rsquo;t confirm. Amounts are showing in{' '}
-              {CURRENCY_LABELS[currency]}, which is the last value read back &mdash; the change may
-              still have reached the backend. Reload to see what actually saved.
-            </p>
-            {detail !== '' && <p className="text-xs text-ink-soft">{detail}</p>}
+          <div className="space-y-1">
+            <BrutalFormError>
+              That switch didn&rsquo;t confirm. Amounts are showing in {CURRENCY_LABELS[currency]}, which is the last
+              value read back &mdash; the change may still have reached the backend. Reload to see what actually saved.
+            </BrutalFormError>
+            {detail !== '' && <p className="font-mono text-xs text-neutral-500">{detail}</p>}
           </div>
         )}
       </section>
 
       {pending && (
-        <ConfirmDialog
+        <BrutalConfirm
           open
-          tone="primary"
-          title="Switch currency?"
+          title="Switch currency"
           message={`Amounts will show in ${CURRENCY_LABELS[pending]}. Nothing is converted — existing records keep their figures.`}
           confirmLabel={`Switch to ${pending}`}
           onConfirm={() => {

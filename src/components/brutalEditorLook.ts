@@ -1,7 +1,7 @@
 import { panelClass, smallButtonBase } from './brutal.tsx'
 import type { EditorLook } from './RichTextEditor.tsx'
 
-/** RichTextEditor's chrome in the revamp's look (the Edit Task modal). Its
+/** RichTextEditor's chrome (the Edit Task modal). Its
  *  own module: a component file may only export components and primitives. */
 export const brutalEditorLook: EditorLook = {
   frame: 'border border-black bg-white',

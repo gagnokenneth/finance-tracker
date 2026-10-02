@@ -5,7 +5,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthContext.tsx'
 import { useAuth } from './auth/useAuth.ts'
 import { makeQueryClient, persistOptionsFor } from './lib/queryClient.ts'
-import { AppShell, FullWidthFrame, LegacyColumn } from './components/AppShell.tsx'
+import { AppShell } from './components/AppShell.tsx'
 import { ToastProvider } from './components/ToastProvider.tsx'
 import { Dashboard } from './pages/Dashboard.tsx'
 import { Tasks } from './pages/Tasks.tsx'
@@ -23,30 +23,23 @@ import { SignIn } from './pages/SignIn.tsx'
 function AuthedApp() {
   const { user } = useAuth()
   if (!user) return <SignIn />
-  // Dashboard, Tasks, Notes, Debts, Bills, Income, Savings and
-  // Settings are exposed. The other module pages still exist in
-  // src/pages/ but are deliberately unregistered; unknown paths land on
-  // the Dashboard. Calendar has no route of its own — it's embedded
-  // directly in Dashboard as <MonthCalendar>, not a separate page.
+  // Unknown paths land on the Dashboard. Calendar has no route of its own —
+  // it's embedded directly in Dashboard as <MonthCalendar>.
   return (
     <Routes>
       <Route element={<AppShell />}>
         <Route index element={<Navigate to="/dashboard" replace />} />
-        <Route element={<FullWidthFrame />}>
-          <Route path="dashboard" element={<Dashboard />} />
-          <Route path="tasks" element={<Tasks />} />
-          <Route path="notes" element={<Notes />} />
-          <Route path="notes/:id" element={<NoteDetail />} />
-          <Route path="debts" element={<Debts />} />
-          <Route path="debts/:id" element={<DebtDetail />} />
-          <Route path="bills" element={<Bills />} />
-          <Route path="bills/:id" element={<BillDetail />} />
-          <Route path="income" element={<Income />} />
-          <Route path="savings" element={<Savings />} />
-        </Route>
-        <Route element={<LegacyColumn />}>
-          <Route path="settings" element={<Settings />} />
-        </Route>
+        <Route path="dashboard" element={<Dashboard />} />
+        <Route path="tasks" element={<Tasks />} />
+        <Route path="notes" element={<Notes />} />
+        <Route path="notes/:id" element={<NoteDetail />} />
+        <Route path="debts" element={<Debts />} />
+        <Route path="debts/:id" element={<DebtDetail />} />
+        <Route path="bills" element={<Bills />} />
+        <Route path="bills/:id" element={<BillDetail />} />
+        <Route path="income" element={<Income />} />
+        <Route path="savings" element={<Savings />} />
+        <Route path="settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Route>
     </Routes>

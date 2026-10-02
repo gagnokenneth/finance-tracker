@@ -5,9 +5,8 @@ import { LOOKS, LookContext, controlClass, useLook } from './brutalLook.tsx'
 import type { LookName } from './brutalLook.tsx'
 
 /*
- * The monochrome "architectural" controls from the UI revamp. Kept apart from
- * ui.tsx rather than restyling it in place: Settings and SignIn, not yet
- * redesigned, still render the old controls.
+ * The app's monochrome "architectural" controls: black, white and the neutral
+ * scale, square corners, hard offset shadows.
  */
 
 /** The design's one interactive gesture: a flat control inverts to solid
@@ -33,7 +32,7 @@ export const cardClass =
 /** A static bordered panel — a note's editor, its checklist. */
 export const panelClass = 'border border-black bg-white shadow-hard-sm'
 
-/** A migrated page's main title, and the smaller one a detail page uses. */
+/** A list page's main title, and the smaller one a detail page uses. */
 export const pageTitleClass = 'text-5xl font-bold tracking-tight text-black uppercase md:text-6xl'
 export const detailTitleClass = 'text-4xl font-bold tracking-tight text-black uppercase md:text-5xl'
 /** A record's name heading its own bordered summary panel (a debt). */
@@ -164,9 +163,16 @@ export function BrutalCardRow({
   )
 }
 
+/** A square checkbox or radio's shape, without its colours. */
+export const squareControlShape =
+  'size-4 shrink-0 cursor-pointer appearance-none rounded-none border disabled:cursor-not-allowed disabled:opacity-50'
+
 /** Square checkbox, filled solid black when checked. */
-export const checkboxClass =
-  'size-4 shrink-0 cursor-pointer appearance-none rounded-none border border-black bg-white checked:bg-black disabled:cursor-not-allowed disabled:opacity-50'
+export const checkboxClass = `${squareControlShape} border-black bg-white checked:bg-black`
+
+/** Every chip's shape: a status badge, a descriptive tag, the Saving… badge. */
+export const chipClass =
+  'inline-block border px-2 py-0.5 font-mono text-[10px] font-bold tracking-wider whitespace-nowrap uppercase'
 
 /** One segment of a stepper; the middle (label) segment shares its frame but
  *  drops the hover and keeps only its top and bottom rules. */
@@ -203,7 +209,7 @@ export function BrutalStepper({
 
 /** A list page's header: big title, an optional summary line under it, its
  *  primary action, and the black rule beneath. */
-export function BrutalPageHeader({ title, summary, action }: { title: string; summary?: ReactNode; action: ReactNode }) {
+export function BrutalPageHeader({ title, summary, action }: { title: string; summary?: ReactNode; action?: ReactNode }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-4 border-b border-black pb-8">
       <div className="space-y-3">

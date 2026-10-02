@@ -3,8 +3,8 @@ import { EditorContent, useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import type { Editor } from '@tiptap/react'
 
-/** Class sets for the editor's chrome. The default is the original rounded
- *  look (Notes); a migrated screen passes its own (brutalEditorLook). */
+/** Class sets for the editor's chrome — see brutalEditorLook.ts: the Edit
+ *  Task modal's and the note page's. */
 export interface EditorLook {
   frame: string
   toolbar: string
@@ -13,15 +13,6 @@ export interface EditorLook {
   /** Extra classes on the Italic button's own label. */
   italicLabel: string
   content: string
-}
-
-const DEFAULT_LOOK: EditorLook = {
-  frame: 'rounded-lg border border-edge bg-white focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/15',
-  toolbar: 'flex items-center gap-1 border-b border-edge px-2 py-1',
-  button: 'rounded-md px-2 py-1 text-xs font-medium text-ink-soft transition-colors hover:bg-paper hover:text-ink',
-  active: 'bg-brand/10 text-brand',
-  italicLabel: '',
-  content: 'px-3 py-2 text-sm text-ink [&_.tiptap]:min-h-24',
 }
 
 const TOOLS: Array<{ label: string; mark: string; toggle: (editor: Editor) => void }> = [
@@ -40,12 +31,12 @@ export function RichTextEditor({
   value,
   onChange,
   autoFocus,
-  look: ui = DEFAULT_LOOK,
+  look: ui,
 }: {
   value: string
   onChange: (html: string) => void
   autoFocus?: boolean
-  look?: EditorLook
+  look: EditorLook
 }) {
   const editor = useEditor({
     extensions: [StarterKit],

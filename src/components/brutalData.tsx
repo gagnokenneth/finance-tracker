@@ -4,10 +4,17 @@ import type { RowStatus } from '../lib/debts.ts'
 import { Money } from './Money.tsx'
 import { PendingBadge } from './PendingBadge.tsx'
 import { DeleteIcon, EditIcon } from './icons.tsx'
-import { BrutalIconButton, labelClass, panelTitleClass, smallButtonClass, smallPrimaryButtonClass } from './brutal.tsx'
+import {
+  BrutalIconButton,
+  chipClass,
+  labelClass,
+  panelTitleClass,
+  smallButtonClass,
+  smallPrimaryButtonClass,
+} from './brutal.tsx'
 
 /*
- * The revamp's monochrome data displays: ledger tables and their cells, row
+ * The monochrome data displays: ledger tables and their cells, row
  * actions, chips, figures, stats and the summary panels that hold them.
  */
 
@@ -24,10 +31,7 @@ const STATUS_CLASS: Record<RowStatus, string> = {
   paid: 'border-neutral-300 bg-neutral-200 text-neutral-700',
 }
 
-/** Every chip's shape: a status badge or a descriptive tag. */
-const chipClass = 'inline-block border px-2 py-0.5 font-mono text-[10px] font-bold tracking-wider whitespace-nowrap uppercase'
-
-export function BrutalStatusBadge({ status }: { status: RowStatus }) {
+function BrutalStatusBadge({ status }: { status: RowStatus }) {
   return (
     <span className={`${chipClass} ${STATUS_CLASS[status]}`}>
       {ROW_STATUS_LABEL[status]}

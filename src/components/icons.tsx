@@ -47,7 +47,7 @@ export function DeleteIcon(props: SVGProps<SVGSVGElement>) {
   )
 }
 
-/** A date field's affordance — the revamp's custom date picker. */
+/** A date field's affordance — BrutalDatePicker. */
 export function CalendarIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <IconBase {...props} defaultSize="size-4">

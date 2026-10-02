@@ -1,7 +1,7 @@
 import { createContext, useContext } from 'react'
 
 /*
- * The revamp's look table and the context that carries it, apart from
+ * The look table and the context that carries it, apart from
  * brutal.tsx so controls in their own files (BrutalDatePicker) can share it:
  * a component file may only export components.
  */

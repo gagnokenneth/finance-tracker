@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useAuth } from '../auth/useAuth.ts'
 import { MIN_PASSWORD_LENGTH, USERNAME_RULE, isValidUsername } from '../auth/password.ts'
-import { Field, TextInput } from '../components/ui.tsx'
+import { BrutalButton, BrutalField, BrutalFormError, BrutalInput } from '../components/brutal.tsx'
 import { isLiveApi } from '../api/index.ts'
 
 type Mode = 'signin' | 'signup'
@@ -58,66 +58,63 @@ export function SignIn() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-paper px-4">
-      <div className="w-full max-w-sm rounded-2xl border border-edge bg-white p-8 shadow-lg shadow-ink/5">
+    <div className="flex min-h-screen items-center justify-center bg-neutral-50 px-4">
+      <div className="w-full max-w-sm border-2 border-black bg-white p-8 shadow-hard-lg">
         {/* A settled strip: the state this app exists to get you to. */}
-        <div aria-hidden className="flex gap-[3px]">
+        <div aria-hidden className="flex gap-1.5">
           {Array.from({ length: 12 }, (_, i) => (
-            <span key={i} className="h-1.5 flex-1 rounded-[2px] bg-settled" />
+            <span key={i} className="h-2.5 flex-1 border border-black bg-black" />
           ))}
         </div>
 
-        <h1 className="mt-6 text-2xl font-semibold tracking-tight text-ink">Finance Tracker</h1>
-        <p className="mt-2 text-sm text-ink-soft">
-          {creating
-            ? 'Create an account to start tracking your money.'
-            : 'Keep track of where your money stands.'}
+        <h1 className="mt-6 text-3xl font-bold tracking-tight text-black uppercase">Finance Tracker</h1>
+        <p className="mt-2 font-mono text-xs text-neutral-500">
+          {creating ? 'Create an account to start tracking your money.' : 'Keep track of where your money stands.'}
         </p>
 
-        <form onSubmit={submit} className="mt-8 flex flex-col gap-4">
-          <Field label="Username" required>
-            <TextInput
+        <form onSubmit={submit} className="mt-8 flex flex-col gap-5">
+          <BrutalField label="Username" htmlFor="signin-username" required>
+            <BrutalInput
+              id="signin-username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               autoComplete="username"
               autoCapitalize="none"
               required
             />
-          </Field>
-          <Field label="Password" required>
-            <TextInput
+          </BrutalField>
+          <BrutalField label="Password" htmlFor="signin-password" required>
+            <BrutalInput
+              id="signin-password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               autoComplete={creating ? 'new-password' : 'current-password'}
               required
             />
-          </Field>
+          </BrutalField>
           {creating && needsInvite && (
-            <Field label="Invite code" required>
-              <TextInput
+            <BrutalField label="Invite code" htmlFor="signin-invite" required>
+              <BrutalInput
+                id="signin-invite"
                 value={inviteCode}
                 onChange={(e) => setInviteCode(e.target.value)}
                 required
               />
-            </Field>
+            </BrutalField>
           )}
 
-          {error && <p className="text-sm text-overdue">{error}</p>}
+          {error && <BrutalFormError>{error}</BrutalFormError>}
 
-          <button
-            type="submit"
-            disabled={pending}
-            className="mt-2 w-full rounded-lg bg-ink py-2.5 text-sm font-medium text-white transition-colors hover:bg-ink/90 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-          >
+          <BrutalButton type="submit" disabled={pending} className="mt-1 w-full">
             {submitLabel}
-          </button>
+          </BrutalButton>
         </form>
 
         <button
           type="button"
           onClick={() => switchMode(creating ? 'signin' : 'signup')}
-          className="mt-5 text-sm text-ink-soft underline-offset-2 hover:text-ink hover:underline"
+          className="mt-6 font-mono text-xs text-black underline-offset-4 hover:underline"
         >
           {creating ? 'I already have an account' : 'Create an account'}
         </button>

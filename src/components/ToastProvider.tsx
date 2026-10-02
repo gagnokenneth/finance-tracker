@@ -1,5 +1,6 @@
 import { createContext, useCallback, useState } from 'react'
 import type { ReactNode } from 'react'
+import { BrutalIconButton, panelClass } from './brutal.tsx'
 
 export type ShowError = (message: string) => void
 
@@ -47,19 +48,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         className="pointer-events-none fixed inset-x-4 bottom-4 z-[70] flex flex-col items-center gap-2 md:inset-x-auto md:right-6 md:items-end"
       >
         {toasts.map((toast) => (
-          <div
-            key={toast.id}
-            className="pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-xl border border-overdue/30 bg-overdue-wash p-4 shadow-lg"
-          >
-            <p className="flex-1 text-sm text-ink">{toast.message}</p>
-            <button
-              type="button"
-              onClick={() => dismiss(toast.id)}
-              aria-label="Dismiss"
-              className="text-sm text-ink-soft hover:text-ink"
-            >
-              ✕
-            </button>
+          <div key={toast.id} className={`${panelClass} pointer-events-auto flex w-full max-w-sm items-start gap-3 p-4`}>
+            <span aria-hidden className="mt-1 size-2 shrink-0 bg-black" />
+            <p className="flex-1 font-mono text-xs text-black">{toast.message}</p>
+            <BrutalIconButton size="sm" label="Dismiss" className="font-mono text-xs" onClick={() => dismiss(toast.id)}>
+              ×
+            </BrutalIconButton>
           </div>
         ))}
       </div>

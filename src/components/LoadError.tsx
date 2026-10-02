@@ -1,4 +1,5 @@
 import { errorDetail } from '../lib/errorText.ts'
+import { labelClass, panelClass } from './brutal.tsx'
 
 /**
  * Shows what the backend actually said when a load fails. Setup problems —
@@ -9,9 +10,9 @@ export function LoadError({ error }: { error: unknown }) {
   const detail = errorDetail(error)
 
   return (
-    <div className="rounded-xl border border-edge bg-white p-6">
-      <p className="font-medium text-overdue">Could not load your data</p>
-      <p className="mt-1 text-sm text-ink-soft">
+    <div className={`${panelClass} p-6`}>
+      <p className={`${labelClass} text-sm`}>Could not load your data</p>
+      <p className="mt-2 font-mono text-xs text-neutral-500">
         {detail === '' ? 'Check your connection and reload the page.' : detail}
       </p>
     </div>
