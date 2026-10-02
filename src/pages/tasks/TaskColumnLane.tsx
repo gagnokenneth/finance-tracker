@@ -2,7 +2,7 @@ import { useDroppable } from '@dnd-kit/core'
 import { TaskCard } from './TaskCard.tsx'
 import { groupByDay } from '../../lib/tasks.ts'
 import { useInlineRename } from '../../hooks/useInlineRename.ts'
-import { BrutalAddButton } from '../../components/brutal.tsx'
+import { BrutalAddButton, inlineEditClass } from '../../components/brutal.tsx'
 import type { Task, TaskColumn } from '../../types.ts'
 
 /**
@@ -56,7 +56,7 @@ export function TaskColumnLane({
               onChange={(e) => rename.setDraft(e.target.value)}
               onBlur={rename.save}
               onKeyDown={rename.onKeyDown}
-              className="h-6 w-full min-w-0 rounded-none border border-black bg-white px-1.5 text-sm font-bold tracking-tight text-black uppercase focus:outline-none"
+              className={`${inlineEditClass} h-6 w-full min-w-0 px-1.5 text-sm font-bold tracking-tight text-black uppercase`}
             />
           ) : (
             <h3

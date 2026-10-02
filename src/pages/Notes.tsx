@@ -2,10 +2,8 @@ import { useState } from 'react'
 import { useFinanceData } from '../hooks/useFinanceData.ts'
 import { groupItemsByNote, doneCount, bodyPreview } from '../lib/notes.ts'
 import { isTemp } from '../lib/tempId.ts'
-import { CardRow } from '../components/CardRow.tsx'
 import { PendingBadge } from '../components/PendingBadge.tsx'
-import { EmptyState } from '../components/EmptyState.tsx'
-import { Button } from '../components/ui.tsx'
+import { BrutalButton, BrutalCardRow, BrutalEmptyState, pageTitleClass } from '../components/brutal.tsx'
 import { LoadError } from '../components/LoadError.tsx'
 import { LoadingScreen } from '../components/LoadingScreen.tsx'
 import { AddNoteModal } from './notes/AddNoteModal.tsx'
@@ -20,35 +18,37 @@ export function Notes() {
   const itemsByNote = groupItemsByNote(data.note_items)
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <h1 className="text-2xl font-semibold tracking-tight text-ink">Notes</h1>
-        <Button type="button" onClick={() => setAdding(true)}>
-          Add note
-        </Button>
+    <div className="space-y-10">
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-black pb-8">
+        <h1 className={pageTitleClass}>Notes</h1>
+        <BrutalButton type="button" onClick={() => setAdding(true)}>
+          + Add note
+        </BrutalButton>
       </div>
 
       {data.notes.length === 0 ? (
-        <EmptyState title="Nothing tracked yet">Jot down a note, or start a checklist on one.</EmptyState>
+        <BrutalEmptyState title="Nothing tracked yet">Jot down a note, or start a checklist on one.</BrutalEmptyState>
       ) : (
         <div className="space-y-3">
           {data.notes.map((note) => {
             const pending = isTemp(note.id)
-            const preview = bodyPreview(note)
             const { done, total } = doneCount(itemsByNote.get(note.id) ?? [])
+            const summary = [bodyPreview(note), total > 0 ? `${done} of ${total} done` : '']
+              .filter(Boolean)
+              .join(' · ')
             return (
-              <CardRow key={note.id} to={`/notes/${note.id}`} pending={pending}>
-                <div className="flex items-start justify-between gap-4">
-                  <span className="font-semibold tracking-tight text-ink">{note.title}</span>
-                  {pending && <PendingBadge />}
+              <BrutalCardRow
+                key={note.id}
+                to={`/notes/${note.id}`}
+                pending={pending}
+                className="flex items-center justify-between gap-4 px-5 py-6"
+              >
+                <div className="min-w-0 space-y-1">
+                  <p className="truncate text-base font-bold tracking-tight text-black">{note.title}</p>
+                  {summary && <p className="truncate font-mono text-xs text-neutral-500">{summary}</p>}
                 </div>
-                {preview && <p className="mt-1 text-sm text-ink-soft">{preview}</p>}
-                {total > 0 && (
-                  <p className="mt-1 text-sm text-ink-soft">
-                    {done} of {total} done
-                  </p>
-                )}
-              </CardRow>
+                {pending ? <PendingBadge /> : <span aria-hidden className="font-mono text-xs text-neutral-500">→</span>}
+              </BrutalCardRow>
             )
           })}
         </div>

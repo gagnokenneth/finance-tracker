@@ -35,10 +35,10 @@ function AuthedApp() {
         <Route element={<FullWidthFrame />}>
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="tasks" element={<Tasks />} />
-        </Route>
-        <Route element={<LegacyColumn />}>
           <Route path="notes" element={<Notes />} />
           <Route path="notes/:id" element={<NoteDetail />} />
+        </Route>
+        <Route element={<LegacyColumn />}>
           <Route path="debts" element={<Debts />} />
           <Route path="debts/:id" element={<DebtDetail />} />
           <Route path="bills" element={<Bills />} />

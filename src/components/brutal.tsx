@@ -1,4 +1,5 @@
 import { createContext, useContext } from 'react'
+import { Link } from 'react-router-dom'
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from 'react'
 import { useEscape } from '../hooks/useEscape.ts'
 
@@ -15,11 +16,22 @@ export const invertOnHover = 'transition-colors hover:bg-black hover:text-white'
 /** Bordered mono text-button, unpadded — sized by its caller. */
 export const smallButtonBase = `border border-black bg-white font-mono text-[11px] font-bold uppercase ${invertOnHover}`
 
-/** The Edit Task modal's "Move to…" actions. */
+/** Small bordered mono action — "Move to…", a checklist item's Remove. */
 export const smallButtonClass = `${smallButtonBase} px-2.5 py-1`
 
-/** A task's surface on the board — a lane card or a Backlog row. */
-export const cardClass = 'border border-black bg-white shadow-hard-xs transition-colors hover:bg-neutral-50'
+/** A clickable row's surface — a task card, a Backlog row, a note. */
+export const cardClass =
+  'border border-black bg-white shadow-hard-xs transition-colors hover:bg-neutral-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black'
+
+/** A static bordered panel — a note's editor, its checklist. */
+export const panelClass = 'border border-black bg-white shadow-hard-sm'
+
+/** A migrated page's main title, and the smaller one a detail page uses. */
+export const pageTitleClass = 'text-5xl font-bold tracking-tight text-black uppercase md:text-6xl'
+export const detailTitleClass = 'text-4xl font-bold tracking-tight text-black uppercase md:text-5xl'
+
+/** The box an inline rename swaps in for a title — sized by its text classes. */
+export const inlineEditClass = 'rounded-none border border-black bg-white focus:outline-2 focus:-outline-offset-2 focus:outline-black'
 
 /**
  * The two looks the designs use, as one table so a look is changed in one
@@ -72,7 +84,8 @@ const LOOKS = {
 
 type LookName = keyof typeof LOOKS
 
-const LookContext = createContext<LookName>('grid')
+/** Pages get 'plain'; a modal sets its own look for what it contains. */
+const LookContext = createContext<LookName>('plain')
 const useLook = () => LOOKS[useContext(LookContext)]
 
 export function BrutalModal({
@@ -128,6 +141,70 @@ export function BrutalModal({
   )
 }
 
+/** A bordered square icon action with a hard shadow — a page's Delete. */
+export function BrutalIconButton({
+  label,
+  className = '',
+  children,
+  ...props
+}: ButtonHTMLAttributes<HTMLButtonElement> & { label: string }) {
+  return (
+    <button
+      type="button"
+      title={label}
+      aria-label={label}
+      {...props}
+      className={`flex size-10 shrink-0 items-center justify-center border border-black bg-white shadow-hard-xs ${invertOnHover} ${className}`}
+    >
+      {children}
+    </button>
+  )
+}
+
+/**
+ * A list row linking to its detail page. A pending row is not a link: its id
+ * exists only in the cache, so the route would find nothing until the write
+ * returns the real one.
+ */
+export function BrutalCardRow({
+  to,
+  pending,
+  className = '',
+  children,
+}: {
+  to: string
+  pending: boolean
+  className?: string
+  children: ReactNode
+}) {
+  return pending ? (
+    <div className={`${cardClass} ${className}`}>{children}</div>
+  ) : (
+    <Link to={to} className={`${cardClass} ${className}`}>
+      {children}
+    </Link>
+  )
+}
+
+/** Square checkbox, filled solid black when checked. */
+export const checkboxClass =
+  'size-4 shrink-0 cursor-pointer appearance-none rounded-none border border-black bg-white checked:bg-black disabled:cursor-not-allowed disabled:opacity-50'
+
+/** The bordered "nothing here yet" block a list shows when it's empty. */
+export function BrutalEmptyState({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className="border border-black bg-white px-6 py-28 text-center md:py-36">
+      <div aria-hidden className="mb-6 flex justify-center gap-[6px]">
+        {Array.from({ length: 8 }, (_, i) => (
+          <span key={i} className="h-0.5 w-3 bg-neutral-500" />
+        ))}
+      </div>
+      <p className="text-sm font-bold tracking-wider text-black uppercase">{title}</p>
+      <p className="mt-2 text-sm text-neutral-500">{children}</p>
+    </div>
+  )
+}
+
 /** The solid black square "+" that adds a task to a lane or the Backlog. */
 export function BrutalAddButton({ className = '', ...props }: ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
@@ -174,7 +251,7 @@ export function BrutalField({
 }
 
 const controlClass =
-  'w-full rounded-none border border-black font-mono text-black transition-all focus:bg-white focus:outline-none'
+  'w-full rounded-none border border-black font-mono text-black transition-all focus:bg-white focus:outline-2 focus:-outline-offset-2 focus:outline-black'
 
 export function BrutalInput({ className = '', ...props }: InputHTMLAttributes<HTMLInputElement>) {
   const ui = useLook()

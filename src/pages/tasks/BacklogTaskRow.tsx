@@ -23,7 +23,7 @@ export function BacklogTaskRow({ task, onClick }: { task: Task; onClick: () => v
         type="button"
         disabled={pending}
         onClick={onClick}
-        className={`${cardClass} flex w-full items-center justify-between gap-3 px-4 py-3 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black disabled:pointer-events-none disabled:opacity-60`}
+        className={`${cardClass} flex w-full items-center justify-between gap-3 px-4 py-3 text-left disabled:pointer-events-none disabled:opacity-60`}
       >
         <span className="truncate text-sm font-bold tracking-tight text-black">{task.title}</span>
         {pending && <PendingBadge />}

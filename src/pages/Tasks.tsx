@@ -6,7 +6,7 @@ import { useFinanceMutations } from '../hooks/useFinanceMutations.ts'
 import { backlogTasks, tasksInWeek, groupByColumn, buildMoveInput } from '../lib/tasks.ts'
 import { sortedColumns, doneColumn } from '../lib/taskColumns.ts'
 import { isoDate, startOfWeek, addWeeks, weekWindow } from '../lib/currentMonth.ts'
-import { BrutalAddButton, invertOnHover, labelClass } from '../components/brutal.tsx'
+import { BrutalAddButton, invertOnHover, labelClass, pageTitleClass } from '../components/brutal.tsx'
 import { LoadError } from '../components/LoadError.tsx'
 import { LoadingScreen } from '../components/LoadingScreen.tsx'
 import { AddTaskModal } from './tasks/AddTaskModal.tsx'
@@ -71,7 +71,7 @@ export function Tasks() {
 
   return (
     <div className="space-y-10">
-      <h1 className="text-5xl font-bold tracking-tight text-black uppercase md:text-6xl">Tasks</h1>
+      <h1 className={pageTitleClass}>Tasks</h1>
 
       <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
         <div className="flex items-center">

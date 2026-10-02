@@ -6,11 +6,22 @@ import { useFinanceMutations } from '../hooks/useFinanceMutations.ts'
 import { useInlineRename } from '../hooks/useInlineRename.ts'
 import { itemsFor } from '../lib/notes.ts'
 import { isTemp } from '../lib/tempId.ts'
-import { Card } from '../components/Card.tsx'
-import { RowButton, DeleteButton, TextInput } from '../components/ui.tsx'
 import { RichTextEditor } from '../components/RichTextEditor.tsx'
+import { brutalPageEditorLook } from '../components/brutalEditorLook.ts'
+import { DeleteIcon } from '../components/icons.tsx'
 import { PendingBadge } from '../components/PendingBadge.tsx'
-import { ConfirmDialog } from '../components/ConfirmDialog.tsx'
+import {
+  BrutalButton,
+  BrutalConfirm,
+  BrutalIconButton,
+  BrutalInput,
+  BrutalSecondaryButton,
+  checkboxClass,
+  detailTitleClass,
+  inlineEditClass,
+  panelClass,
+  smallButtonClass,
+} from '../components/brutal.tsx'
 import { LoadError } from '../components/LoadError.tsx'
 import { LoadingScreen } from '../components/LoadingScreen.tsx'
 
@@ -46,92 +57,96 @@ export function NoteDetail() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
+    <div className="space-y-8">
+      <div className="flex items-center justify-between gap-4">
         {rename.renaming ? (
-          <TextInput
+          <input
             autoFocus
+            aria-label="Note title"
             value={rename.draft}
             onChange={(e) => rename.setDraft(e.target.value)}
             onBlur={rename.save}
             onKeyDown={rename.onKeyDown}
-            className="!w-auto text-2xl font-semibold tracking-tight text-ink"
+            className={`${detailTitleClass} ${inlineEditClass} min-w-0 flex-1 px-2`}
           />
         ) : (
           <h1
-            className={`text-2xl font-semibold tracking-tight text-ink ${!pending ? 'cursor-text hover:underline' : ''}`}
+            className={`${detailTitleClass} min-w-0 truncate ${!pending ? 'cursor-text hover:underline' : ''}`}
             onClick={() => !pending && rename.start()}
           >
             {note.title}
           </h1>
         )}
-        <DeleteButton type="button" onClick={() => setDeleting(true)} />
+        <BrutalIconButton label="Delete note" onClick={() => setDeleting(true)}>
+          <DeleteIcon className="size-4" />
+        </BrutalIconButton>
       </div>
 
-      <Card>
-        {pending ? (
-          <p className="text-sm text-ink-faint">Saving…</p>
-        ) : (
-          <RichTextEditor
-            value={note.body ?? ''}
-            onChange={(html) => updateNote.mutate({ id: note.id, patch: { body: html || null } })}
-          />
-        )}
-      </Card>
+      {pending ? (
+        <p className={`${panelClass} p-4 font-mono text-xs text-neutral-500`}>Saving…</p>
+      ) : (
+        <RichTextEditor
+          look={brutalPageEditorLook}
+          value={note.body ?? ''}
+          onChange={(html) => updateNote.mutate({ id: note.id, patch: { body: html || null } })}
+        />
+      )}
 
       {!pending && !showChecklist && (
-        <RowButton onClick={() => setChecklistOpen(true)}>Add checklist</RowButton>
+        <BrutalSecondaryButton type="button" className="shadow-hard-xs" onClick={() => setChecklistOpen(true)}>
+          + Add checklist
+        </BrutalSecondaryButton>
       )}
 
       {showChecklist && (
-        <Card>
-          <div className="space-y-3">
-            <form onSubmit={addItem} className="flex items-center gap-2">
-              <TextInput
-                value={newItemText}
-                onChange={(e) => setNewItemText(e.target.value)}
-                placeholder="Add an item…"
-              />
-              <RowButton type="submit" tone="primary">
-                Add
-              </RowButton>
-            </form>
-            {items.length === 0 ? (
-              <p className="text-sm text-ink-faint">No items yet.</p>
-            ) : (
-              <ul className="divide-y divide-edge">
-                {items.map((item) => {
-                  const itemPending = isTemp(item.id)
-                  return (
-                    <li key={item.id} className="flex items-center gap-3 py-2">
-                      <input
-                        type="checkbox"
-                        checked={item.done}
-                        disabled={itemPending}
-                        onChange={(e) =>
-                          updateNoteItem.mutate({ id: item.id, patch: { done: e.target.checked } })
-                        }
-                      />
-                      <span className={`flex-1 text-sm ${item.done ? 'text-ink-faint line-through' : 'text-ink'}`}>
-                        {item.text}
-                      </span>
-                      {itemPending ? (
-                        <PendingBadge />
-                      ) : (
-                        <RowButton tone="danger" onClick={() => deleteNoteItem.mutate(item.id)}>
-                          Remove
-                        </RowButton>
-                      )}
-                    </li>
-                  )
-                })}
-              </ul>
-            )}
-          </div>
-        </Card>
+        <div className={`${panelClass} space-y-4 p-6`}>
+          <form onSubmit={addItem} className="flex items-stretch gap-3">
+            <BrutalInput
+              aria-label="New checklist item"
+              value={newItemText}
+              onChange={(e) => setNewItemText(e.target.value)}
+              placeholder="Add an item…"
+              className="min-w-0 flex-1 placeholder:text-neutral-500"
+            />
+            <BrutalButton type="submit" className="shadow-hard-xs">
+              Add
+            </BrutalButton>
+          </form>
+          {items.length === 0 ? (
+            <p className="font-mono text-xs text-neutral-500">No items yet.</p>
+          ) : (
+            <ul className="divide-y divide-black border-y border-black">
+              {items.map((item) => {
+                const itemPending = isTemp(item.id)
+                return (
+                  <li key={item.id} className="flex items-center gap-3 py-3">
+                    <input
+                      type="checkbox"
+                      aria-label={item.text}
+                      className={checkboxClass}
+                      checked={item.done}
+                      disabled={itemPending}
+                      onChange={(e) => updateNoteItem.mutate({ id: item.id, patch: { done: e.target.checked } })}
+                    />
+                    <span className={`flex-1 font-mono text-sm ${item.done ? 'text-neutral-400 line-through' : 'text-black'}`}>
+                      {item.text}
+                    </span>
+                    {itemPending ? (
+                      <PendingBadge />
+                    ) : (
+                      <button type="button" className={smallButtonClass} onClick={() => deleteNoteItem.mutate(item.id)}>
+                        Remove
+                      </button>
+                    )}
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </div>
       )}
 
-      <ConfirmDialog
+      <BrutalConfirm
         open={deleting}
         title="Delete note"
         message={`Delete "${note.title}"? This cannot be undone.`}
