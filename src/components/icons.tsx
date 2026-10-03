@@ -56,3 +56,21 @@ export function CalendarIcon(props: SVGProps<SVGSVGElement>) {
     </IconBase>
   )
 }
+
+/** The mobile nav's toggle — three bars while closed. */
+export function MenuIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <IconBase strokeWidth={2} strokeLinecap="square" {...props} defaultSize="size-4">
+      <path d="M4 7h16M4 12h16M4 17h16" />
+    </IconBase>
+  )
+}
+
+/** The mobile nav's toggle while open. */
+export function CloseIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <IconBase strokeWidth={2} strokeLinecap="square" {...props} defaultSize="size-4">
+      <path d="M6 6l12 12M18 6L6 18" />
+    </IconBase>
+  )
+}

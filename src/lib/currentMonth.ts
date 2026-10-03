@@ -137,3 +137,11 @@ export function monthLabel(month: string): string {
   const [year, monthNum] = month.split('-').map(Number)
   return MONTH_LABEL.format(new Date(year, monthNum - 1, 1))
 }
+
+const DAY_LABEL = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
+
+/** A yyyy-mm-dd day as it is shown, e.g. "Saturday, Oct 3". */
+export function dayLabel(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  return DAY_LABEL.format(new Date(y, m - 1, d))
+}

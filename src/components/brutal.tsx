@@ -13,6 +13,9 @@ import type { LookName } from './brutalLook.tsx'
  *  black on hover. Shared by the nav, the calendar and every control here. */
 export const invertOnHover = 'transition-colors hover:bg-black hover:text-white'
 
+/** The keyboard-focus ring for a control without a native one of its own. */
+export const focusRing = 'focus-visible:outline-2 focus-visible:outline-black'
+
 /** A small button's shape and type, without its colours. */
 const smallButtonShape = 'border border-black font-mono text-[11px] font-bold uppercase'
 
@@ -27,7 +30,7 @@ export const smallPrimaryButtonClass = `${smallButtonShape} bg-black px-3 py-1 t
 
 /** A clickable row's surface — a task card, a Backlog row, a note. */
 export const cardClass =
-  'border border-black bg-white shadow-hard-xs transition-colors hover:bg-neutral-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black'
+  `border border-black bg-white shadow-hard-xs transition-colors hover:bg-neutral-50 focus-visible:outline-offset-2 ${focusRing}`
 
 /** A static bordered panel — a note's editor, its checklist. */
 export const panelClass = 'border border-black bg-white shadow-hard-sm'
